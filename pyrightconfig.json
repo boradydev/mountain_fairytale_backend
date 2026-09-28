@@ -1,0 +1,22 @@
+{
+  "include": ["src", "tests"],
+  "exclude": ["src/migrations"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["."],
+  "pythonVersion": "3.13",
+  "reportMissingImports": true,
+  "typeCheckingMode": "strict",
+  "reportMissingModuleSource": "none",
+  "reportUnknownParameterType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportMissingParameterType": false,
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "reportPrivateUsage": "none"
+    }
+  ]
+}
