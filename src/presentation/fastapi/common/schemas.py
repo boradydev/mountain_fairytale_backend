@@ -16,7 +16,7 @@ class BaseSchema(BaseSchemaOrigin):
     )
 
 
-class StdResponse[Data]:
+class StdResponse[Data](BaseSchema):
     offset: int | None = None
     limit: int | None = None
     total: int | None = None
