@@ -351,23 +351,21 @@ standard-no-fastapi-cloud-cli = ["email-validator (>=2.0.0)", "fastapi-cli[stand
 
 [[package]]
 name = "ftl-extract"
-version = "0.10.0"
+version = "0.12.1"
 description = "Extract fluent keys from python code and organize them in .ftl files"
 optional = false
 python-versions = "<3.15,>=3.11"
 groups = ["dev"]
 files = [
-    {file = "ftl_extract-0.10.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d2719fd6e01ec3c9500fb0281d9145d4413c3ad0f104755e7a4582eec52d767d"},
-    {file = "ftl_extract-0.10.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:1a4098b32bd4d4ee88deaa4d666807b8514a4e6735c6b24aa2711d8c0ef6741a"},
-    {file = "ftl_extract-0.10.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:d48fdb337039abd66bf76ff6f0df132ac4bf4f31ca65357de22263f79193e55a"},
-    {file = "ftl_extract-0.10.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:7ac31d84fef0a3b1b7f2738b22325bbae70f6f3c9c1ea419e30f4c07a257b32e"},
-    {file = "ftl_extract-0.10.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:d1a283ecf4efe786f7180f60a46d5ec79d3570401a2b26a6e3ea92caf26ed47b"},
-    {file = "ftl_extract-0.10.0-py3-none-win_amd64.whl", hash = "sha256:a53b27ca75140ed043f5b6405e3960b6c769db228bcb63822fa67635ca26aec8"},
-    {file = "ftl_extract-0.10.0.tar.gz", hash = "sha256:b52494a527804da918253731ced88bee25cd0d8cede98d1ccc183c7988c638ae"},
+    {file = "ftl_extract-0.12.1-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:469af6719a331eafa4a361dd38e2020b0d364c86baa504698515d3ff4e9b0786"},
+    {file = "ftl_extract-0.12.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:66c68f85db4a264ec4acd0b5c6256af8e9743cd9cdbcb80a36ba629223c83446"},
+    {file = "ftl_extract-0.12.1-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:75a82418abcf602880ed9ee45fcdb0982cf3bf045d0af198ad38c60dfc535096"},
+    {file = "ftl_extract-0.12.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:173025bfb570a1b591148e55cfaf2554d792f011a787af269c1a29b386eae2e0"},
+    {file = "ftl_extract-0.12.1-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:2d729e81f7e8e3c38393474d759ad6744541daa1b68d9106e5aab9515dc5b2eb"},
+    {file = "ftl_extract-0.12.1-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:a815c8c3b11c2d7ef7e91c6d3f57cc777ffa4425da655d90b8449b08c3115ade"},
+    {file = "ftl_extract-0.12.1-py3-none-win_amd64.whl", hash = "sha256:2795ea6be6e22fb08c368fb97144a2850a8b1d53f3f82d14fe7a4cbf4cd52721"},
+    {file = "ftl_extract-0.12.1.tar.gz", hash = "sha256:849772f68a33d3d8419c921fc9d570366bdeb54af5f7294cf50caa8a421c0444"},
 ]
-
-[package.extras]
-dev = ["cibuildwheel (==3.4.0)", "isort (==8.0.1)", "pre-commit (==4.5.1)", "ruff (==0.15.5)", "setuptools (==82.0.0)", "setuptools-rust (==1.12.0)", "wheel (==0.46.3)"]
 
 [[package]]
 name = "h11"
@@ -1330,4 +1328,4 @@ standard = ["colorama (>=0.4) ; sys_platform == \"win32\"", "httptools (>=0.6.3)
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.13"
-content-hash = "180546148d5348c8c64444f33dcc9eedad205226a29ce6ad5ffd82c26860d4a5"
+content-hash = "6b3d3cc07bfcd5dce896bccc96bab32cb6f775f41daf6929f750e6cf716c74de"
