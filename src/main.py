@@ -1,12 +1,12 @@
 import dotenv
 import uvicorn
 
-from src.settings import StartupSettings
+from src.settings import UvicornSettings
 
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
-    settings = StartupSettings()
+    settings = UvicornSettings()
     uvicorn.run(
         app=settings.FASTAPI_APP,
         host=settings.APP_HOST,
