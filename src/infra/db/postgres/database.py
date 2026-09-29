@@ -9,18 +9,6 @@ from src.infra.db.postgres.settings import PostgresSettings
 
 
 class Postgres:
-    """
-    Управляет жизненным циклом подключений к базе данных PostgreSQL.
-
-    Этот класс инкапсулирует создание асинхронного движка (Engine) и фабрики
-    сессий, обеспечивая централизованное управление ресурсами БД.
-
-    Attributes:
-        _engine: Экземпляр асинхронного движка SQLAlchemy.
-        _session_factory : Фабрика для генерации
-            новых асинхронных сессий.
-    """
-
     _engine: AsyncEngine
     _session_factory: async_sessionmaker[AsyncSession]
 
@@ -32,10 +20,10 @@ class Postgres:
         Инициализирует PostgresDB и настраивает пул соединений.
 
         Args:
-            settings: Настройки нужны дял url.
+            settings: Настройки нужны для url.
         """
         _settings = settings or PostgresSettings()
-        _engine = create_async_engine(url=_settings.DB_URL_ASYNC)
+        self._engine = create_async_engine(url=_settings.DB_URL_ASYNC)
         self._session_factory = async_sessionmaker(
             bind=self._engine,
             expire_on_commit=False,
