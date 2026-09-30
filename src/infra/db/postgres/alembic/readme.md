@@ -1,7 +1,7 @@
 ## Создание миграции
 #### Команда запускается из корня проекта. Необходимо явно указать путь к файлу ``alembic.ini.``
 ```bash
-poetry run alembic -c src/infrastructure/db/postgres/alembic.ini revision
+poetry run alembic -c src/infra/db/postgres/alembic/alembic.ini revision
 ```
 ## Подготовка миграций к публикации
 #### Упаковывает миграции в отдельную папку.
@@ -15,7 +15,7 @@ poetry run alembic -c src/infrastructure/db/postgres/alembic.ini revision
         ├── migration.py
         └── update.sql
 ```bash
-poetry run python src/infrastructure/db/postgres/alembic/migrations/move_migrations.py --sql
+poetry run python src/infra/db/postgres/alembic/migrations/move_migrations.py --sql
 ```
 
 ## Выполнение SQL-файлов

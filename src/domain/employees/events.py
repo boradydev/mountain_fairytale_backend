@@ -4,7 +4,6 @@ from typing import Any
 from uuid6 import UUID
 
 from src.domain.common.events import BaseDomainEvent
-from src.domain.employees import vals
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

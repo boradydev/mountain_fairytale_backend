@@ -13,7 +13,7 @@ from src.infra.db.postgres.alembic.migrations.sql_reader import sql_reader
 
 # revision identifiers, used by Alembic.
 revision: str = 'e74dbe1c27eb'
-down_revision: Union[str, Sequence[str], None] = 'e7dc382495aa'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
