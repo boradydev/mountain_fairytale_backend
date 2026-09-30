@@ -1,19 +1,21 @@
 from types import NoneType
-from typing import Annotated
 
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status
 
-from src.presentation.fastapi.common.deps import get_access_token_pyload
+from src.presentation.fastapi.common.deps import AccessTokenPayloadDep
 from src.presentation.fastapi.common.schemas import StdResponse
-from src.presentation.fastapi.employees.schemas import AuthTokensResp, EmployeesResp, \
-    EmployeeResp, \
-    CredsReq, RefreshTokenReq, AccessTokenPyload
+from src.presentation.fastapi.employees.schemas import (
+    AuthTokensResp,
+    CredsReq,
+    EmployeeResp,
+    EmployeesResp,
+    RefreshTokenReq,
+)
 
-AUTH_TAGS = ["Авторизация и аутентификация сотрудников"]
 
 auth_router = APIRouter(
     prefix="/auth",
-    tags=AUTH_TAGS,
+    tags=["Авторизация и аутентификация сотрудников"],
 )
 
 
@@ -28,6 +30,7 @@ async def login(
     assert CredsReq
     return StdResponse()
 
+
 @auth_router.post(
     "/refresh",
     status_code=status.HTTP_200_OK,
@@ -35,17 +38,17 @@ async def login(
 )
 async def refresh(
     body: RefreshTokenReq,
+    access_token_pyload: AccessTokenPayloadDep,
 ) -> StdResponse[AuthTokensResp]:
     assert RefreshTokenReq
     return StdResponse()
 
 
-ME_TAGS = ["Logout сотрудника"]
-
 me_router = APIRouter(
     prefix="/me",
-    tags=ME_TAGS,
+    tags=["Logout сотрудника"],
 )
+
 
 @me_router.post(
     "/logout",
@@ -53,18 +56,16 @@ me_router = APIRouter(
     response_model=StdResponse[NoneType],
 )
 async def refresh(
-    access_token_pyload: Annotated[AccessTokenPyload, Depends(get_access_token_pyload)],
+    access_token_pyload: AccessTokenPayloadDep,
     refresh_token: RefreshTokenReq,
 ) -> StdResponse[AuthTokensResp]:
     assert RefreshTokenReq
     return StdResponse()
 
 
-EMPLOYEES_TAGS = ["Crud сотрудников для использования админом"]
-
 employees_router = APIRouter(
     prefix="/employees",
-    tags=EMPLOYEES_TAGS,
+    tags=["Crud сотрудников для использования админом"],
 )
 
 employees_router.get(

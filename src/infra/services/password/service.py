@@ -1,7 +1,9 @@
 from pwdlib import PasswordHash
 
+from src.app.common.abcs.services.password_service import IPasswordService
 
-class PasswordService:
+
+class PasswordService(IPasswordService):
     """Сервис хэширования и проверки паролей."""
 
     def __init__(self) -> None:

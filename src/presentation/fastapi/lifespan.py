@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.infra.db.postgres.database import Postgres
-from src.infra.deps.app_ctx import AppContext
+from src.presentation.fastapi.common.app_context import AppContext
 from src.infra.services.password.service import PasswordService
 from src.infra.services.token.service import JwtTokenService
 

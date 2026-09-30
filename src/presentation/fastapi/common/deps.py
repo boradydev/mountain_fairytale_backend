@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.requests import Request
 
-from src.infra.deps.app_ctx import AppContext
+from src.presentation.fastapi.common.app_context import AppContext
 from src.presentation.fastapi.common.excs import UnauthorizedHTTPException
 from src.presentation.fastapi.employees.schemas import AccessTokenPyload
 
@@ -24,3 +24,5 @@ def get_access_token_pyload(
         raise UnauthorizedHTTPException
 
     return ctx.token_service.get_payload_access_token(access_token=access_token)
+
+AccessTokenPayloadDep = Annotated[AccessTokenPyload, Depends(get_access_token_pyload)]

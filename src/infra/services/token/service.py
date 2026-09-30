@@ -5,6 +5,7 @@ import jwt
 from jwt import InvalidTokenError
 
 from src.infra.services.token.settings import JwtSettings
+from src.presentation.fastapi.common.abcs import ITokenService
 from src.presentation.fastapi.common.excs import UnauthorizedHTTPException
 from src.presentation.fastapi.employees.schemas import (
     AccessTokenPyload,
@@ -12,7 +13,7 @@ from src.presentation.fastapi.employees.schemas import (
 )
 
 
-class JwtTokenService:
+class JwtTokenService(ITokenService):
     """Сервис создания и проверки JWT токенов."""
 
     def __init__(
