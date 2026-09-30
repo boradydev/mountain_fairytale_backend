@@ -75,6 +75,7 @@ uuid6 = "^2025.0.1"
 sqlalchemy = { version = "^2.0.46", extras = ["asyncio"] }
 pyjwt = "2.13.0"
 inflection = "^0.5.1"
+pwdlib = { version = "^0.3.0", extras = ["argon2"] }
 
 
 [build-system]

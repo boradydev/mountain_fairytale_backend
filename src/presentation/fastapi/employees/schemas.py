@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import Field
@@ -30,6 +31,9 @@ class EmployeesResp(BaseSchema):
 class AccessTokenPyload(BaseSchema):
     employee_id: str
     role: str
+    exp: datetime
+
 
 class RefreshTokenPyload(BaseSchema):
     employee_id: str
+    exp: datetime
