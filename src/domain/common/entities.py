@@ -6,22 +6,6 @@ from src.domain.common.events import BaseDomainEvent, FieldChange
 
 @dataclass
 class BaseEntity:
-    """
-    Базовая доменная сущность.
-
-    Attributes:
-        _events (List[BaseDomainEvent]): Список накопленных доменных событий.
-            Используемые параметры field:
-                ``init=False``: Поле исключено из __init__, так как события
-                    генерируются внутри методов сущности, а не передаются извне
-                ``repr=False``: Поле исключено из строкового представления (repr),
-                    чтобы не засорять логи техническими деталями событий
-                ``compare=False``: Поле не участвует в сравнении объектов (==), так как
-                    наличие или отсутствие событий не меняет идентичность сущности
-                ``default_factory=list``: Гарантирует создание нового пустого списка
-                    для каждого экземпляра, избегая проблемы разделяемого состояния
-    """
-
     _events: list[BaseDomainEvent] = field(
         init=False,
         repr=False,
@@ -29,20 +13,26 @@ class BaseEntity:
         default_factory=list,
     )
 
+    _changes: dict[str, FieldChange] = field(
+        init=False,
+        repr=False,
+        compare=False,
+        default_factory=dict,
+    )
+
     def _add_event(self, event: BaseDomainEvent) -> None:
-        """Добавляет событие."""
         self._events.append(event)
 
     def pull_events(self) -> list[BaseDomainEvent]:
-        """Забирает все накопленные события и очищает список."""
         events = self._events.copy()
         self._events.clear()
         return events
 
     def _apply_update_changes(
-        self, payload: dict[str, Any], allowed_fields: set[str]
+        self,
+        payload: dict[str, Any],
+        allowed_fields: set[str],
     ) -> dict[str, FieldChange]:
-        """Приватный метод для вычисления dirty-полей и обновления внутреннего состояния."""
         changes: dict[str, FieldChange] = {}
 
         for key, new_value in payload.items():
@@ -55,7 +45,20 @@ class BaseEntity:
             if new_value is None or current_value == new_value:
                 continue
 
-            changes[key] = FieldChange(old=current_value, new=new_value)
+            change = FieldChange(
+                old=current_value,
+                new=new_value,
+            )
+
+            changes[key] = change
+            self._changes[key] = change
+
             setattr(self, private_attr_name, new_value)
 
         return changes
+
+    def get_changes(self) -> dict[str, FieldChange]:
+        return self._changes.copy()
+
+    def clear_changes(self) -> None:
+        self._changes.clear()
