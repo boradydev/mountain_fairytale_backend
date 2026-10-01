@@ -23,6 +23,7 @@ class EmployeeSQL:
     # Статические сырые запросы
     ADD = text(sql_reader("add.sql", __file__))
     GET_BY_ID = text(sql_reader("get_by_id.sql", __file__))
+    GET_BY_USERNAME = text(sql_reader("get_by_username.sql", __file__))
     GET_ALL = text(sql_reader("get_all.sql", __file__))
 
     @classmethod

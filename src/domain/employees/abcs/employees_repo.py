@@ -21,5 +21,12 @@ class IEmployeesRepository(ABC):
         """Возвращает сотрудника по идентификатору."""
 
     @abstractmethod
+    async def get_by_username(
+        self,
+        username: str,
+    ) -> Employee | None:
+        """Возвращает сотрудника по имени пользователя."""
+
+    @abstractmethod
     async def get_all(self) -> list[Employee]:
         """Возвращает всех сотрудников."""

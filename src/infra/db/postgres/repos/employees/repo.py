@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.employees.abcs.repo import IEmployeesRepository
+from src.domain.employees.abcs.employees_repo import IEmployeesRepository
 from src.domain.employees.entities import Employee
 from src.infra.db.postgres.repos.employees.sql.registry import EmployeeSQL
 
@@ -55,6 +55,31 @@ class EmployeesRepository(IEmployeesRepository):
             EmployeeSQL.GET_BY_ID,
             {
                 "employee_id": employee_id,
+            },
+        )
+
+        row = result.mappings().one_or_none()
+
+        if row is None:
+            return None
+
+        return Employee(
+            _employee_id=row["employee_id"],
+            _username=row["username"],
+            _password_hash=row["password_hash"],
+            _role=row["role"],
+            _is_active=row["is_active"],
+            _created_at=row["created_at"],
+        )
+
+    async def get_by_username(
+        self,
+        username: str,
+    ) -> Employee | None:
+        result = await self._session.execute(
+            EmployeeSQL.GET_BY_USERNAME,
+            {
+                "username": username,
             },
         )
 
