@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.app.common.abcs.uow import InterfaceUOW
-from src.domain.employees.abcs.repo import IEmployeesRepository
+from src.domain.employees.abcs.employees_repo import IEmployeesRepository
 
 
 class IEmployeesUOW(InterfaceUOW, ABC):
