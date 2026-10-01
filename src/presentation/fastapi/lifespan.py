@@ -7,7 +7,7 @@ from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.services.event_publisher.service import EventPublisher
 from src.infra.services.password.service import PasswordService
 from src.infra.services.token.service import JwtTokenService
-from src.presentation.fastapi.common.app_context import AppContext
+from src.infra.factories.app_context import AppContext
 
 
 @asynccontextmanager

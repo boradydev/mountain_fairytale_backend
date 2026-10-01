@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.requests import Request
 
-from src.presentation.fastapi.common.app_context import AppContext
+from src.infra.factories.app_context import AppContext
 from src.presentation.fastapi.common.excs import UnauthorizedHTTPException
 from src.presentation.fastapi.employees.schemas import AccessTokenPyload
 
