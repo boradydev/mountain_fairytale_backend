@@ -22,6 +22,7 @@ async def test_add_and_get_by_id(postgres) -> None:
             actor_id=uuid7(),
             username=username,
             password_hash="hash",
+            role="employee"
         )
 
         await repository.add(employee)
@@ -61,12 +62,14 @@ async def test_get_all(postgres) -> None:
             actor_id=uuid7(),
             username=username1,
             password_hash="hash1",
+            role="employee"
         )
 
         second = Employee.create(
             actor_id=uuid7(),
             username=username2,
             password_hash="hash2",
+            role="employee"
         )
 
         await repository.add(first)
@@ -92,6 +95,7 @@ async def test_update_changes_only_modified_fields(postgres) -> None:
             actor_id=uuid7(),
             username=username_original,
             password_hash="original_hash",
+            role="employee"
         )
 
         await repository.add(employee)
@@ -130,6 +134,7 @@ async def test_update_multiple_fields_in_one_query(postgres) -> None:
             actor_id=uuid7(),
             username=username_original,
             password_hash="original_hash",
+            role="employee"
         )
 
         await repository.add(employee)
@@ -171,6 +176,7 @@ async def test_deactivate(postgres) -> None:
             actor_id=uuid7(),
             username=username,
             password_hash="hash",
+            role="employee"
         )
 
         await repository.add(employee)
@@ -205,6 +211,7 @@ async def test_update_without_changes_does_nothing(postgres) -> None:
             actor_id=uuid7(),
             username=username,
             password_hash="hash",
+            role="employee"
         )
 
         await repository.add(employee)
@@ -242,3 +249,36 @@ async def test_update_without_changes_does_nothing(postgres) -> None:
         result = await repository.get_by_id(employee.employee_id)
         assert result is not None
         assert result.username == username
+
+
+@pytest.mark.integration
+async def test_get_by_username(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+        username = get_unique_username("alex")
+
+        employee = Employee.create(
+            actor_id=uuid7(),
+            username=username,
+            password_hash="hash",
+            role="employee"
+        )
+
+        await repository.add(employee)
+        await session.commit()
+
+        result = await repository.get_by_username(username)
+
+        assert result is not None
+        assert result.employee_id == employee.employee_id
+        assert result.username == username
+
+
+@pytest.mark.integration
+async def test_get_by_username_returns_none_for_unknown_username(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        result = await repository.get_by_username("non_existent_user")
+
+        assert result is None
