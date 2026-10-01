@@ -12,3 +12,8 @@ class InvalidCredentialsException(DomainException):
 @dataclass(frozen=True, slots=True)
 class EmployeeNotFoundException(DomainException):
     employee_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeNotFoundByUsernameException(DomainException):
+    username: str
