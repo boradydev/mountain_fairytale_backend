@@ -15,15 +15,11 @@ from src.infra.factories.app_context import AppContext
 async def lifespan(app: FastAPI):
     """Управляет жизненным циклом ресурсов приложения."""
     postgres = Postgres()
-    event_publisher = EventPublisher(
-        session_factory=postgres.session_factory,
-    )
     token_service = JwtTokenService()
     passwd_service = PasswordService()
 
     employees_use_cases = EmployeesUseCaseFactory(
         session_factory=postgres.session_factory,
-        event_publisher=event_publisher,
         password_service=passwd_service,
     )
 
@@ -31,7 +27,6 @@ async def lifespan(app: FastAPI):
         postgres_session_factory=postgres.session_factory,
         token_service=token_service,
         passwd_service=passwd_service,
-        event_publisher=event_publisher,
         employees_use_cases=employees_use_cases,
     )
 
@@ -44,5 +39,4 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await event_publisher.wait_pending()
     await postgres.dispose()

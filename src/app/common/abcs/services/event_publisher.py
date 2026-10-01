@@ -11,7 +11,12 @@ class IEventPublisher(ABC):
     """
 
     @abstractmethod
-    async def publish_many(self, *, events: list[BaseDomainEvent]) -> None:
+    async def publish_many(
+        self,
+        *,
+        events: list[BaseDomainEvent],
+    ) -> None:
+        pass
         """
         Оптимизированная публикация списка событий.
 

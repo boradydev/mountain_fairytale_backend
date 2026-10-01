@@ -1,11 +1,11 @@
-import asyncio
+# src/infra/services/event_publisher/service.py
 import logging
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
 from src.app.common.abcs.services.event_publisher import IEventPublisher
@@ -18,12 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class EventPublisher(IEventPublisher):
-    def __init__(
-        self,
-        session_factory: async_sessionmaker[AsyncSession],
-    ) -> None:
-        self._session_factory = session_factory
-        self._tasks: set[asyncio.Task[None]] = set()
+    """
+    Публишер доменных событий.
+    Создается внутри UOW и использует его сессию.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
 
     async def publish_many(
         self,
@@ -33,44 +34,24 @@ class EventPublisher(IEventPublisher):
         if not events:
             return
 
-        task = asyncio.create_task(
-            self._save_events(events),
-        )
-
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-
-    async def wait_pending(self) -> None:
-        """Ожидает завершения всех фоновых задач сохранения событий."""
-        if not self._tasks:
-            return
-
-        await asyncio.gather(
-            *self._tasks,
-        )
-
-    async def _save_events(
-        self,
-        events: list[BaseDomainEvent],
-    ) -> None:
         try:
             records = [self._to_record(event) for event in events]
 
-            async with self._session_factory() as session:
-                repository = EventsRepository(
-                    session=session,
-                )
+            # Передаем внутреннюю сессию в репозиторий событий
+            repository = EventsRepository(
+                session=self._session,
+            )
 
-                await repository.add_many(
-                    records=records,
-                )
-
-                await session.commit()
+            await repository.add_many(
+                records=records,
+            )
 
         except Exception:
             logger.exception(
-                "Failed to save domain events.",
+                "Failed to save domain events inside transaction.",
             )
+            raise
+
 
     @staticmethod
     def _to_record(
