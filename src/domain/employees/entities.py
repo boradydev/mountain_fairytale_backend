@@ -18,10 +18,22 @@ class Employee(BaseEntity):
     _is_active: bool
     _created_at: datetime
 
+    # Единственный источник правды для ID и колонок
+    ID_FIELD = "employee_id"
+
+    # Поля, доступные для изменения через общий метод update()
     _ALLOWED_UPDATE_FIELDS = {
         "username",
         "password_hash",
     }
+
+    # ЕДИНСТВЕННАЯ ТОЧКА ПРАВДЫ ДЛЯ БАЗЫ ДАННЫХ
+    # Сюда входят вообще все поля домена, которые могут измениться в течение жизни сущности
+    UPDATABLE_DATABASE_COLUMNS = frozenset([
+        "username",
+        "password_hash",
+        "is_active"
+    ])
 
     @classmethod
     def create(
