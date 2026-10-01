@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.app.common.abcs.services.event_publisher import IEventPublisher
 from src.app.common.abcs.services.password_service import IPasswordService
+from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.presentation.fastapi.common.abcs import ITokenService
 
 
@@ -13,3 +14,5 @@ class AppContext:
     token_service: ITokenService
     passwd_service: IPasswordService
     event_publisher: IEventPublisher
+
+    employees_use_cases: EmployeesUseCaseFactory
