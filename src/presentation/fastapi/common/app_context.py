@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.app.common.abcs.services.event_publisher import IEventPublisher
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.presentation.fastapi.common.abcs import ITokenService
 
@@ -11,3 +12,4 @@ class AppContext:
     postgres_session_factory: async_sessionmaker[AsyncSession]
     token_service: ITokenService
     passwd_service: IPasswordService
+    event_publisher: IEventPublisher

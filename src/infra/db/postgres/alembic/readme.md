@@ -3,6 +3,10 @@
 ```bash
 poetry run alembic -c src/infra/db/postgres/alembic/alembic.ini revision
 ```
+```bash
+alembic -c src/infra/db/postgres/alembic/alembic.ini upgrade head
+```
+
 ## Подготовка миграций к публикации
 #### Упаковывает миграции в отдельную папку.
     versions/
