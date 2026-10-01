@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.repo import IEmployeesRepository
 from src.domain.employees.entities import Employee
-from src.infra.db.postgres.repos.employees.sql.registry import SQL
+from src.infra.db.postgres.repos.employees.sql.registry import EmployeeSQL
 
 
 class EmployeesRepository(IEmployeesRepository):
@@ -28,7 +28,7 @@ class EmployeesRepository(IEmployeesRepository):
         }
 
         await self._session.execute(
-            SQL.ADD,
+            EmployeeSQL.ADD,
             params,
         )
 
@@ -39,7 +39,7 @@ class EmployeesRepository(IEmployeesRepository):
             return
 
         await self._session.execute(
-            SQL.UPDATE(
+            EmployeeSQL.UPDATE(
                 employee_id=employee.employee_id,
                 changes=changes,
             ),
@@ -52,7 +52,7 @@ class EmployeesRepository(IEmployeesRepository):
         employee_id: UUID,
     ) -> Employee | None:
         result = await self._session.execute(
-            SQL.GET_BY_ID,
+            EmployeeSQL.GET_BY_ID,
             {
                 "employee_id": employee_id,
             },
@@ -74,7 +74,7 @@ class EmployeesRepository(IEmployeesRepository):
 
     async def get_all(self) -> list[Employee]:
         result = await self._session.execute(
-            SQL.GET_ALL,
+            EmployeeSQL.GET_ALL,
         )
 
         rows = result.mappings().all()
