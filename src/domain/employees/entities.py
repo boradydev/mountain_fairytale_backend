@@ -41,12 +41,13 @@ class Employee(BaseEntity):
         actor_id: UUID,
         username: str,
         password_hash: str,
+        role: str,
     ) -> Self:
         employee = cls(
             _employee_id=uuid7(),
             _username=username,
             _password_hash=password_hash,
-            _role="employee",
+            _role=role,
             _is_active=True,
             _created_at=datetime.now(),
         )

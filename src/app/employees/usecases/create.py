@@ -11,6 +11,7 @@ class CreateEmployeeDTO:
     actor_id: UUID
     username: str
     password: str
+    role: str = "employee"
 
 
 class CreateEmployeeUseCase:
@@ -34,6 +35,7 @@ class CreateEmployeeUseCase:
             actor_id=dto.actor_id,
             username=dto.username,
             password_hash=password_hash,
+            role=dto.role,
         )
 
         async with self._uow as uow:

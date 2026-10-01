@@ -59,3 +59,7 @@ class EmployeesUseCaseFactory:
             session_factory=self._session_factory,
             event_publisher=self._event_publisher,
         )
+
+    @property
+    def create_uow(self) -> EmployeesUOW:
+        return self._create_uow()

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.infra.bootstrap.admins.ensure_admin import ensure_admin
 from src.infra.db.postgres.database import Postgres
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.services.event_publisher.service import EventPublisher
@@ -35,6 +36,11 @@ async def lifespan(app: FastAPI):
     )
 
     app.state.ctx = ctx  # type: ignore[assignment]
+
+    await ensure_admin(
+        password_service=passwd_service,
+        uow=employees_use_cases.create_uow
+    )
 
     yield
 
