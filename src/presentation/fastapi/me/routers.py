@@ -15,6 +15,7 @@ from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
 )
+from src.presentation.fastapi.me import responses
 
 
 me_router = APIRouter(
@@ -27,6 +28,7 @@ me_router = APIRouter(
     "/logout",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
+    responses=responses.LOGOUT,
 )
 async def logout(
     request: Request,
@@ -50,6 +52,7 @@ async def logout(
     "/change-password",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
+    responses=responses.CHANGE_PASSWORD,
 )
 async def change_password(
     body: ChangeEmployeePasswordReq,

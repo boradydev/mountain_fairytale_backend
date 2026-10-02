@@ -15,6 +15,7 @@ from src.presentation.fastapi.common.deps import (
     Context,
 )
 from src.presentation.fastapi.common.schemas import StdResponse
+from src.presentation.fastapi.employees import responses
 from src.presentation.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
     CreateEmployeeReq,
@@ -34,6 +35,7 @@ employees_router = APIRouter(
     "",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeesResp],
+    responses=responses.GET_EMPLOYEES,
 )
 async def get_employees(
     ctx: Context,
@@ -51,6 +53,7 @@ async def get_employees(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
+    responses=responses.GET_EMPLOYEE,
 )
 async def get_employee(
     employee_id: UUID,
@@ -71,6 +74,7 @@ async def get_employee(
     "/create",
     status_code=status.HTTP_201_CREATED,
     response_model=StdResponse[EmployeeResp],
+    responses=responses.CREATE_EMPLOYEE,
 )
 async def create_employee(
     body: CreateEmployeeReq,
@@ -94,6 +98,7 @@ async def create_employee(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
+    responses=responses.UPDATE_EMPLOYEE,
 )
 async def update_employee(
     employee_id: UUID,
@@ -118,6 +123,7 @@ async def update_employee(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
+    responses=responses.DEACTIVATE_EMPLOYEE,
 )
 async def deactivate_employee(
     employee_id: UUID,
@@ -140,6 +146,7 @@ async def deactivate_employee(
     "/{employee_id:uuid}/change-password",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
+    responses=responses.CHANGE_EMPLOYEE_PASSWORD,
 )
 async def change_employee_password(
     employee_id: UUID,

@@ -2,6 +2,7 @@
 
 from src.domain.employees.excs import InvalidCredentialsException, \
     EmployeeNotFoundByUsernameException
+from src.presentation.fastapi.auth.excs import UnauthorizedException, RefreshTokenNotFoundException
 from src.presentation.fastapi.common.handlers import get_swagger_exc
 
 
@@ -13,4 +14,6 @@ LOGIN = get_swagger_exc(
 REFRESH = get_swagger_exc(
     InvalidCredentialsException,
     EmployeeNotFoundByUsernameException,
+    UnauthorizedException,
+    RefreshTokenNotFoundException,
 )

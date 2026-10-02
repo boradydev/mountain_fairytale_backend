@@ -17,6 +17,7 @@ from src.domain.employees.excs import (
     EmployeeNotFoundException,
     InvalidCredentialsException,
 )
+from src.presentation.fastapi.auth.excs import UnauthorizedException
 from src.presentation.fastapi.common.types import Resp
 
 
@@ -25,6 +26,10 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         InvalidCredentialsException: Resp(
             status_code=401,
             detail="Invalid credentials",
+        ),
+        UnauthorizedException: Resp(
+            status_code=401,
+            detail="Unauthorized",
         ),
         EmployeeNotFoundByUsernameException: Resp(
             status_code=404,

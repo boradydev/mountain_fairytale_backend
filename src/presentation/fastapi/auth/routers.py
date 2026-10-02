@@ -4,7 +4,7 @@ from src.app.auth.usecases.login import LoginDTO
 from src.app.auth.usecases.refresh import RefreshDTO
 from src.presentation.fastapi.auth import responses
 from src.presentation.fastapi.auth.deps import AuthTokenManagerDep
-from src.presentation.fastapi.auth.excs import UnauthorizedException
+from src.presentation.fastapi.auth.excs import UnauthorizedException, RefreshTokenNotFoundException
 from src.presentation.fastapi.common.deps import Context
 from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.auth.schemas import CredsReq, RefreshTokenReq, AuthTokensResp
@@ -63,7 +63,7 @@ async def refresh(
         refresh_token = auth_token_manager.refresh_token_from_cookie
 
     if refresh_token is None:
-        raise UnauthorizedException
+        raise RefreshTokenNotFoundException
 
     tokens = await ctx.auth_use_cases.refresh().execute(
         RefreshDTO(
