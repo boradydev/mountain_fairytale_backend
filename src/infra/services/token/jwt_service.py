@@ -4,9 +4,9 @@ from typing import Any
 import jwt
 from jwt import InvalidTokenError
 
+from src.infra.services.token.excs import UnauthorizedException
 from src.infra.services.token.settings import JwtSettings
 from src.presentation.fastapi.common.abcs import ITokenService
-from src.presentation.fastapi.common.excs import UnauthorizedHTTPException
 from src.presentation.fastapi.employees.schemas import (
     AccessTokenPyload,
     RefreshTokenPyload,
@@ -29,7 +29,10 @@ class JwtTokenService(ITokenService):
         expires_at = self._get_access_token_expiration()
 
         return self._encode(
-            payload=payload,
+            payload={
+                **payload,
+                "token_type": "access",
+            },
             expires_at=expires_at,
         )
 
@@ -48,7 +51,10 @@ class JwtTokenService(ITokenService):
         expires_at = self._get_refresh_token_expiration()
 
         return self._encode(
-            payload=payload,
+            payload={
+                **payload,
+                "token_type": "refresh",
+            },
             expires_at=expires_at,
         )
 
@@ -98,6 +104,6 @@ class JwtTokenService(ITokenService):
                 algorithms=[self._settings.JWT_ALGORITHM],
             )
         except InvalidTokenError as exc:
-            raise UnauthorizedHTTPException from exc
+            raise UnauthorizedException from exc
 
         return payload
