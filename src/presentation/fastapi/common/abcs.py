@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.presentation.fastapi.employees.schemas import (
-    AccessTokenPyload,
-    RefreshTokenPyload,
-)
+from src.presentation.fastapi.auth.schemas import AccessTokenPyload, RefreshTokenPyload
 
 
 class ITokenService(ABC):

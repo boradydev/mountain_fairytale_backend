@@ -1,11 +1,14 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import Depends
-from fastapi.requests import Request
+from fastapi import Depends, Request
 
+from src.app.employees.usecases.get import GetEmployeeDTO
+from src.domain.employees.entities import Employee
+from src.domain.employees.excs import InvalidCredentialsException
 from src.infra.factories.app_context import AppContext
-from src.presentation.fastapi.common.excs import UnauthorizedHTTPException
-from src.presentation.fastapi.employees.schemas import AccessTokenPyload
+from src.presentation.fastapi.auth.excs import UnauthorizedException
+from src.presentation.fastapi.auth.schemas import AccessTokenPyload
 
 
 def get_app_ctx(request: Request) -> AppContext:
@@ -19,10 +22,50 @@ def get_access_token_pyload(
     request: Request,
     ctx: Context,
 ) -> AccessTokenPyload:
-    access_token = request.headers.get("access_token")
+    authorization = request.headers.get("Authorization")
+
+    access_token: str | None = None
+
+    if authorization is not None:
+        scheme, _, value = authorization.partition(" ")
+
+        if scheme.lower() == "bearer" and value:
+            access_token = value
+
     if access_token is None:
-        raise UnauthorizedHTTPException
+        access_token = request.cookies.get("access_token")
 
-    return ctx.token_service.get_payload_access_token(access_token=access_token)
+    if access_token is None:
+        raise UnauthorizedException
 
-AccessTokenPayloadDep = Annotated[AccessTokenPyload, Depends(get_access_token_pyload)]
+    return ctx.token_service.get_payload_access_token(
+        access_token=access_token,
+    )
+
+
+AccessTokenPayloadDep = Annotated[
+    AccessTokenPyload,
+    Depends(get_access_token_pyload),
+]
+
+
+async def get_current_employee(
+    access_token_payload: AccessTokenPayloadDep,
+    ctx: Context,
+) -> Employee:
+    employee = await ctx.employees_use_cases.get_employee().execute(
+        GetEmployeeDTO(
+            employee_id=UUID(access_token_payload.employee_id),
+        ),
+    )
+
+    if not employee.is_active:
+        raise InvalidCredentialsException
+
+    return employee
+
+
+CurrentEmployee = Annotated[
+    Employee,
+    Depends(get_current_employee),
+]

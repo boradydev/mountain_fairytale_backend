@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.app.common.abcs.services.password_service import IPasswordService
+from src.infra.factories.auth import AuthUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
+from src.infra.services.token.settings import JwtSettings
 from src.presentation.fastapi.common.abcs import ITokenService
 
 
@@ -14,3 +16,6 @@ class AppContext:
     passwd_service: IPasswordService
 
     employees_use_cases: EmployeesUseCaseFactory
+    auth_use_cases: AuthUseCaseFactory
+
+    token_settings: JwtSettings

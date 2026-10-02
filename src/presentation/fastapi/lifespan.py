@@ -4,18 +4,22 @@ from fastapi import FastAPI
 
 from src.infra.bootstrap.admins.ensure_admin import ensure_admin
 from src.infra.db.postgres.database import Postgres
+from src.infra.factories.auth import AuthUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
-from src.infra.services.event_publisher.service import EventPublisher
 from src.infra.services.password.service import PasswordService
-from src.infra.services.token.service import JwtTokenService
+from src.infra.services.token.jwt_service import JwtTokenService
 from src.infra.factories.app_context import AppContext
+from src.infra.services.token.settings import JwtSettings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Управляет жизненным циклом ресурсов приложения."""
     postgres = Postgres()
-    token_service = JwtTokenService()
+
+    token_settings = JwtSettings()
+    token_service = JwtTokenService(settings=token_settings)
+
     passwd_service = PasswordService()
 
     employees_use_cases = EmployeesUseCaseFactory(
@@ -23,11 +27,20 @@ async def lifespan(app: FastAPI):
         password_service=passwd_service,
     )
 
+    auth_use_cases = AuthUseCaseFactory(
+        session_factory=postgres.session_factory,
+        password_service=passwd_service,
+        token_service=token_service,
+    )
+
     ctx = AppContext(
         postgres_session_factory=postgres.session_factory,
         token_service=token_service,
         passwd_service=passwd_service,
         employees_use_cases=employees_use_cases,
+        auth_use_cases=auth_use_cases,
+        token_settings=token_settings
+
     )
 
     app.state.ctx = ctx  # type: ignore[assignment]

@@ -10,10 +10,7 @@ from src.infra.services.token.excs import (
 )
 from src.infra.services.token.settings import JwtSettings
 from src.presentation.fastapi.common.abcs import ITokenService
-from src.presentation.fastapi.employees.schemas import (
-    AccessTokenPyload,
-    RefreshTokenPyload,
-)
+from src.presentation.fastapi.auth.schemas import AccessTokenPyload, RefreshTokenPyload
 
 
 class JwtTokenService(ITokenService):

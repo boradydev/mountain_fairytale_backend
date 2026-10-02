@@ -20,5 +20,5 @@ class IPasswordService(ABC):
         plain_password: str,
         hashed_password: str,
     ) -> bool:
-        """Проверяет соответствие пароля ранее созданному хешу."""
+        """Проверяет пароль относительно хеша."""
         raise NotImplementedError
