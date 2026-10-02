@@ -7,6 +7,7 @@ from src.infra.bootstrap.admins.ensure_admin import ensure_admin
 from src.infra.db.postgres.database import Postgres
 from src.infra.factories.app_context import AppContext
 from src.infra.factories.auth import AuthUseCaseFactory
+from src.infra.factories.cars import CarsUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.services.password.service import PasswordService
 from src.infra.services.token.jwt_service import JwtTokenService
@@ -39,12 +40,17 @@ async def lifespan(app: FastAPI):
         token_service=token_service,
     )
 
+    cars_use_cases = CarsUseCaseFactory(
+        session_factory=postgres.session_factory,
+    )
+
     ctx = AppContext(
         postgres_session_factory=postgres.session_factory,
         token_service=token_service,
         passwd_service=passwd_service,
         employees_use_cases=employees_use_cases,
         auth_use_cases=auth_use_cases,
+        cars_use_cases=cars_use_cases,
         token_settings=token_settings,
     )
 

@@ -9,6 +9,8 @@ AI Note:
 """
 
 from collections.abc import Mapping
+
+from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsException
 from types import MappingProxyType
 
 from src.core.excs import BaseAppException
@@ -38,6 +40,15 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         EmployeeNotFoundException: Resp(
             status_code=404,
             detail="Employee not found",
+        ),
+        CarNotFoundException: Resp(
+            status_code=404,
+            detail="Car not found",
+        ),
+
+        CarNumberAlreadyExistsException: Resp(
+            status_code=409,
+            detail="Car with this number already exists",
         ),
     },
 )
