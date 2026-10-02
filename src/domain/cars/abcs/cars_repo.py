@@ -20,13 +20,6 @@ class ICarsRepository(ABC):
         """Сохраняет изменения автомобиля."""
 
     @abstractmethod
-    async def delete(
-        self,
-        car_id: UUID,
-    ) -> None:
-        """Удаляет автомобиль."""
-
-    @abstractmethod
     async def get_by_id(
         self,
         car_id: UUID,

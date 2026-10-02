@@ -25,6 +25,7 @@ class CarsRepository(ICarsRepository):
                 "model": car.model,
                 "number": car.number,
                 "current_mileage": car.current_mileage,
+                "is_active": car.is_active,
             },
         )
 
@@ -45,17 +46,6 @@ class CarsRepository(ICarsRepository):
         )
 
         car.clear_changes()
-
-    async def delete(
-        self,
-        car_id: UUID,
-    ) -> None:
-        await self._session.execute(
-            CarSQL.DELETE,
-            {
-                "car_id": car_id,
-            },
-        )
 
     async def get_by_id(
         self,
@@ -78,6 +68,7 @@ class CarsRepository(ICarsRepository):
             _model=row["model"],
             _number=row["number"],
             _current_mileage=row["current_mileage"],
+            _is_active=row["is_active"],
         )
 
     async def get_by_number(
@@ -101,6 +92,7 @@ class CarsRepository(ICarsRepository):
             _model=row["model"],
             _number=row["number"],
             _current_mileage=row["current_mileage"],
+            _is_active=row["is_active"],
         )
 
     async def get_all(self) -> list[Car]:
@@ -116,6 +108,7 @@ class CarsRepository(ICarsRepository):
                 _model=row["model"],
                 _number=row["number"],
                 _current_mileage=row["current_mileage"],
+                _is_active=row["is_active"],
             )
             for row in rows
         ]

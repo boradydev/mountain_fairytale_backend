@@ -16,9 +16,3 @@ class UpdateCarEvent(BaseDomainEvent):
     actor_id: UUID
     car_id: UUID
     changes: dict[str, Any]
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class DeleteCarEvent(BaseDomainEvent):
-    actor_id: UUID
-    car_id: UUID

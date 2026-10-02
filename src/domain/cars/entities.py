@@ -14,6 +14,7 @@ class Car(BaseEntity):
     _model: str
     _number: str
     _current_mileage: float
+    _is_active: bool
 
     ID_FIELD = "car_id"
 
@@ -21,12 +22,14 @@ class Car(BaseEntity):
         "model",
         "number",
         "current_mileage",
+        "is_active",
     }
 
     UPDATABLE_DATABASE_COLUMNS = frozenset([
         "model",
         "number",
         "current_mileage",
+        "is_active",
     ])
 
     @classmethod
@@ -43,6 +46,7 @@ class Car(BaseEntity):
             _model=model,
             _number=number,
             _current_mileage=current_mileage,
+            _is_active=True,
         )
 
         car._add_event(
@@ -76,15 +80,37 @@ class Car(BaseEntity):
             ),
         )
 
-    def delete(
-        self,
-        *,
-        actor_id: UUID,
-    ) -> None:
+    def deactivate(self, actor_id: UUID) -> None:
+        if not self._is_active:
+            return
+
+        change = self._apply_update_changes(
+            payload={"is_active": False},
+            allowed_fields={"is_active"},
+        )
+
         self._add_event(
-            events.DeleteCarEvent(
+            events.UpdateCarEvent(
                 actor_id=actor_id,
                 car_id=self._car_id,
+                changes=change,
+            ),
+        )
+
+    def activate(self, actor_id: UUID) -> None:
+        if self._is_active:
+            return
+
+        change = self._apply_update_changes(
+            payload={"is_active": True},
+            allowed_fields={"is_active"},
+        )
+
+        self._add_event(
+            events.UpdateCarEvent(
+                actor_id=actor_id,
+                car_id=self._car_id,
+                changes=change,
             ),
         )
 
@@ -103,3 +129,7 @@ class Car(BaseEntity):
     @property
     def current_mileage(self) -> float:
         return self._current_mileage
+
+    @property
+    def is_active(self) -> bool:
+        return self._is_active

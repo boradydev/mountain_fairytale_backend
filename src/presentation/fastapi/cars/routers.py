@@ -3,9 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
+from src.app.cars.usecases.activate import ActivateCarDTO
 from src.app.cars.usecases.check_duplicate import CheckCarDuplicateDTO
 from src.app.cars.usecases.create import CreateCarDTO
-from src.app.cars.usecases.delete import DeleteCarDTO
+from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.update import UpdateCarDTO
 from src.presentation.fastapi.common.deps import (
@@ -147,24 +148,47 @@ async def update_car(
     )
 
 
-@cars_router.delete(
-    "/{car_id:uuid}",
+@cars_router.put(
+    "/{car_id:uuid}/deactivate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
     responses=responses.DELETE_CAR,
 )
-async def delete_car(
+async def deactivate_car(
     car_id: UUID,
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[NoneType]:
-    await ctx.cars_use_cases.delete_car().execute(
-        DeleteCarDTO(
+    await ctx.cars_use_cases.deactivate_car().execute(
+        DeactivateCarDTO(
             actor_id=UUID(access_token_payload.employee_id),
             car_id=car_id,
         ),
     )
 
     return StdResponse(
-        message="Автомобиль удалён.",
+        message="Автомобиль деактивирован.",
+    )
+
+
+@cars_router.put(
+    "/{car_id:uuid}/activate",
+    status_code=status.HTTP_200_OK,
+    response_model=StdResponse[NoneType],
+    responses=responses.DELETE_CAR,
+)
+async def activate_car(
+    car_id: UUID,
+    ctx: Context,
+    access_token_payload: AccessTokenPayloadDep,
+) -> StdResponse[NoneType]:
+    await ctx.cars_use_cases.activate_car().execute(
+        ActivateCarDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            car_id=car_id,
+        ),
+    )
+
+    return StdResponse(
+        message="Автомобиль активирован.",
     )

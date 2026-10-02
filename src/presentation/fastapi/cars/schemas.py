@@ -11,6 +11,7 @@ class CarResp(BaseSchema):
     model: str
     number: str
     current_mileage: float
+    is_active: bool
 
 
 class CarsResp(BaseSchema):
