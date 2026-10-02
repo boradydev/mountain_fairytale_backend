@@ -4,7 +4,10 @@ from typing import Any
 import jwt
 from jwt import InvalidTokenError
 
-from src.infra.services.token.excs import UnauthorizedException
+from src.infra.services.token.excs import (
+    InvalidAccessTokenException,
+    InvalidRefreshTokenException,
+)
 from src.infra.services.token.settings import JwtSettings
 from src.presentation.fastapi.common.abcs import ITokenService
 from src.presentation.fastapi.employees.schemas import (
@@ -40,7 +43,10 @@ class JwtTokenService(ITokenService):
         self,
         access_token: str,
     ) -> AccessTokenPyload:
-        payload = self._decode(access_token)
+        try:
+            payload = self._decode(access_token)
+        except InvalidTokenError as exc:
+            raise InvalidAccessTokenException from exc
 
         return AccessTokenPyload.model_validate(payload)
 
@@ -62,7 +68,10 @@ class JwtTokenService(ITokenService):
         self,
         refresh_token: str,
     ) -> RefreshTokenPyload:
-        payload = self._decode(refresh_token)
+        try:
+            payload = self._decode(refresh_token)
+        except InvalidTokenError as exc:
+            raise InvalidRefreshTokenException from exc
 
         return RefreshTokenPyload.model_validate(payload)
 
@@ -97,13 +106,10 @@ class JwtTokenService(ITokenService):
         self,
         token: str,
     ) -> dict[str, Any]:
-        try:
-            payload = jwt.decode(
-                token,
-                self._settings.JWT_SECRET_KEY,
-                algorithms=[self._settings.JWT_ALGORITHM],
-            )
-        except InvalidTokenError as exc:
-            raise UnauthorizedException from exc
+        payload = jwt.decode(
+            token,
+            self._settings.JWT_SECRET_KEY,
+            algorithms=[self._settings.JWT_ALGORITHM],
+        )
 
         return payload

@@ -4,5 +4,10 @@ from src.core.excs import BaseAppException
 
 
 @dataclass(frozen=True, slots=True)
-class UnauthorizedException(BaseAppException):
+class InvalidAccessTokenException(BaseAppException):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class InvalidRefreshTokenException(BaseAppException):
     pass
