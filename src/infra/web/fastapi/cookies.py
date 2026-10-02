@@ -4,8 +4,7 @@ from typing import Literal
 from fastapi import Request, Response
 
 from src.infra.services.token.settings import JwtSettings
-from src.infra.web.fastapi.excs import CookieNotFound
-from src.presentation.fastapi.auth.abcs.cookies import IAuthTokenManager
+from src.presentation.fastapi.auth.abcs.tokens import IAuthTokenManager
 
 
 class IFastapiCookieManager(ABC):
@@ -32,8 +31,8 @@ class IFastapiCookieManager(ABC):
 
 
 class AuthTokenManager(IFastapiCookieManager, IAuthTokenManager):
-    _ACCESS_TOKEN = "access_token"
-    _REFRESH_TOKEN = "refresh_token"
+    _ACCESS_KEY = "access_token"
+    _REFRESH_KEY = "refresh_token"
 
     def __init__(
         self,
@@ -51,6 +50,8 @@ class AuthTokenManager(IFastapiCookieManager, IAuthTokenManager):
         self._same_site = same_site
         self.settings = settings
 
+    # --- Управление куками (для Web) ---
+
     def set_auth_cookies(
         self,
         *,
@@ -58,39 +59,48 @@ class AuthTokenManager(IFastapiCookieManager, IAuthTokenManager):
         refresh_token: str,
     ) -> None:
         self._set(
-            key=self._ACCESS_TOKEN,
+            key=self._ACCESS_KEY,
             value=access_token,
             max_age=self.settings.access_token_expire_seconds,
         )
-
         self._set(
-            key=self._REFRESH_TOKEN,
+            key=self._REFRESH_KEY,
             value=refresh_token,
             max_age=self.settings.refresh_token_expire_seconds,
         )
 
     def delete_auth_cookies(self) -> None:
         self._response.delete_cookie(
-            key=self._ACCESS_TOKEN,
+            key=self._ACCESS_KEY,
             path="/",
         )
         self._response.delete_cookie(
-            key=self._REFRESH_TOKEN,
+            key=self._REFRESH_KEY,
             path="/",
         )
 
-    def _get(self, key: str) -> str | None:
-        cookie = self._request.cookies.get(key)
-
-        if not cookie:
-            raise CookieNotFound
-
-        return cookie
+    # --- Извлечение из COOKIES ---
 
     @property
-    def access_token(self) -> str | None:
-        return self._get(self._ACCESS_TOKEN)
+    def access_token_from_cookie(self) -> str | None:
+        return self._request.cookies.get(self._ACCESS_KEY)
 
     @property
-    def refresh_token(self) -> str | None:
-        return self._get(self._REFRESH_TOKEN)
+    def refresh_token_from_cookie(self) -> str | None:
+        return self._request.cookies.get(self._REFRESH_KEY)
+
+    # --- Извлечение из HEADERS (для Flutter) ---
+
+    @property
+    def access_token_from_header(self) -> str | None:
+        """Извлекает токен из стандартного заголовка Authorization: Bearer <token>."""
+        auth_header = self._request.headers.get("Authorization")
+        if not auth_header:
+            return None
+
+        # Ожидаем формат "Bearer <token>"
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+
+        return None

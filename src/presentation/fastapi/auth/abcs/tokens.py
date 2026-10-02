@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class IAuthCookieManager(ABC):
+class IAuthTokenManager(ABC):
     @abstractmethod
     def set_auth_cookies(
         self,
@@ -17,10 +17,15 @@ class IAuthCookieManager(ABC):
 
     @property
     @abstractmethod
-    def access_token(self) -> str:
+    def access_token_from_cookie(self) -> str | None:
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def refresh_token(self) -> str:
+    def refresh_token_from_cookie(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def access_token_from_header(self) -> str | None:
         raise NotImplementedError
