@@ -84,8 +84,9 @@ def get_unknown_exception_handler(
 def map_exceptions_to_responses(
     *excs: type[BaseAppException],
     exception_map: Mapping[type[BaseAppException], Resp] = APP_EXCEPTION_MAP,
-) -> dict[int, dict[str, str]]:
-    """Converts application exceptions into FastAPI router `responses` format.
+) -> dict[int | str, dict[str, Any]] | None:
+    """
+    Converts application exceptions into FastAPI router `responses` format.
 
     Extracts HTTP status codes and details from `exception_map` for given `excs`.
     Concatenates descriptions with ` | ` if multiple exceptions share the same status code.
@@ -100,7 +101,7 @@ def map_exceptions_to_responses(
     Example:
         `@router.post(..., responses=map_exceptions_to_responses(UserNotFound, BannedUser))`
     """
-    responses: dict[int, dict[str, str]] = {}
+    responses: dict[int | str, dict[str, Any]] | None = {}
 
     for exc in excs:
         resp = exception_map.get(exc)
