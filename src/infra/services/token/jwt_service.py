@@ -74,12 +74,12 @@ class JwtTokenService(ITokenService):
 
     def _get_access_token_expiration(self) -> datetime:
         return datetime.now(UTC) + timedelta(
-            minutes=self._settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            seconds=self._settings.ACCESS_TOKEN_EXPIRE_SECONDS,
         )
 
     def _get_refresh_token_expiration(self) -> datetime:
         return datetime.now(UTC) + timedelta(
-            days=self._settings.REFRESH_TOKEN_EXPIRE_DAYS,
+            seconds=self._settings.REFRESH_TOKEN_EXPIRE_SECONDS,
         )
 
     def _encode(

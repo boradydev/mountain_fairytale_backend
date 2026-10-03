@@ -61,12 +61,12 @@ class AuthTokenManager(IFastapiCookieManager, IAuthTokenManager):
         self._set(
             key=self._ACCESS_KEY,
             value=access_token,
-            max_age=self.settings.access_token_expire_seconds,
+            max_age=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS,
         )
         self._set(
             key=self._REFRESH_KEY,
             value=refresh_token,
-            max_age=self.settings.refresh_token_expire_seconds,
+            max_age=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS,
         )
 
     def delete_auth_cookies(self) -> None:
