@@ -58,5 +58,9 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
             status_code=403,
             detail="Employee account is deactivated",
         ),
+        EmployeeAuthNotFoundException: Resp(
+            status_code=401,
+            detail="Invalid credentials",
+        ),
     },
 )

@@ -16,7 +16,7 @@ class TestAuthFlow:
         assert response.status_code == 200
         data = response.json()["data"]
 
-        # Body cemalCase
+        # Body camelCase
         assert "accessToken" in data
         assert "refreshToken" in data
 
@@ -24,21 +24,21 @@ class TestAuthFlow:
         assert "access-token" in client.cookies
         assert "refresh-token" in client.cookies
 
-    def test_login_invalid_credentials(self):
+    def test_login_invalid_credentials(self, client):
         """Неверный пароль/логин -> 401."""
         payload = {"username": "wrong_user", "password": "wrong_password"}
         response = client.post("/public/auth/login", json=payload)
 
         assert response.status_code == 401
 
-    def test_login_employee_not_found(self):
+    def test_login_employee_not_found(self, client):
         """Пользователь не существует -> 404."""
         payload = {"username": "non_existent", "password": "any_password"}
         response = client.post("/public/auth/login", json=payload)
 
         assert response.status_code == 404
 
-    def test_login_employee_deactivated(self):
+    def test_login_employee_deactivated(self, client):
         """Пользователь деактивирован -> 403."""
         payload = {"username": "deactivated_user", "password": "password123"}
         response = client.post("/public/auth/login", json=payload)
@@ -47,25 +47,25 @@ class TestAuthFlow:
 
         # --- Сценарии для /refresh ---
 
-    def test_refresh_success(self):
+    def test_refresh_success(self, client):
         """Обновление токена с валидным refresh_token -> 200 OK."""
-        payload = {"refresh_token": "valid_refresh_token"}
+        payload = {"refreshToken": "valid_refresh_token"}
         response = client.post("/public/auth/refresh", json=payload)
 
         assert response.status_code == 200
-        assert "access_token" in response.json()["data"]
+        assert "accessToken" in response.json()["data"]
 
-    def test_refresh_no_token_provided(self):
+    def test_refresh_no_token_provided(self, client):
         """Токен не передан ни в теле, ни в куках -> 401."""
         client.cookies.clear()
-        payload = {"refresh_token": None}
+        payload = {"refreshToken": None}
         response = client.post("/public/auth/refresh", json=payload)
 
         assert response.status_code == 401
 
-    def test_refresh_employee_not_found(self):
+    def test_refresh_employee_not_found(self, client):
         """Токен есть, но пользователь удален из системы -> 404."""
-        payload = {"refresh_token": "token_for_deleted_user"}
+        payload = {"refreshToken": "token_for_deleted_user"}
         response = client.post("/public/auth/refresh", json=payload)
 
         assert response.status_code == 404

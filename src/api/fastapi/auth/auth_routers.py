@@ -2,7 +2,7 @@ from fastapi import APIRouter, status
 
 from src.app.auth.usecases.login import LoginDTO
 from src.app.auth.usecases.refresh import RefreshDTO
-from src.domain.employees import employee_excs
+from src.domain.auth import auth_excs
 from src.api.fastapi.auth.auth_deps import AuthTokenManagerDep
 from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException
 from src.api.fastapi.auth.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
@@ -22,16 +22,16 @@ auth_router = APIRouter(
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[AuthTokensResp],
     responses=map_exceptions_to_responses(
-        employee_excs.InvalidCredentialsException,
-        employee_excs.EmployeeNotFoundException,
-        employee_excs.EmployeeDeactivateException,
+        auth_excs.InvalidCredentialsException,
+        auth_excs.AuthEmployeeNotFoundByUsernameException,
+        auth_excs.AuthEmployeeDeactivateException,
     ),
     description="""
     Предусловие: Пользователь существует и активен.
     Действие: Аутентификация пользователя и выдача токенов.
     Результат:
-        1. Возвращает токены в теле ответа.
-        2. Устанавливает HTTP-only куки.
+        1. Body (camelCase): токены для windows клиентов (Flutter).
+        2. Cookies (kebab-case): Для веб-клиентов (Browser).
     Критические сценарии:
         1. Неверные логин или пароль.
         2. Сотрудник не существует.
@@ -69,15 +69,16 @@ async def login(
     response_model=StdResponse[AuthTokensResp],
     responses=map_exceptions_to_responses(
         RefreshTokenNotFoundException,
-        employee_excs.EmployeeNotFoundException,
+        auth_excs.AuthEmployeeNotFoundException,
+        auth_excs.AuthEmployeeDeactivateException,
     ),
     description="""
         Предусловие: Сотрудник существует и активен.
         Действие: Обновление пары токенов доступа и обновления.
         Входные данные: refresh_token из тела запроса или из HTTP-only кук.
-        Результат: 
-            1. Возвращает новую пару токенов AuthTokensResp.
-            2. Обновляет HTTP-only куки.
+        Результат:
+            1. Body (camelCase): токены для windows клиентов (Flutter).
+            2. Cookies (kebab-case): Для веб-клиентов (Browser).
         Критические сценарии: 
             1. Не передан токен обновления.
             2. Сотрудник не существует.

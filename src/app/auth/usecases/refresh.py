@@ -3,7 +3,7 @@ from uuid import UUID
 
 from src.app.auth.dto import AuthTokensDTO
 from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.domain.auth import auth_excs
 from src.api.fastapi.common.abcs import ITokenService
 
 
@@ -36,8 +36,11 @@ class RefreshUseCase:
                 employee_id,
             )
 
-            if employee is None or not employee.is_active:
-                raise EmployeeNotFoundException
+            if employee is None:
+                raise auth_excs.AuthEmployeeNotFoundException
+
+            if not employee.is_active:
+                raise auth_excs.AuthEmployeeDeactivateException
 
             access_token = self._token_service.create_access_token(
                 employee_id=str(employee.employee_id),
