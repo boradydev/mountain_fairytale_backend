@@ -5,22 +5,20 @@ from fastapi import APIRouter, Request, Response, status
 from src.app.employees.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
+from src.domain.employees.excs import EmployeeNotFoundException
 from src.infra.services.token.settings import JwtSettings
 from src.infra.web.fastapi.cookies import AuthTokenManager
+from src.presentation.fastapi.auth.excs import UnauthorizedException
 from src.presentation.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,
 )
+from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
 )
-from src.domain.employees.excs import EmployeeNotFoundException
-from src.presentation.fastapi.auth.excs import UnauthorizedException
-from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 
-LOGOUT_RESPONSES = map_exceptions_to_responses(UnauthorizedException)
-CHANGE_PASSWORD_RESPONSES = map_exceptions_to_responses(UnauthorizedException, EmployeeNotFoundException)
 
 me_router = APIRouter(
     prefix="/me",
@@ -32,7 +30,7 @@ me_router = APIRouter(
     "/logout",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=LOGOUT_RESPONSES,
+    responses=map_exceptions_to_responses(UnauthorizedException),
 )
 async def logout(
     request: Request,
@@ -56,7 +54,7 @@ async def logout(
     "/change-password",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=CHANGE_PASSWORD_RESPONSES,
+    responses=map_exceptions_to_responses(UnauthorizedException, EmployeeNotFoundException),
 )
 async def change_password(
     body: ChangeEmployeePasswordReq,

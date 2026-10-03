@@ -9,26 +9,20 @@ from src.app.cars.usecases.create import CreateCarDTO
 from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.update import UpdateCarDTO
-from src.presentation.fastapi.common.deps import (
-    AccessTokenPayloadDep,
-    Context,
-)
-from src.presentation.fastapi.common.schemas import StdResponse
+from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsException
 from src.presentation.fastapi.cars.schemas import (
     CarResp,
     CarsResp,
     CreateCarReq,
     UpdateCarReq,
 )
-from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsException
+from src.presentation.fastapi.common.deps import (
+    AccessTokenPayloadDep,
+    Context,
+)
 from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
+from src.presentation.fastapi.common.schemas import StdResponse
 
-GET_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException)
-GET_CARS_RESPONSES = map_exceptions_to_responses()
-CREATE_CAR_RESPONSES = map_exceptions_to_responses(CarNumberAlreadyExistsException)
-UPDATE_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException, CarNumberAlreadyExistsException)
-DELETE_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException)
-CHECK_DUPLICATE_RESPONSES = map_exceptions_to_responses()
 
 cars_router = APIRouter(
     prefix="/cars",
@@ -40,7 +34,7 @@ cars_router = APIRouter(
     "",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarsResp],
-    responses=GET_CARS_RESPONSES,
+    responses=map_exceptions_to_responses(),
 )
 async def get_cars(
     ctx: Context,
@@ -49,10 +43,7 @@ async def get_cars(
 
     return StdResponse(
         data=CarsResp(
-            cars=[
-                CarResp.model_validate(car)
-                for car in cars
-            ],
+            cars=[CarResp.model_validate(car) for car in cars],
         ),
     )
 
@@ -61,7 +52,7 @@ async def get_cars(
     "/check-duplicate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp | NoneType],
-    responses=CHECK_DUPLICATE_RESPONSES,
+    responses=map_exceptions_to_responses(),
 )
 async def check_duplicate(
     number: str,
@@ -74,11 +65,7 @@ async def check_duplicate(
     )
 
     return StdResponse(
-        data=(
-            CarResp.model_validate(car)
-            if car is not None
-            else None
-        ),
+        data=(CarResp.model_validate(car) if car is not None else None),
     )
 
 
@@ -86,7 +73,7 @@ async def check_duplicate(
     "/{car_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp],
-    responses=GET_CAR_RESPONSES,
+    responses=map_exceptions_to_responses(CarNotFoundException),
 )
 async def get_car(
     car_id: UUID,
@@ -107,7 +94,7 @@ async def get_car(
     "/create",
     status_code=status.HTTP_201_CREATED,
     response_model=StdResponse[CarResp],
-    responses=CREATE_CAR_RESPONSES,
+    responses=map_exceptions_to_responses(CarNumberAlreadyExistsException),
 )
 async def create_car(
     body: CreateCarReq,
@@ -132,7 +119,7 @@ async def create_car(
     "/{car_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp],
-    responses=UPDATE_CAR_RESPONSES,
+    responses=map_exceptions_to_responses(CarNotFoundException, CarNumberAlreadyExistsException),
 )
 async def update_car(
     car_id: UUID,
@@ -159,7 +146,7 @@ async def update_car(
     "/{car_id:uuid}/deactivate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=DELETE_CAR_RESPONSES,
+    responses=map_exceptions_to_responses(CarNotFoundException),
 )
 async def deactivate_car(
     car_id: UUID,
@@ -182,7 +169,7 @@ async def deactivate_car(
     "/{car_id:uuid}/activate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=DELETE_CAR_RESPONSES,
+    responses=map_exceptions_to_responses(CarNotFoundException),
 )
 async def activate_car(
     car_id: UUID,

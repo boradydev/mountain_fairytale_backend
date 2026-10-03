@@ -10,10 +10,13 @@ from src.app.employees.usecases.create import CreateEmployeeDTO
 from src.app.employees.usecases.deactivate import DeactivateEmployeeDTO
 from src.app.employees.usecases.get import GetEmployeeDTO
 from src.app.employees.usecases.update import UpdateEmployeeDTO
+from src.domain.employees.excs import EmployeeNotFoundException
+from src.presentation.fastapi.auth.excs import UnauthorizedException
 from src.presentation.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,
 )
+from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
@@ -22,16 +25,7 @@ from src.presentation.fastapi.employees.schemas import (
     EmployeesResp,
     UpdateEmployeeReq,
 )
-from src.domain.employees.excs import EmployeeNotFoundException
-from src.presentation.fastapi.auth.excs import UnauthorizedException
-from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 
-GET_EMPLOYEE_RESPONSES = map_exceptions_to_responses(EmployeeNotFoundException)
-GET_EMPLOYEES_RESPONSES = map_exceptions_to_responses()
-UPDATE_EMPLOYEE_RESPONSES = map_exceptions_to_responses(EmployeeNotFoundException)
-DEACTIVATE_EMPLOYEE_RESPONSES = map_exceptions_to_responses(EmployeeNotFoundException)
-CHANGE_EMPLOYEE_PASSWORD_RESPONSES = map_exceptions_to_responses(EmployeeNotFoundException)
-CREATE_EMPLOYEE_RESPONSES = map_exceptions_to_responses(UnauthorizedException)
 
 employees_router = APIRouter(
     prefix="/employees",
@@ -43,7 +37,7 @@ employees_router = APIRouter(
     "",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeesResp],
-    responses=GET_EMPLOYEES_RESPONSES,
+    responses=map_exceptions_to_responses(),
 )
 async def get_employees(
     ctx: Context,
@@ -61,7 +55,7 @@ async def get_employees(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
-    responses=GET_EMPLOYEE_RESPONSES,
+    responses=map_exceptions_to_responses(EmployeeNotFoundException),
 )
 async def get_employee(
     employee_id: UUID,
@@ -82,7 +76,7 @@ async def get_employee(
     "/create",
     status_code=status.HTTP_201_CREATED,
     response_model=StdResponse[EmployeeResp],
-    responses=CREATE_EMPLOYEE_RESPONSES,
+    responses=map_exceptions_to_responses(UnauthorizedException),
 )
 async def create_employee(
     body: CreateEmployeeReq,
@@ -106,7 +100,7 @@ async def create_employee(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
-    responses=UPDATE_EMPLOYEE_RESPONSES,
+    responses=map_exceptions_to_responses(EmployeeNotFoundException),
 )
 async def update_employee(
     employee_id: UUID,
@@ -131,7 +125,7 @@ async def update_employee(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=DEACTIVATE_EMPLOYEE_RESPONSES,
+    responses=map_exceptions_to_responses(EmployeeNotFoundException),
 )
 async def deactivate_employee(
     employee_id: UUID,
@@ -154,7 +148,7 @@ async def deactivate_employee(
     "/{employee_id:uuid}/change-password",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=CHANGE_EMPLOYEE_PASSWORD_RESPONSES,
+    responses=map_exceptions_to_responses(EmployeeNotFoundException),
 )
 async def change_employee_password(
     employee_id: UUID,
