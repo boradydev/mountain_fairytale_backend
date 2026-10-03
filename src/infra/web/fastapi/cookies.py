@@ -31,8 +31,8 @@ class IFastapiCookieManager(ABC):
 
 
 class AuthTokenManager(IFastapiCookieManager, IAuthTokenManager):
-    _ACCESS_KEY = "access_token"
-    _REFRESH_KEY = "refresh_token"
+    _ACCESS_KEY = "access-token"
+    _REFRESH_KEY = "refresh-token"
 
     def __init__(
         self,
