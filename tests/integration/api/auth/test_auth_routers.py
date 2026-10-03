@@ -36,7 +36,7 @@ class TestAuthFlow:
         payload = {"username": "non_existent", "password": "any_password"}
         response = client.post("/public/auth/login", json=payload)
 
-        assert response.status_code == 404
+        assert response.status_code == 401
 
     def test_login_employee_deactivated(self, client):
         """Пользователь деактивирован -> 403."""

@@ -4,8 +4,8 @@ from uuid import UUID
 from fastapi import Depends, Request
 
 from src.app.employees.usecases.get import GetEmployeeDTO
+from src.domain.auth.auth_excs import InvalidCredentialsException
 from src.domain.employees.entities import Employee
-from src.domain.employees.employee_excs import InvalidCredentialsException
 from src.infra.factories.app_context import AppContext
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
