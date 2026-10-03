@@ -26,8 +26,8 @@ class TestAuthFlow:
         assert "refreshToken" in data
 
         # Cookies kebab-case
-        assert "access-token" in client.cookies
-        assert "refresh-token" in client.cookies
+        assert client.cookies.get("access-token") == data["accessToken"]
+        assert client.cookies.get("refresh-token") == data["refreshToken"]
 
     def test_login_invalid_credentials(self, client):
         """Неверный пароль/логин -> 401."""
@@ -78,6 +78,8 @@ class TestAuthFlow:
 
         assert response.status_code == 200
         assert "accessToken" in response.json()["data"]
+        new_access_token = response.json()["data"]["accessToken"]
+        assert client.cookies.get("access-token") == new_access_token
 
     def test_refresh_via_cookies_success(self, client, admin_settings):
         """Обновление токена через Cookies (тело пустое) -> 200 OK."""
@@ -94,6 +96,8 @@ class TestAuthFlow:
 
         assert response.status_code == 200
         assert "accessToken" in response.json()["data"]
+        new_access_token = response.json()["data"]["accessToken"]
+        assert client.cookies.get("access-token") == new_access_token
 
     def test_refresh_no_token_provided(self, client):
         """Токен не передан ни в теле, ни в куках -> 401."""
