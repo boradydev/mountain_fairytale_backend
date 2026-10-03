@@ -17,9 +17,9 @@ from src.core.excs import BaseAppException
 from src.domain.employees.employee_excs import (
     EmployeeNotFoundByUsernameException,
     EmployeeNotFoundException,
-    InvalidCredentialsException,
+    InvalidCredentialsException, EmployeeDeactivateException,
 )
-from src.api.fastapi.common.api_excs import UnauthorizedException
+from src.api.fastapi.common.api_excs import UnauthorizedException, RefreshTokenNotFoundException
 from src.api.fastapi.common.types import Resp
 
 
@@ -49,6 +49,14 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         CarNumberAlreadyExistsException: Resp(
             status_code=409,
             detail="Car with this number already exists",
+        ),
+        RefreshTokenNotFoundException: Resp(
+            status_code=401,
+            detail="Refresh token not found",
+        ),
+        EmployeeDeactivateException: Resp(
+            status_code=403,
+            detail="Employee account is deactivated",
         ),
     },
 )

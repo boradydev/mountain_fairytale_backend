@@ -7,7 +7,7 @@ from src.api.fastapi.auth.auth_deps import AuthTokenManagerDep
 from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException
 from src.api.fastapi.auth.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
 from src.api.fastapi.common.deps import Context
-from src.api.fastapi.common.handlers import map_exceptions_to_responses
+from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
 
 

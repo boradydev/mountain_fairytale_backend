@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from src.core.excs import BaseAppException
 from src.api.fastapi.common import routers
 from src.api.fastapi.common.exc_map import APP_EXCEPTION_MAP
-from src.api.fastapi.common.handlers import (
+from src.api.fastapi.common.excs_handlers import (
     get_business_exception_handler,
     get_unknown_exception_handler,
 )

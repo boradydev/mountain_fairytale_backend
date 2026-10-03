@@ -20,7 +20,7 @@ from src.api.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,
 )
-from src.api.fastapi.common.handlers import map_exceptions_to_responses
+from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
 
 
