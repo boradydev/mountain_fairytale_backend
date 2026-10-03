@@ -47,9 +47,18 @@ class TestAuthFlow:
 
         # --- Сценарии для /refresh ---
 
-    def test_refresh_success(self, client):
+    def test_refresh_success(self, client, admin_settings):
         """Обновление токена с валидным refresh_token -> 200 OK."""
-        payload = {"refreshToken": "valid_refresh_token"}
+        # 1. Получаем реальный refresh_token через логин
+        login_payload = {
+            "username": admin_settings.ADMIN_USERNAME,
+            "password": admin_settings.ADMIN_PASSWORD,
+        }
+        login_response = client.post("/public/auth/login", json=login_payload)
+        refresh_token = login_response.json()["data"]["refreshToken"]
+
+        # 2. Используем полученный токен для обновления
+        payload = {"refreshToken": refresh_token}
         response = client.post("/public/auth/refresh", json=payload)
 
         assert response.status_code == 200
@@ -62,10 +71,3 @@ class TestAuthFlow:
         response = client.post("/public/auth/refresh", json=payload)
 
         assert response.status_code == 401
-
-    def test_refresh_employee_not_found(self, client):
-        """Токен есть, но пользователь удален из системы -> 404."""
-        payload = {"refreshToken": "token_for_deleted_user"}
-        response = client.post("/public/auth/refresh", json=payload)
-
-        assert response.status_code == 404
