@@ -9,6 +9,8 @@ AI Note:
 """
 
 from collections.abc import Mapping
+
+from src.infra.services.token.excs import InvalidRefreshTokenException
 from types import MappingProxyType
 
 from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException, UnauthorizedException
@@ -66,6 +68,10 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
             detail="Employee account is deactivated",
         ),
         AuthEmployeeNotFoundException: Resp(
+            status_code=401,
+            detail="Invalid credentials",
+        ),
+        InvalidRefreshTokenException: Resp(
             status_code=401,
             detail="Invalid credentials",
         ),
