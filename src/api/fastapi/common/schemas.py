@@ -6,7 +6,7 @@ class BaseSchemaOrigin(BaseModel):
     """Базовая схема с поддержкой snake_case."""
 
 
-class BaseSchema(BaseSchemaOrigin):
+class BaseSchema(BaseModel):
     """Базовая схема с поддержкой camelCase."""
 
     model_config = ConfigDict(

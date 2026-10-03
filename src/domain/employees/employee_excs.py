@@ -5,11 +5,6 @@ from src.domain.common.excs import DomainException
 
 
 @dataclass(frozen=True, slots=True)
-class InvalidCredentialsException(DomainException):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
 class EmployeeNotFoundException(DomainException):
     employee_id: UUID
 
@@ -17,6 +12,7 @@ class EmployeeNotFoundException(DomainException):
 @dataclass(frozen=True, slots=True)
 class EmployeeNotFoundByUsernameException(DomainException):
     username: str
+
 
 @dataclass(frozen=True, slots=True)
 class EmployeeDeactivateException(DomainException):
