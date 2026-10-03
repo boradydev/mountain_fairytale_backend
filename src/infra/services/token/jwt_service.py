@@ -9,8 +9,8 @@ from src.infra.services.token.excs import (
     InvalidRefreshTokenException,
 )
 from src.infra.services.token.settings import JwtSettings
-from src.presentation.fastapi.common.abcs import ITokenService
-from src.presentation.fastapi.auth.schemas import AccessTokenPyload, RefreshTokenPyload
+from src.api.fastapi.common.abcs import ITokenService
+from src.api.fastapi.auth.auth_schemas import AccessTokenPyload, RefreshTokenPyload
 
 
 class JwtTokenService(ITokenService):

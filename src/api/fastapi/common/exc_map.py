@@ -14,13 +14,13 @@ from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsExc
 from types import MappingProxyType
 
 from src.core.excs import BaseAppException
-from src.domain.employees.excs import (
+from src.domain.employees.employee_excs import (
     EmployeeNotFoundByUsernameException,
     EmployeeNotFoundException,
     InvalidCredentialsException,
 )
-from src.presentation.fastapi.auth.excs import UnauthorizedException
-from src.presentation.fastapi.common.types import Resp
+from src.api.fastapi.auth.auth_excs import UnauthorizedException
+from src.api.fastapi.common.types import Resp
 
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(

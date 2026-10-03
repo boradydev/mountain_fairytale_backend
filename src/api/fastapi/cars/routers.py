@@ -10,18 +10,18 @@ from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.update import UpdateCarDTO
 from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsException
-from src.presentation.fastapi.cars.schemas import (
+from src.api.fastapi.cars.schemas import (
     CarResp,
     CarsResp,
     CreateCarReq,
     UpdateCarReq,
 )
-from src.presentation.fastapi.common.deps import (
+from src.api.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,
 )
-from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
-from src.presentation.fastapi.common.schemas import StdResponse
+from src.api.fastapi.common.handlers import map_exceptions_to_responses
+from src.api.fastapi.common.schemas import StdResponse
 
 
 cars_router = APIRouter(

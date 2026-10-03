@@ -5,10 +5,10 @@ from fastapi import Depends, Request
 
 from src.app.employees.usecases.get import GetEmployeeDTO
 from src.domain.employees.entities import Employee
-from src.domain.employees.excs import InvalidCredentialsException
+from src.domain.employees.employee_excs import InvalidCredentialsException
 from src.infra.factories.app_context import AppContext
-from src.presentation.fastapi.auth.excs import UnauthorizedException
-from src.presentation.fastapi.auth.schemas import AccessTokenPyload
+from src.api.fastapi.auth.auth_excs import UnauthorizedException
+from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
 
 
 def get_app_ctx(request: Request) -> AppContext:

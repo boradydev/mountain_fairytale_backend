@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import Depends, Request, Response
 
 from src.infra.web.fastapi.cookies import AuthTokenManager
-from src.presentation.fastapi.auth.abcs.tokens import IAuthTokenManager
-from src.presentation.fastapi.common.deps import Context
+from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
+from src.api.fastapi.common.deps import Context
 
 
 def get_auth_token_manager(

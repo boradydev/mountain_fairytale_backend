@@ -5,17 +5,17 @@ from fastapi import APIRouter, Request, Response, status
 from src.app.employees.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
-from src.domain.employees.excs import EmployeeNotFoundException
+from src.domain.employees.employee_excs import EmployeeNotFoundException
 from src.infra.services.token.settings import JwtSettings
 from src.infra.web.fastapi.cookies import AuthTokenManager
-from src.presentation.fastapi.auth.excs import UnauthorizedException
-from src.presentation.fastapi.common.deps import (
+from src.api.fastapi.auth.auth_excs import UnauthorizedException
+from src.api.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,
 )
-from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
-from src.presentation.fastapi.common.schemas import StdResponse
-from src.presentation.fastapi.employees.schemas import (
+from src.api.fastapi.common.handlers import map_exceptions_to_responses
+from src.api.fastapi.common.schemas import StdResponse
+from src.api.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
 )
 

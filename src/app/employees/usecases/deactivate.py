@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.excs import EmployeeNotFoundException
+from src.domain.employees.employee_excs import EmployeeNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

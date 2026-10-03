@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.presentation.fastapi.common.schemas import BaseSchema
+from src.api.fastapi.common.schemas import BaseSchema
 
 
 class CarResp(BaseSchema):

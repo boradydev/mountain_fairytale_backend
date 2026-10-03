@@ -3,11 +3,9 @@ from dataclasses import dataclass
 from src.app.auth.dto import AuthTokensDTO
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.app.employees.abcs.uow import IEmployeesUOW
+from src.domain.employees import employee_excs
 from src.domain.employees.events import EmployeeLoginEvent
-from src.domain.employees.excs import (
-    InvalidCredentialsException,
-)
-from src.presentation.fastapi.common.abcs import ITokenService
+from src.api.fastapi.common.abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -36,8 +34,15 @@ class LoginUseCase:
                 dto.username,
             )
 
-            if employee is None or not employee.is_active:
-                raise InvalidCredentialsException
+            if employee is None:
+                raise employee_excs.EmployeeNotFoundByUsernameException(
+                    username=dto.username,
+                )
+
+            if not employee.is_active:
+                raise employee_excs.EmployeeDeactivateException(
+                    employee_id=employee.employee_id,
+                )
 
             is_valid = self._password_service.verify_password(
                 plain_password=dto.password,
@@ -45,7 +50,7 @@ class LoginUseCase:
             )
 
             if not is_valid:
-                raise InvalidCredentialsException
+                raise employee_excs.InvalidCredentialsException
 
             access_token = self._token_service.create_access_token(
                 employee_id=str(employee.employee_id),

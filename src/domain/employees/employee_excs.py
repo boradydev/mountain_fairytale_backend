@@ -17,3 +17,7 @@ class EmployeeNotFoundException(DomainException):
 @dataclass(frozen=True, slots=True)
 class EmployeeNotFoundByUsernameException(DomainException):
     username: str
+
+@dataclass(frozen=True, slots=True)
+class EmployeeDeactivateException(DomainException):
+    employee_id: UUID

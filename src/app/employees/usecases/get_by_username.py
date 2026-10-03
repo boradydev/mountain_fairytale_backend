@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from src.app.employees.abcs.uow import IEmployeesUOW
 from src.domain.employees.entities import Employee
-from src.domain.employees.excs import EmployeeNotFoundByUsernameException
+from src.domain.employees.employee_excs import EmployeeNotFoundByUsernameException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

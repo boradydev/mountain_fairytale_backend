@@ -3,8 +3,8 @@ from uuid import UUID
 
 from src.app.auth.dto import AuthTokensDTO
 from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.excs import InvalidCredentialsException
-from src.presentation.fastapi.common.abcs import ITokenService
+from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.api.fastapi.common.abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -37,7 +37,7 @@ class RefreshUseCase:
             )
 
             if employee is None or not employee.is_active:
-                raise InvalidCredentialsException
+                raise EmployeeNotFoundException
 
             access_token = self._token_service.create_access_token(
                 employee_id=str(employee.employee_id),

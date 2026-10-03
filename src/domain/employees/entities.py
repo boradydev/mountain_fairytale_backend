@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Self
-from uuid import UUID
 
-from uuid6 import uuid7
+from uuid6 import uuid7, UUID
 
 from src.domain.common.entities import BaseEntity
 from src.domain.employees import events

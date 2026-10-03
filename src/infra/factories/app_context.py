@@ -7,7 +7,7 @@ from src.infra.factories.auth import AuthUseCaseFactory
 from src.infra.factories.cars import CarsUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.services.token.settings import JwtSettings
-from src.presentation.fastapi.common.abcs import ITokenService
+from src.api.fastapi.common.abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True)
