@@ -2,12 +2,25 @@ from fastapi import APIRouter, status
 
 from src.app.auth.usecases.login import LoginDTO
 from src.app.auth.usecases.refresh import RefreshDTO
-from src.presentation.fastapi.auth import responses
 from src.presentation.fastapi.auth.deps import AuthTokenManagerDep
 from src.presentation.fastapi.auth.excs import UnauthorizedException, RefreshTokenNotFoundException
 from src.presentation.fastapi.common.deps import Context
 from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.auth.schemas import CredsReq, RefreshTokenReq, AuthTokensResp
+from src.domain.employees.excs import InvalidCredentialsException, EmployeeNotFoundByUsernameException
+from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
+
+LOGIN_RESPONSES = map_exceptions_to_responses(
+    InvalidCredentialsException,
+    EmployeeNotFoundByUsernameException,
+)
+
+REFRESH_RESPONSES = map_exceptions_to_responses(
+    InvalidCredentialsException,
+    EmployeeNotFoundByUsernameException,
+    UnauthorizedException,
+    RefreshTokenNotFoundException,
+)
 
 auth_router = APIRouter(
     prefix="/auth",
@@ -19,7 +32,7 @@ auth_router = APIRouter(
     "/login",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[AuthTokensResp],
-    responses=responses.LOGIN
+    responses=LOGIN_RESPONSES
 )
 async def login(
     body: CredsReq,
@@ -50,7 +63,7 @@ async def login(
     "/refresh",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[AuthTokensResp],
-    responses=responses.REFRESH
+    responses=REFRESH_RESPONSES
 )
 async def refresh(
     body: RefreshTokenReq,

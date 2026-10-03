@@ -15,8 +15,12 @@ from src.presentation.fastapi.common.schemas import StdResponse
 from src.presentation.fastapi.employees.schemas import (
     ChangeEmployeePasswordReq,
 )
-from src.presentation.fastapi.me import responses
+from src.domain.employees.excs import EmployeeNotFoundException
+from src.presentation.fastapi.auth.excs import UnauthorizedException
+from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 
+LOGOUT_RESPONSES = map_exceptions_to_responses(UnauthorizedException)
+CHANGE_PASSWORD_RESPONSES = map_exceptions_to_responses(UnauthorizedException, EmployeeNotFoundException)
 
 me_router = APIRouter(
     prefix="/me",
@@ -28,7 +32,7 @@ me_router = APIRouter(
     "/logout",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=responses.LOGOUT,
+    responses=LOGOUT_RESPONSES,
 )
 async def logout(
     request: Request,
@@ -52,7 +56,7 @@ async def logout(
     "/change-password",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=responses.CHANGE_PASSWORD,
+    responses=CHANGE_PASSWORD_RESPONSES,
 )
 async def change_password(
     body: ChangeEmployeePasswordReq,

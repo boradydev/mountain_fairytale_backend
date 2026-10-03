@@ -81,7 +81,7 @@ def get_unknown_exception_handler(
     return handler
 
 
-def get_swagger_exc(
+def map_exceptions_to_responses(
     *excs: type[BaseAppException],
     exception_map: Mapping[type[BaseAppException], Resp] = APP_EXCEPTION_MAP,
 ) -> dict[int, dict[str, str]]:
@@ -98,7 +98,7 @@ def get_swagger_exc(
         Dict for FastAPI `@router.method(..., responses=...)` parameter.
 
     Example:
-        `@router.post(..., responses=get_swagger_exc(UserNotFound, BannedUser))`
+        `@router.post(..., responses=map_exceptions_to_responses(UserNotFound, BannedUser))`
     """
     responses: dict[int, dict[str, str]] = {}
 

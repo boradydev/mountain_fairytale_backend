@@ -14,14 +14,21 @@ from src.presentation.fastapi.common.deps import (
     Context,
 )
 from src.presentation.fastapi.common.schemas import StdResponse
-from src.presentation.fastapi.cars import responses
 from src.presentation.fastapi.cars.schemas import (
     CarResp,
     CarsResp,
     CreateCarReq,
     UpdateCarReq,
 )
+from src.domain.cars.excs import CarNotFoundException, CarNumberAlreadyExistsException
+from src.presentation.fastapi.common.handlers import map_exceptions_to_responses
 
+GET_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException)
+GET_CARS_RESPONSES = map_exceptions_to_responses()
+CREATE_CAR_RESPONSES = map_exceptions_to_responses(CarNumberAlreadyExistsException)
+UPDATE_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException, CarNumberAlreadyExistsException)
+DELETE_CAR_RESPONSES = map_exceptions_to_responses(CarNotFoundException)
+CHECK_DUPLICATE_RESPONSES = map_exceptions_to_responses()
 
 cars_router = APIRouter(
     prefix="/cars",
@@ -33,7 +40,7 @@ cars_router = APIRouter(
     "",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarsResp],
-    responses=responses.GET_CARS,
+    responses=GET_CARS_RESPONSES,
 )
 async def get_cars(
     ctx: Context,
@@ -54,7 +61,7 @@ async def get_cars(
     "/check-duplicate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp | NoneType],
-    responses=responses.CHECK_DUPLICATE,
+    responses=CHECK_DUPLICATE_RESPONSES,
 )
 async def check_duplicate(
     number: str,
@@ -79,7 +86,7 @@ async def check_duplicate(
     "/{car_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp],
-    responses=responses.GET_CAR,
+    responses=GET_CAR_RESPONSES,
 )
 async def get_car(
     car_id: UUID,
@@ -100,7 +107,7 @@ async def get_car(
     "/create",
     status_code=status.HTTP_201_CREATED,
     response_model=StdResponse[CarResp],
-    responses=responses.CREATE_CAR,
+    responses=CREATE_CAR_RESPONSES,
 )
 async def create_car(
     body: CreateCarReq,
@@ -125,7 +132,7 @@ async def create_car(
     "/{car_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp],
-    responses=responses.UPDATE_CAR,
+    responses=UPDATE_CAR_RESPONSES,
 )
 async def update_car(
     car_id: UUID,
@@ -152,7 +159,7 @@ async def update_car(
     "/{car_id:uuid}/deactivate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=responses.DELETE_CAR,
+    responses=DELETE_CAR_RESPONSES,
 )
 async def deactivate_car(
     car_id: UUID,
@@ -175,7 +182,7 @@ async def deactivate_car(
     "/{car_id:uuid}/activate",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
-    responses=responses.DELETE_CAR,
+    responses=DELETE_CAR_RESPONSES,
 )
 async def activate_car(
     car_id: UUID,
