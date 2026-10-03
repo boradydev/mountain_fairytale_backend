@@ -11,7 +11,7 @@ from src.app.employees.usecases.deactivate import DeactivateEmployeeDTO
 from src.app.employees.usecases.get import GetEmployeeDTO
 from src.app.employees.usecases.update import UpdateEmployeeDTO
 from src.domain.employees.employee_excs import EmployeeNotFoundException
-from src.api.fastapi.auth.auth_excs import UnauthorizedException
+from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
     AccessTokenPayloadDep,
     Context,

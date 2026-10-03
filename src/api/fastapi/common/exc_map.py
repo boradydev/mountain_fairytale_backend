@@ -19,7 +19,7 @@ from src.domain.employees.employee_excs import (
     EmployeeNotFoundException,
     InvalidCredentialsException,
 )
-from src.api.fastapi.auth.auth_excs import UnauthorizedException
+from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.types import Resp
 
 
