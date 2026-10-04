@@ -17,3 +17,8 @@ class CarDeactivateException(DomainException):
 @dataclass(frozen=True, slots=True)
 class CarNumberAlreadyExistsException(DomainException):
     number: str
+
+
+@dataclass(frozen=True, slots=True)
+class CarAlreadyActivateException(DomainException):
+    number: str

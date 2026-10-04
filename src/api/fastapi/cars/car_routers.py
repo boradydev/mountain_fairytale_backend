@@ -7,9 +7,8 @@ from fastapi import APIRouter, status, Path, Query
 from src.api.fastapi.cars.car_schemas import (
     CarResp,
     CarsResp,
-    CheckCarDuplicateQuery,
     CreateCarReq,
-    UpdateCarReq, GetCarPath,
+    UpdateCarReq,
 )
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
@@ -43,6 +42,7 @@ API CONTRACT — CARS
     5. Госномер автомобиля должен быть уникальным.
     6. ID автомобиля является UUID.
     7. Все request/response schemas используют camelCase через BaseSchema.
+    8. Все эндпоинты модуля являются защищенными (Protected) и требуют авторизации.
 
 AI TESTING RULES:
 
@@ -147,12 +147,12 @@ async def get_cars(
     """,
 )
 async def check_duplicate(
-    query: CheckCarDuplicateQuery,
+    number: Annotated[str, Query(min_length=1, max_length=10)],
     ctx: Context,
 ) -> StdResponse[CarResp | None]:
     car = await ctx.cars_use_cases.check_duplicate().execute(
         CheckCarDuplicateDTO(
-            number=query.number,
+            number=number,
         ),
     )
 
@@ -189,12 +189,12 @@ async def check_duplicate(
     """,
 )
 async def get_car(
-    path: GetCarPath,
+    car_id: Annotated[UUID, Path()],
     ctx: Context,
 ) -> StdResponse[CarResp]:
     car = await ctx.cars_use_cases.get_car().execute(
         GetCarDTO(
-            car_id=path.car_id,
+            car_id=car_id,
         ),
     )
 
@@ -322,34 +322,25 @@ async def update_car(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
-    Входные данные:
-        car_id — UUID автомобиля.
-
     Результат:
-        HTTP 200.
-        Автомобиль переводится в состояние isActive=false.
+        Автомобиль деактивируется(софт удаление).
 
     Важные требования:
         1. Автомобиль НЕ удаляется физически.
         2. История автомобиля сохраняется.
-        3. После деактивации автомобиль можно получить по UUID.
+        3. После деактивации автомобиль нельзя получить по UUID.
         4. Автомобиль можно повторно активировать.
         5. Повторная деактивация не должна физически удалять сущность.
 
-    Ошибки:
-        401 — пользователь не авторизован.
-        404 — автомобиль не найден.
-
     Критические сценарии для API-тестов:
         1. Деактивация активного автомобиля.
-        2. Проверка isActive == false через GET.
-        3. Проверка сохранения carId/model/number.
-        4. Повторная деактивация.
-        5. Деактивация несуществующего автомобиля -> 404.
+        2. Проверка сохранения carId/model/number.
+        3. Повторная деактивация.
+        4. Деактивация несуществующего автомобиля -> 404.
     """,
 )
 async def deactivate_car(
-    car_id: UUID,
+    car_id: Annotated[UUID, Path()],
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[NoneType]:
@@ -372,6 +363,7 @@ async def deactivate_car(
     responses=map_exceptions_to_responses(
         UnauthorizedException,
         car_excs.CarNotFoundException,
+        car_excs.CarAlreadyActivateException
     ),
     description="""
     Активация автомобиля.
@@ -379,33 +371,24 @@ async def deactivate_car(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
-    Входные данные:
-        car_id — UUID автомобиля.
-
     Результат:
-        HTTP 200.
-        Автомобиль переводится в состояние isActive=true.
+        Автомобиль становится активным(отменяется софт удаление).
 
     Важные требования:
         1. Активация не создаёт новую сущность.
         2. Сохраняется исходный carId.
-        3. Сохраняются model, number и currentMileage.
-        4. Автомобиль после активации снова является активным.
-
-    Ошибки:
-        401 — пользователь не авторизован.
-        404 — автомобиль не найден.
+        3. Автомобиль после активации снова является активным.
 
     Критические сценарии для API-тестов:
         1. deactivate -> activate.
         2. Проверка isActive == true после activate.
         3. Проверка сохранения всех остальных данных.
-        4. Активация уже активного автомобиля.
+        4. Активация уже активного автомобиля -> 409.
         5. Активация несуществующего автомобиля -> 404.
     """,
 )
 async def activate_car(
-    car_id: UUID,
+    car_id: Annotated[UUID, Path()],
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[NoneType]:
