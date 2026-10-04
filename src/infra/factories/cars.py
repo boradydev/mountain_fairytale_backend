@@ -1,9 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.cars.usecases.activate import ActivateCarUseCase
 from src.app.cars.usecases.check_duplicate import CheckCarDuplicateUseCase
 from src.app.cars.usecases.create import CreateCarUseCase
-from src.app.cars.usecases.deactivate import DeactivateCarUseCase
 from src.app.cars.usecases.get import GetCarUseCase
 from src.app.cars.usecases.get_all import GetCarsUseCase
 from src.app.cars.usecases.update import UpdateCarUseCase
@@ -34,16 +32,6 @@ class CarsUseCaseFactory:
 
     def update_car(self) -> UpdateCarUseCase:
         return UpdateCarUseCase(
-            uow=self._create_uow(),
-        )
-
-    def activate_car(self) -> ActivateCarUseCase:
-        return ActivateCarUseCase(
-            uow=self._create_uow(),
-        )
-
-    def deactivate_car(self) -> DeactivateCarUseCase:
-        return DeactivateCarUseCase(
             uow=self._create_uow(),
         )
 
