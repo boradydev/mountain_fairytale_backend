@@ -1,10 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Query
 from pydantic import Field
 
+from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
 from src.api.fastapi.common.schemas import BaseSchema
+from src.domain.cars.entities import Car
 
 
 class CarResp(BaseSchema):
@@ -25,7 +26,4 @@ class CreateCarReq(BaseSchema):
     current_mileage: Annotated[float, Field(ge=0)] = 0
 
 
-class UpdateCarReq(BaseSchema):
-    model: Annotated[str | None, Field(min_length=1, max_length=100)] = None
-    number: Annotated[str | None, Field(min_length=1, max_length=30)] = None
-    current_mileage: Annotated[float | None, Field(ge=0)] = None
+UpdateCarReq = create_patch_schema_for_domain(Car)
