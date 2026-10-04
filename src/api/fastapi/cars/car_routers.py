@@ -22,6 +22,7 @@ from src.app.cars.usecases.check_duplicate import CheckCarDuplicateDTO
 from src.app.cars.usecases.create import CreateCarDTO
 from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
+from src.app.cars.usecases.get_all import GetCarsDTO
 from src.app.cars.usecases.update import UpdateCarDTO
 from src.domain.cars import car_excs
 
@@ -86,21 +87,32 @@ cars_router = APIRouter(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
+    Входные данные:
+        Query parameter:
+            include_deactivated: если true, вернуть все автомобили, включая деактивированные.
+
     Действие:
         Вернуть список автомобилей.
 
     Результат:
-        Список только активных автомобилей.
+        Если include_deactivated=false (по умолчанию) -> список только активных автомобилей.
+        Если include_deactivated=true -> список всех автомобилей.
 
     Критические сценарии для API-тестов:
-        1. Если активных автомобилей нет, то возвращается пустой список.
-        2. В списке есть только активные автомобили.
+        1. Если активных автомобилей нет, а include_deactivated=false, то возвращается пустой список.
+        2. При include_deactivated=false в списке только активные автомобили.
+        3. При include_deactivated=true в списке присутствуют и активные, и деактивированные автомобили.
     """,
 )
 async def get_cars(
     ctx: Context,
+    include_deactivated: Annotated[bool, Query(default=False)],
 ) -> StdResponse[CarsResp]:
-    cars = await ctx.cars_use_cases.get_cars().execute()
+    cars = await ctx.cars_use_cases.get_cars().execute(
+        GetCarsDTO(
+            include_deactivated=include_deactivated
+        )
+    )
 
     return StdResponse(
         data=CarsResp(
@@ -137,13 +149,13 @@ async def get_cars(
         1. Endpoint не должен возвращать 404, если автомобиль не найден.
         2. Отсутствие автомобиля является нормальным результатом проверки.
         3. Поиск выполняется по полному значению number.
+        4. Поиск должен находить как активные, так и деактивированные автомобили.
 
     Критические сценарии для API-тестов:
         1. Номер существует -> возвращается автомобиль.
         2. Номер не существует -> data == null.
         3. После создания автомобиля проверка его номера возвращает автомобиль.
-        4. Номер деактивированного автомобиля также должен корректно находиться,
-           поскольку деактивация не является физическим удалением.
+        4. Номер деактивированного автомобиля должен быть найден.
     """,
 )
 async def check_duplicate(
@@ -168,7 +180,6 @@ async def check_duplicate(
     responses=map_exceptions_to_responses(
         UnauthorizedException,
         car_excs.CarNotFoundException,
-        car_excs.CarDeactivateException
     ),
     description="""
     Получение автомобиля по UUID.
@@ -177,14 +188,14 @@ async def check_duplicate(
         Запрос выполняется от имени авторизованного пользователя.
 
     Результат:
-        Автомобиль активный в системе.
+        Автомобиль (активный или деактивированный).
 
     Важные требования:
-        1. Получение только активного автомобиля.
+        1. Получение любого существующего автомобиля независимо от его статуса.
 
     Критические сценарии для API-тестов:
         1. Получение существующего активного автомобиля.
-        2. Получение деактивированного автомобиля, статус код 403.
+        2. Получение существующего деактивированного автомобиля.
         3. Получение несуществующего автомобиля, статус код 404.
     """,
 )
