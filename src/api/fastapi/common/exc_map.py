@@ -18,7 +18,11 @@ from src.api.fastapi.common.types import Resp
 from src.core.excs import BaseAppException
 from src.domain.auth.auth_excs import AuthEmployeeNotFoundException, InvalidCredentialsException, \
     AuthEmployeeNotFoundByUsernameException, AuthEmployeeDeactivateException
-from src.domain.cars.car_excs import CarNotFoundException
+from src.domain.cars.car_excs import (
+    CarNotFoundException,
+    CarNumberAlreadyExistsException,
+    CarAlreadyActivateException,
+)
 from src.domain.employees.employee_excs import (
     EmployeeDeactivateException,
     EmployeeNotFoundByUsernameException,
@@ -50,6 +54,14 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         CarNotFoundException: Resp(
             status_code=404,
             detail="Car not found",
+        ),
+        CarNumberAlreadyExistsException: Resp(
+            status_code=409,
+            detail="Car number already exists",
+        ),
+        CarAlreadyActivateException: Resp(
+            status_code=409,
+            detail="Car is already active",
         ),
         RefreshTokenNotFoundException: Resp(
             status_code=401,
