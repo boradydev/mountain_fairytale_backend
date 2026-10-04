@@ -10,5 +10,10 @@ class CarNotFoundException(DomainException):
 
 
 @dataclass(frozen=True, slots=True)
+class CarDeactivateException(DomainException):
+    car_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
 class CarNumberAlreadyExistsException(DomainException):
     number: str

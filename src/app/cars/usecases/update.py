@@ -3,7 +3,7 @@ from uuid import UUID
 
 from src.app.cars.abcs.uow import ICarsUOW
 from src.domain.cars.entities import Car
-from src.domain.cars.excs import (
+from src.domain.cars.car_excs import (
     CarNotFoundException,
     CarNumberAlreadyExistsException,
 )

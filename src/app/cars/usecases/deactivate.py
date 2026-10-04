@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.cars.abcs.uow import ICarsUOW
-from src.domain.cars.excs import CarNotFoundException
+from src.domain.cars.car_excs import CarNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

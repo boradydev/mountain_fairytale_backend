@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from src.api.fastapi.auth.auth_routers import auth_router
 from src.api.fastapi.cars.car_routers import cars_router
+from src.api.fastapi.common.deps import verify_access_token
 from src.api.fastapi.employees.employee_routers import employees_router
 from src.api.fastapi.me.me_routers import me_router
 
@@ -15,6 +16,7 @@ public.include_router(auth_router)
 
 protected = APIRouter(
     prefix="/protected",
+    dependencies=[Depends(verify_access_token)]
 )
 
 protected.include_router(me_router)

@@ -18,7 +18,7 @@ from src.api.fastapi.common.types import Resp
 from src.core.excs import BaseAppException
 from src.domain.auth.auth_excs import AuthEmployeeNotFoundException, InvalidCredentialsException, \
     AuthEmployeeNotFoundByUsernameException, AuthEmployeeDeactivateException
-from src.domain.cars.excs import CarNotFoundException
+from src.domain.cars.car_excs import CarNotFoundException
 from src.domain.employees.employee_excs import (
     EmployeeDeactivateException,
     EmployeeNotFoundByUsernameException,

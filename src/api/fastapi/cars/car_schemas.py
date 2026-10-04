@@ -1,6 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
+from fastapi import Query
 from pydantic import Field
 
 from src.api.fastapi.common.schemas import BaseSchema
@@ -28,3 +29,10 @@ class UpdateCarReq(BaseSchema):
     model: Annotated[str | None, Field(min_length=1, max_length=100)] = None
     number: Annotated[str | None, Field(min_length=1, max_length=30)] = None
     current_mileage: Annotated[float | None, Field(ge=0)] = None
+
+
+class CheckCarDuplicateQuery(BaseSchema):
+    number: Annotated[str, Query(min_length=1, max_length=10)]
+
+class GetCarPath(BaseSchema):
+    car_id: UUID

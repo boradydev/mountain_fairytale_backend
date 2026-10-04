@@ -1,14 +1,16 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Response
 
+from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
+from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
+from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.app.employees.usecases.get import GetEmployeeDTO
 from src.domain.auth.auth_excs import InvalidCredentialsException
 from src.domain.employees.entities import Employee
 from src.infra.factories.app_context import AppContext
-from src.api.fastapi.common.api_excs import UnauthorizedException
-from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
+from src.infra.web.fastapi.cookies import AuthTokenManager
 
 
 def get_app_ctx(request: Request) -> AppContext:
@@ -18,26 +20,39 @@ def get_app_ctx(request: Request) -> AppContext:
 Context = Annotated[AppContext, Depends(get_app_ctx)]
 
 
-def get_access_token_pyload(
-    request: Request,
+def get_auth_token_manager(
     ctx: Context,
-) -> AccessTokenPyload:
-    authorization = request.headers.get("Authorization")
+    request: Request,
+    response: Response,
+) -> IAuthTokenManager:
+    return AuthTokenManager(
+        request=request,
+        response=response,
+        settings=ctx.token_settings,
+    )
 
-    access_token: str | None = None
 
-    if authorization is not None:
-        scheme, _, value = authorization.partition(" ")
+AuthTokenManagerDep = Annotated[IAuthTokenManager, Depends(get_auth_token_manager)]
 
-        if scheme.lower() == "bearer" and value:
-            access_token = value
+
+def verify_access_token(
+    auth_token_manager: AuthTokenManagerDep,
+) -> str:
+    access_token = auth_token_manager.access_token_from_header
 
     if access_token is None:
-        access_token = request.cookies.get("access_token")
+        access_token = auth_token_manager.access_token_from_cookie
 
     if access_token is None:
         raise UnauthorizedException
 
+    return access_token
+
+
+def get_access_token_pyload(
+    access_token: Annotated[str, Depends(verify_access_token)],
+    ctx: Context,
+) -> AccessTokenPyload:
     return ctx.token_service.get_payload_access_token(
         access_token=access_token,
     )

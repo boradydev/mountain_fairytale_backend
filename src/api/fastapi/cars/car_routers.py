@@ -1,14 +1,15 @@
 from types import NoneType
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Path, Query
 
 from src.api.fastapi.cars.car_schemas import (
     CarResp,
     CarsResp,
     CheckCarDuplicateQuery,
     CreateCarReq,
-    UpdateCarReq,
+    UpdateCarReq, GetCarPath,
 )
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
@@ -23,10 +24,7 @@ from src.app.cars.usecases.create import CreateCarDTO
 from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.update import UpdateCarDTO
-from src.domain.cars.car_excs import (
-    CarNotFoundException,
-    CarNumberAlreadyExistsException,
-)
+from src.domain.cars import car_excs
 
 
 """
@@ -169,7 +167,8 @@ async def check_duplicate(
     response_model=StdResponse[CarResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        CarNotFoundException,
+        car_excs.CarNotFoundException,
+        car_excs.CarDeactivateException
     ),
     description="""
     Получение автомобиля по UUID.
@@ -177,37 +176,25 @@ async def check_duplicate(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
-    Входные данные:
-        Path parameter:
-            car_id: UUID автомобиля.
-
     Результат:
-        HTTP 200.
-        data содержит CarResp.
-
-    Ошибки:
-        401 — пользователь не авторизован.
-        404 — автомобиль с указанным UUID не найден.
+        Автомобиль активный в системе.
 
     Важные требования:
-        1. Активный и деактивированный автомобиль остаются сущностями системы.
-        2. Деактивация не должна приводить к тому, что GET по UUID начинает
-           возвращать 404.
+        1. Получение только активного автомобиля.
 
     Критические сценарии для API-тестов:
-        1. Получение существующего автомобиля.
-        2. Получение деактивированного автомобиля.
-        3. Получение несуществующего UUID -> 404.
+        1. Получение существующего активного автомобиля.
+        2. Получение деактивированного автомобиля, статус код 403.
+        3. Получение несуществующего автомобиля, статус код 404.
     """,
 )
 async def get_car(
-    car_id: UUID,
+    path: GetCarPath,
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[CarResp]:
     car = await ctx.cars_use_cases.get_car().execute(
         GetCarDTO(
-            car_id=car_id,
+            car_id=path.car_id,
         ),
     )
 
@@ -222,7 +209,7 @@ async def get_car(
     response_model=StdResponse[CarResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        CarNumberAlreadyExistsException,
+        car_excs.CarNumberAlreadyExistsException,
     ),
     description="""
     Создание нового автомобиля.
@@ -230,27 +217,8 @@ async def get_car(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
-    Входные данные:
-        CreateCarReq:
-            - model — обязательная строка;
-            - number — обязательная строка;
-            - currentMileage — необязательное значение.
-
     Результат:
-        HTTP 201.
-        data содержит созданный автомобиль.
-
-    После создания:
-        - carId должен быть назначен системой;
-        - isActive должен быть true;
-        - переданные model и number должны быть сохранены;
-        - currentMileage должен соответствовать переданному значению
-          либо значению по умолчанию, определённому API-контрактом.
-
-    Ошибки:
-        401 — пользователь не авторизован.
-        Конфликт государственного номера — номер уже используется другим
-        автомобилем.
+        Содержит созданный автомобиль.
 
     Важные требования:
         1. Нельзя создать два автомобиля с одним number.
@@ -263,7 +231,6 @@ async def get_car(
         3. Проверка isActive == true.
         4. Проверка сохранения данных через GET.
         5. Попытка создать второй автомобиль с тем же number.
-        6. Запрос без авторизации.
     """,
 )
 async def create_car(
@@ -291,8 +258,8 @@ async def create_car(
     response_model=StdResponse[CarResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        CarNotFoundException,
-        CarNumberAlreadyExistsException,
+        car_excs.CarNotFoundException,
+        car_excs.CarNumberAlreadyExistsException,
     ),
     description="""
     Обновление данных автомобиля.
@@ -300,43 +267,28 @@ async def create_car(
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
-    Входные данные:
-        Path:
-            car_id — UUID автомобиля.
-
-        Body:
-            UpdateCarReq.
-            Все изменяемые поля являются необязательными.
-
     Результат:
-        HTTP 200.
-        data содержит актуальное состояние автомобиля.
-
-    Ошибки:
-        401 — пользователь не авторизован.
-        404 — автомобиль не найден.
-        Конфликт государственного номера — указанный number уже принадлежит
-        другому автомобилю.
+        Содержит актуальное состояние автомобиля.
 
     Важные требования:
-        1. Можно изменять только поля, предусмотренные UpdateCarReq.
-        2. Изменение number не должно создавать дубликатов.
-        3. Обновление одного автомобиля не должно изменять другой автомобиль.
-        4. Деактивированный автомобиль остаётся доступным для обновления,
-           если это допускается текущей моделью API.
+        1. Изменение number не должно создавать дубликатов.
+        2. Обновление одного автомобиля не должно изменять другой автомобиль.
+
 
     Критические сценарии для API-тестов:
-        1. Обновление model.
-        2. Обновление number.
-        3. Обновление currentMileage.
-        4. Частичное обновление.
-        5. Обновление несуществующего автомобиля -> 404.
-        6. Попытка занять уже существующий number.
-        7. Проверка результата через GET.
+        1. Частичное обновление полей (передана только часть полей, остальные в БД не меняются).
+        2. Полное обновление всех полей (передан весь объект целиком).
+        3. Обновление несуществующего автомобиля -> 404 Not Found.
+        4. Попытка занять уже существующий номер автомобиля -> 409 Conflict.
+        5. Проверка результата через GET (что данные реально применились в БД).
+        6. Пустой запрос (тело запроса `{}`): -> 422.
+        7. Передача `null` в необязательные поля: если поле может быть `null` отправляет в БД.
+        8. Передача `null` в обязательные поля: попытка передать `null` -> 422.
+        9. Передача невалидного UUID в URL: отправка `/cars/123-не-uuid` -> 422.
     """,
 )
 async def update_car(
-    car_id: UUID,
+    car_id: Annotated[UUID, Path()],
     body: UpdateCarReq,
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
@@ -362,7 +314,7 @@ async def update_car(
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        CarNotFoundException,
+        car_excs.CarNotFoundException,
     ),
     description="""
     Деактивация автомобиля.
@@ -419,7 +371,7 @@ async def deactivate_car(
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        CarNotFoundException,
+        car_excs.CarNotFoundException,
     ),
     description="""
     Активация автомобиля.

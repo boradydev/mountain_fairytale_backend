@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from src.api.fastapi.auth.auth_deps import AuthTokenManagerDep
+from src.api.fastapi.common.deps import AuthTokenManagerDep
 from src.api.fastapi.auth.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
 from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException
 from src.api.fastapi.common.deps import Context
