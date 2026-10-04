@@ -114,6 +114,24 @@ class TestCarRouters:
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         assert response.status_code == 409
 
+    async def test_create_car_duplicate_number_with_deactivated(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        car_factory,
+    ) -> None:
+        await self.login(client, active_employee)
+        
+        # Создаем деактивированный автомобиль с определенным номером
+        await car_factory(number="DEACT123", is_active=False)
+
+        # Пытаемся создать новый активный автомобиль с тем же номером
+        payload = {"model": "Tesla", "number": "DEACT123"}
+        response = await client.post(f"{BASE_PATH}/create", json=payload)
+        
+        # Ожидаем 409 Conflict, так как номер должен быть уникальным во всей системе
+        assert response.status_code == 409
+
     async def test_update_car_partial(
         self,
         client: AsyncClient,
@@ -129,6 +147,24 @@ class TestCarRouters:
         assert response.status_code == 200
         assert response.json()["data"]["model"] == "New Model"
         assert response.json()["data"]["number"] == "OLD123"
+
+    async def test_update_car_duplicate_number(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        car_factory,
+    ) -> None:
+        await self.login(client, active_employee)
+        
+        # Создаем два автомобиля
+        car1 = await car_factory(number="CAR1")
+        await car_factory(number="CAR2")
+
+        # Пытаемся изменить номер первого автомобиля на номер второго
+        payload = {"number": "CAR2"}
+        response = await client.patch(f"{BASE_PATH}/{car1.car_id}", json=payload)
+        
+        assert response.status_code == 409
 
     async def test_update_car_not_found(
         self,

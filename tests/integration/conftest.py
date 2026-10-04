@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+import random
+import string
 import pytest
 from uuid6 import uuid7
 
@@ -153,7 +155,7 @@ def car_factory(
         current_mileage: float = 0.0,
         is_active: bool = True,
     ) -> CarTestData:
-        number = number or f"A{uuid7().hex[:6].upper()}XX"
+        number = number or f"A{''.join(random.choices(string.ascii_uppercase + string.digits, k=8))}XX"
 
         car = Car.create(
             actor_id=uuid7(),
