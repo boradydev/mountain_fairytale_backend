@@ -106,7 +106,7 @@ cars_router = APIRouter(
 )
 async def get_cars(
     ctx: Context,
-    include_deactivated: Annotated[bool, Query(default=False)],
+    include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[CarsResp]:
     cars = await ctx.cars_use_cases.get_cars().execute(
         GetCarsDTO(
@@ -271,6 +271,7 @@ async def create_car(
         UnauthorizedException,
         car_excs.CarNotFoundException,
         car_excs.CarNumberAlreadyExistsException,
+        car_excs.CarDomainUpdateException,
     ),
     description="""
     Обновление данных автомобиля.

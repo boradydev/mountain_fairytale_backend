@@ -22,3 +22,9 @@ class CarNumberAlreadyExistsException(DomainException):
 @dataclass(frozen=True, slots=True)
 class CarAlreadyActivateException(DomainException):
     number: str
+
+
+@dataclass(frozen=True, slots=True)
+class CarDomainUpdateException(DomainException):
+    field: str
+    message: str

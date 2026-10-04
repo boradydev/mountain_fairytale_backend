@@ -4,6 +4,7 @@ from uuid import UUID
 
 from uuid6 import uuid7
 
+from src.domain.cars.car_excs import CarDomainUpdateException
 from src.domain.common.entities import BaseEntity
 from src.domain.cars import events
 
@@ -64,6 +65,8 @@ class Car(BaseEntity):
         actor_id: UUID,
         **payload: Any,
     ) -> None:
+        self._validate_update(payload)
+
         changes = self._apply_update_changes(
             payload=payload,
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
@@ -79,6 +82,21 @@ class Car(BaseEntity):
                 changes=changes,
             ),
         )
+
+    def _validate_update(self, payload: dict[str, Any]) -> None:
+        new_mileage = payload.get("current_mileage")
+
+        if (
+            new_mileage is not None
+            and new_mileage < self._current_mileage
+        ):
+            raise CarDomainUpdateException(
+                field="current_mileage",
+                message=(
+                    f"New mileage ({new_mileage}) cannot be less "
+                    f"than current mileage ({self._current_mileage})."
+                ),
+            )
 
     def deactivate(self, actor_id: UUID) -> None:
         if not self._is_active:
