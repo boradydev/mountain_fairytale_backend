@@ -27,4 +27,8 @@ class CreateCarReq(BaseSchema):
 
 
 class UpdateCarReq(create_patch_schema_for_domain(Car)):
-    """PATCH schema for Car."""
+    """
+    PATCH schema for Car.
+    Allowed fields: model, number, current_mileage, is_active.
+    All fields are optional, but non-nullable.
+    """
