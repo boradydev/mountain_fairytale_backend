@@ -40,7 +40,9 @@ class RefreshUseCase:
                 raise auth_excs.AuthEmployeeNotFoundException
 
             if not employee.is_active:
-                raise auth_excs.AuthEmployeeDeactivateException
+                raise auth_excs.AuthEmployeeDeactivateException(
+                    employee_id=employee.employee_id,
+                )
 
             access_token = self._token_service.create_access_token(
                 employee_id=str(employee.employee_id),

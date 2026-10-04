@@ -1,13 +1,5 @@
-from collections.abc import AsyncGenerator
-from typing import Any
+"""PostgreSQL fixtures are defined in tests/integration/conftest.py.
 
-import pytest
-
-from src.infra.db.postgres.database import Postgres
-
-
-@pytest.fixture
-async def postgres() -> AsyncGenerator[Postgres, Any]:
-    postgres = Postgres()
-    yield postgres
-    await postgres.dispose()
+They are intentionally located at the integration-test root so that the same
+Postgres/UOW fixtures can be reused by API and infrastructure integration tests.
+"""
