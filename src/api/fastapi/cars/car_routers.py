@@ -6,6 +6,7 @@ from fastapi import APIRouter, status
 from src.api.fastapi.cars.car_schemas import (
     CarResp,
     CarsResp,
+    CheckCarDuplicateQuery,
     CreateCarReq,
     UpdateCarReq,
 )
@@ -22,7 +23,7 @@ from src.app.cars.usecases.create import CreateCarDTO
 from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.update import UpdateCarDTO
-from src.domain.cars.excs import (
+from src.domain.cars.car_excs import (
     CarNotFoundException,
     CarNumberAlreadyExistsException,
 )
@@ -84,36 +85,18 @@ cars_router = APIRouter(
     description="""
     Получение списка всех автомобилей.
 
-    Предусловия:
-        Дополнительные параметры не требуются.
+    Предусловие:
+        Запрос выполняется от имени авторизованного пользователя.
 
     Действие:
         Вернуть список автомобилей.
 
     Результат:
-        HTTP 200.
-        Body:
-            StdResponse[CarsResp]
-
-        В data.cars содержится список автомобилей.
-        Каждый автомобиль содержит:
-            - carId;
-            - model;
-            - number;
-            - currentMileage;
-            - isActive.
-
-    Важные требования:
-        1. Автомобили не должны физически исчезать из системы.
-        2. В списке должны корректно отображаться значения isActive.
-        3. Список должен содержать данные всех существующих автомобилей.
+        Список только активных автомобилей.
 
     Критические сценарии для API-тестов:
-        1. Список пуст.
-        2. В списке есть активные автомобили.
-        3. В списке есть деактивированные автомобили.
-        4. После deactivate автомобиль остаётся доступным через API.
-        5. После activate автомобиль снова имеет isActive=true.
+        1. Если активных автомобилей нет, то возвращается пустой список.
+        2. В списке есть только активные автомобили.
     """,
 )
 async def get_cars(
@@ -133,10 +116,13 @@ async def get_cars(
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp | NoneType],
     responses=map_exceptions_to_responses(
-UnauthorizedException,
+        UnauthorizedException,
     ),
     description="""
     Проверка существования автомобиля с указанным государственным номером.
+
+    Предусловие:
+        Запрос выполняется от имени авторизованного пользователя.
 
     Входные данные:
         Query parameter:
@@ -163,12 +149,12 @@ UnauthorizedException,
     """,
 )
 async def check_duplicate(
-    number: str,
+    query: CheckCarDuplicateQuery,
     ctx: Context,
 ) -> StdResponse[CarResp | None]:
     car = await ctx.cars_use_cases.check_duplicate().execute(
         CheckCarDuplicateDTO(
-            number=number,
+            number=query.number,
         ),
     )
 
@@ -182,10 +168,14 @@ async def check_duplicate(
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[CarResp],
     responses=map_exceptions_to_responses(
+        UnauthorizedException,
         CarNotFoundException,
     ),
     description="""
     Получение автомобиля по UUID.
+
+    Предусловие:
+        Запрос выполняется от имени авторизованного пользователя.
 
     Входные данные:
         Path parameter:
@@ -196,6 +186,7 @@ async def check_duplicate(
         data содержит CarResp.
 
     Ошибки:
+        401 — пользователь не авторизован.
         404 — автомобиль с указанным UUID не найден.
 
     Важные требования:
@@ -212,6 +203,7 @@ async def check_duplicate(
 async def get_car(
     car_id: UUID,
     ctx: Context,
+    access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[CarResp]:
     car = await ctx.cars_use_cases.get_car().execute(
         GetCarDTO(
