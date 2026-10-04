@@ -22,6 +22,7 @@ class CarSQL:
     GET_BY_ID = text(sql_reader("get_by_id.sql", __file__))
     GET_BY_NUMBER = text(sql_reader("get_by_number.sql", __file__))
     GET_ALL = text(sql_reader("get_all.sql", __file__))
+    GET_ALL_WITH_DEACTIVATE = text(sql_reader("get_all_with_deactivated.sql", __file__))
 
     @classmethod
     def UPDATE(

@@ -95,10 +95,19 @@ class CarsRepository(ICarsRepository):
             _is_active=row["is_active"],
         )
 
-    async def get_all(self) -> list[Car]:
-        result = await self._session.execute(
-            CarSQL.GET_ALL,
-        )
+    async def get_all(
+        self,
+        include_deactivated: bool = False,
+    ) -> list[Car]:
+        if include_deactivated:
+            result = await self._session.execute(
+                CarSQL.GET_ALL_WITH_DEACTIVATE,
+            )
+
+        else:
+            result = await self._session.execute(
+                CarSQL.GET_ALL,
+            )
 
         rows = result.mappings().all()
 

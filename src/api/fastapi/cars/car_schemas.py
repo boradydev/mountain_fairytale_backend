@@ -26,4 +26,5 @@ class CreateCarReq(BaseSchema):
     current_mileage: Annotated[float, Field(ge=0)] = 0
 
 
-UpdateCarReq = create_patch_schema_for_domain(Car)
+class UpdateCarReq(create_patch_schema_for_domain(Car)):
+    """PATCH schema for Car."""

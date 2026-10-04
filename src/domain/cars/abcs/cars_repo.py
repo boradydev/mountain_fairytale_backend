@@ -29,6 +29,7 @@ class ICarsRepository(ABC):
     @abstractmethod
     async def get_all(
         self,
+        include_deactivated: bool = False,
     ) -> list[Car]:
         """Возвращает все автомобили."""
 

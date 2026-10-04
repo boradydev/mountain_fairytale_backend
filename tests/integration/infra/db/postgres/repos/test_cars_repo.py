@@ -2,7 +2,7 @@ import pytest
 from uuid6 import uuid7
 
 from src.domain.cars.entities import Car
-from src.infra.db.postgres.repos.cars.repo import CarsRepository
+from src.infra.db.postgres.repos.cars.cars_repo import CarsRepository
 
 
 @pytest.mark.integration

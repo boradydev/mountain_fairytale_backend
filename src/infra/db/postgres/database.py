@@ -1,3 +1,6 @@
+from typing import Any
+
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -36,3 +39,14 @@ class Postgres:
     async def dispose(self) -> None:
         """Закрывает все активные соединения в пуле движка."""
         await self._engine.dispose()
+
+    async def execute(
+        self,
+        sql: str,
+        params: dict[str, Any] | None = None,
+    ) -> None:
+        async with self._engine.begin() as connection:
+            await connection.execute(
+                text(sql),
+                params or {},
+            )

@@ -2,7 +2,7 @@ from types import NoneType
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status, Path, Query
+from fastapi import APIRouter, Path, Query, status
 
 from src.api.fastapi.cars.car_schemas import (
     CarResp,
@@ -109,9 +109,7 @@ async def get_cars(
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[CarsResp]:
     cars = await ctx.cars_use_cases.get_cars().execute(
-        GetCarsDTO(
-            include_deactivated=include_deactivated
-        )
+        GetCarsDTO(include_deactivated=include_deactivated)
     )
 
     return StdResponse(
@@ -296,6 +294,7 @@ async def create_car(
         6. Пустой запрос (тело запроса `{}`): -> 422.
         7. Передача `null` в поля: если домен определит, что `null` не валиден для данного поля, возвращается 422.
         8. Передача невалидного UUID в URL: отправка `/cars/123-не-uuid` -> 422.
+        9. Нарушение доменных инвариантов при обновлении (CarDomainUpdateException) -> 422 Unprocessable Entity.
     """,
 )
 async def update_car(
@@ -372,9 +371,7 @@ async def deactivate_car(
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
-        UnauthorizedException,
-        car_excs.CarNotFoundException,
-        car_excs.CarAlreadyActivateException
+        UnauthorizedException, car_excs.CarNotFoundException, car_excs.CarAlreadyActivateException
     ),
     description="""
     Активация автомобиля.
