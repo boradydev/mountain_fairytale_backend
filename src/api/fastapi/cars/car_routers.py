@@ -17,10 +17,8 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.app.cars.usecases.activate import ActivateCarDTO
 from src.app.cars.usecases.check_duplicate import CheckCarDuplicateDTO
 from src.app.cars.usecases.create import CreateCarDTO
-from src.app.cars.usecases.deactivate import DeactivateCarDTO
 from src.app.cars.usecases.get import GetCarDTO
 from src.app.cars.usecases.get_all import GetCarsDTO
 from src.app.cars.usecases.update import UpdateCarDTO
@@ -315,98 +313,4 @@ async def update_car(
 
     return StdResponse(
         data=CarResp.model_validate(car),
-    )
-
-
-@cars_router.put(
-    "/{car_id:uuid}/deactivate",
-    status_code=status.HTTP_200_OK,
-    response_model=StdResponse[NoneType],
-    responses=map_exceptions_to_responses(
-        UnauthorizedException,
-        car_excs.CarNotFoundException,
-    ),
-    description="""
-    Деактивация автомобиля.
-
-    Предусловие:
-        Запрос выполняется от имени авторизованного пользователя.
-
-    Результат:
-        Автомобиль деактивируется(софт удаление).
-
-    Важные требования:
-        1. Автомобиль НЕ удаляется физически.
-        2. История автомобиля сохраняется.
-        3. После деактивации автомобиль по-прежнему можно получить по UUID через GET /{car_id}.
-        4. Автомобиль можно повторно активировать.
-        5. Повторная деактивация не должна физически удалять сущность.
-
-    Критические сценарии для API-тестов:
-        1. Деактивация активного автомобиля.
-        2. Проверка сохранения carId/model/number.
-        3. Повторная деактивация.
-        4. Деактивация несуществующего автомобиля -> 404.
-    """,
-)
-async def deactivate_car(
-    car_id: Annotated[UUID, Path()],
-    ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
-) -> StdResponse[NoneType]:
-    await ctx.cars_use_cases.deactivate_car().execute(
-        DeactivateCarDTO(
-            actor_id=UUID(access_token_payload.employee_id),
-            car_id=car_id,
-        ),
-    )
-
-    return StdResponse(
-        message="Автомобиль деактивирован.",
-    )
-
-
-@cars_router.put(
-    "/{car_id:uuid}/activate",
-    status_code=status.HTTP_200_OK,
-    response_model=StdResponse[NoneType],
-    responses=map_exceptions_to_responses(
-        UnauthorizedException, car_excs.CarNotFoundException, car_excs.CarAlreadyActivateException
-    ),
-    description="""
-    Активация автомобиля.
-
-    Предусловие:
-        Запрос выполняется от имени авторизованного пользователя.
-
-    Результат:
-        Автомобиль становится активным(отменяется софт удаление).
-
-    Важные требования:
-        1. Активация не создаёт новую сущность.
-        2. Сохраняется исходный carId.
-        3. Автомобиль после активации снова является активным.
-
-    Критические сценарии для API-тестов:
-        1. deactivate -> activate.
-        2. Проверка isActive == true после activate.
-        3. Проверка сохранения всех остальных данных.
-        4. Активация уже активного автомобиля -> 409.
-        5. Активация несуществующего автомобиля -> 404.
-    """,
-)
-async def activate_car(
-    car_id: Annotated[UUID, Path()],
-    ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
-) -> StdResponse[NoneType]:
-    await ctx.cars_use_cases.activate_car().execute(
-        ActivateCarDTO(
-            actor_id=UUID(access_token_payload.employee_id),
-            car_id=car_id,
-        ),
-    )
-
-    return StdResponse(
-        message="Автомобиль активирован.",
     )

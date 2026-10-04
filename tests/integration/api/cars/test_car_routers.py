@@ -139,42 +139,6 @@ class TestCarRouters:
         response = await client.patch(f"{BASE_PATH}/{uuid7()}", json={"model": "Any"})
         assert response.status_code == 404
 
-    async def test_deactivate_and_activate_flow(
-        self,
-        client: AsyncClient,
-        active_employee: EmployeeTestData,
-        car_factory,
-    ) -> None:
-        await self.login(client, active_employee)
-        car = await car_factory(is_active=True)
-
-        # 1. Деактивация
-        deact_resp = await client.put(f"{BASE_PATH}/{car.car_id}/deactivate")
-        assert deact_resp.status_code == 200
-
-        # Проверка статуса
-        get_resp = await client.get(f"{BASE_PATH}/{car.car_id}")
-        assert get_resp.json()["data"]["isActive"] is False
-
-        # 2. Активация
-        act_resp = await client.put(f"{BASE_PATH}/{car.car_id}/activate")
-        assert act_resp.status_code == 200
-
-        get_resp_final = await client.get(f"{BASE_PATH}/{car.car_id}")
-        assert get_resp_final.json()["data"]["isActive"] is True
-
-    async def test_activate_already_active(
-        self,
-        client: AsyncClient,
-        active_employee: EmployeeTestData,
-        car_factory,
-    ) -> None:
-        await self.login(client, active_employee)
-        car = await car_factory(is_active=True)
-
-        response = await client.put(f"{BASE_PATH}/{car.car_id}/activate")
-        assert response.status_code == 200
-
     async def test_unauthorized_access(
         self,
         client: AsyncClient,
