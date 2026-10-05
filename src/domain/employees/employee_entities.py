@@ -24,7 +24,6 @@ class Employee(BaseEntity):
 
     _ALLOWED_UPDATE_FIELDS = {
         "username",
-        "password_hash",
         "is_active",
     }
 
@@ -73,5 +72,20 @@ class Employee(BaseEntity):
                 actor_id=actor_id,
                 employee_id=self.employee_id,
                 changes=changes,
+            ),
+        )
+
+    def change_password(
+        self,
+        actor_id: UUID,
+        new_password_hash: str,
+    ) -> None:
+        self.password_hash = new_password_hash
+
+        self._add_event(
+            events.UpdateEmployeeEvent(
+                actor_id=actor_id,
+                employee_id=self.employee_id,
+                changes={"password_hash": new_password_hash},
             ),
         )

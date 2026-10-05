@@ -40,9 +40,9 @@ class ChangeEmployeePasswordUseCase:
                     employee_id=dto.employee_id,
                 )
 
-            employee.update(
+            employee.change_password(
                 actor_id=dto.actor_id,
-                password_hash=password_hash,
+                new_password_hash=password_hash,
             )
 
             await uow.employees.update(employee)
