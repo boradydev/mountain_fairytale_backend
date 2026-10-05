@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from asyncpg import UniqueViolationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,9 +28,8 @@ class CarsRepository(ICarsRepository):
             await self._session.flush()
         except IntegrityError as exc:
             if (
-                getattr(exc.orig, "pgcode", None) == "23505"
-                and getattr(exc.orig, "constraint_name", None)
-                == "cars_number_key"
+                isinstance(exc.orig, UniqueViolationError)
+                and exc.orig.constraint_name == "cars_number_key"
             ):
                 raise CarNumberAlreadyExistsException(
                     number=car.number,
