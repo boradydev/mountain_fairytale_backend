@@ -34,9 +34,17 @@ class StrictPatchModel(BaseSchema):
 
             if extra.get(_PATCH_NULLABLE_MARKER) is False:
                 raise ValueError(
-                    f"Поле '{field_name}' не может быть null.",
+                    f"Field '{field_name}' cannot be null.",
                 )
 
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_not_empty(cls, data: Any) -> Any:
+        """Проверяет, что в PATCH-запросе передано хотя бы одно поле."""
+        if isinstance(data, dict) and not data:
+            raise ValueError("Request body cannot be empty.")
         return data
 
 

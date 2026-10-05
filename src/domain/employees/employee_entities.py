@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text
+from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
@@ -14,13 +14,19 @@ class Employee(BaseEntity):
     __tablename__ = "employees"
 
     employee_id: Mapped[UUID] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(Text, unique=True)
+
+    UQ_USERNAME = "employees_username_key"
+    username: Mapped[str] = mapped_column(
+        Text,
+        UniqueConstraint(name=UQ_USERNAME),
+        index=True,
+    )
+
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
-    ID_FIELD = "employee_id"
 
     _ALLOWED_UPDATE_FIELDS = {
         "username",

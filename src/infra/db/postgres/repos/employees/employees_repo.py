@@ -1,10 +1,13 @@
 from uuid import UUID
 
+from asyncpg import exceptions as pg_excs
 from sqlalchemy import select, desc
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
 from src.domain.employees.employee_entities import Employee
+from src.domain.employees.employee_excs import EmployeeUsernameAlreadyExistsException
 
 
 class EmployeesRepository(IEmployeesRepository):
@@ -19,12 +22,29 @@ class EmployeesRepository(IEmployeesRepository):
         employee: Employee,
     ) -> None:
         self._session.add(employee)
+        username = employee.username
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            pgcode = getattr(exc.orig, "pgcode", None)
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and employee.UQ_USERNAME in str(exc.orig):
+                raise EmployeeUsernameAlreadyExistsException(username=username) from exc
+
+            raise
 
     async def update(
         self,
         employee: Employee,
     ) -> None:
-        await self._session.flush()
+        username = employee.username
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            pgcode = getattr(exc.orig, "pgcode", None)
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and employee.UQ_USERNAME in str(exc.orig):
+                raise EmployeeUsernameAlreadyExistsException(username=username) from exc
+
+            raise
 
     async def get_by_id(
         self,

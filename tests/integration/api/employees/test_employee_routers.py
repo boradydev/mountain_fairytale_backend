@@ -3,6 +3,7 @@ from uuid import UUID
 
 from tests.integration.conftest import EmployeeTestData
 from src.core.uuid7 import uuid7
+from tests.helpers import unique_username
 
 
 BASE_PATH = "/protected/employees"
@@ -31,8 +32,8 @@ class TestEmployeeRouters:
         await self.login(client, active_employee)
 
         # Создаем одного активного и одного деактивированного
-        active_emp = await employee_factory(username="active_user")
-        inactive_emp = await employee_factory(username="inactive_user", is_active=False)
+        active_emp = await employee_factory(username=unique_username("active"))
+        inactive_emp = await employee_factory(username=unique_username("inactive"), is_active=False)
 
         # По умолчанию include_deactivated=false
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
@@ -51,8 +52,8 @@ class TestEmployeeRouters:
     ) -> None:
         await self.login(client, active_employee)
 
-        active_emp = await employee_factory(username="active_all")
-        inactive_emp = await employee_factory(username="inactive_all", is_active=False)
+        active_emp = await employee_factory(username=unique_username("active_all"))
+        inactive_emp = await employee_factory(username=unique_username("inactive_all"), is_active=False)
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
@@ -99,7 +100,7 @@ class TestEmployeeRouters:
         await self.login(client, active_employee)
 
         payload = {
-            "username": f"new_user_{uuid7().hex[:6]}",
+            "username": unique_username("new_user"),
             "password": "strong_password123"
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
@@ -123,7 +124,7 @@ class TestEmployeeRouters:
         await self.login(client, active_employee)
 
         payload = {
-            "username": f"empty_pass_{uuid7().hex[:6]}",
+            "username": unique_username("empty_pass"),
             "password": ""
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
@@ -139,7 +140,7 @@ class TestEmployeeRouters:
         await self.login(client, active_employee)
         emp = await employee_factory()
 
-        payload = {"username": "updated_username_test"}
+        payload = {"username": unique_username("updated")}
         response = await client.patch(f"{BASE_PATH}/{emp.employee_id}", json=payload)
         assert response.status_code == 200
         assert response.json()["data"]["username"] == payload["username"]
