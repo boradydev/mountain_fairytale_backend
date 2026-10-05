@@ -1,7 +1,7 @@
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import Float, Text
+from sqlalchemy import Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
@@ -15,11 +15,17 @@ class Car(BaseEntity):
 
     car_id: Mapped[UUID] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(Text, index=True)
-    number: Mapped[str] = mapped_column(Text, unique=True, index=True)
+
+    UQ_NUMBER = "cars_number_key"
+    number: Mapped[str] = mapped_column(
+        Text,
+        UniqueConstraint(name=UQ_NUMBER),
+        index=True,
+    )
+
     current_mileage: Mapped[float] = mapped_column(Float, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
 
-    ID_FIELD = "car_id"
 
     _ALLOWED_UPDATE_FIELDS = {
         "model",

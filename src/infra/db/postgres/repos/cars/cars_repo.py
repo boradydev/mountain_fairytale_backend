@@ -24,14 +24,16 @@ class CarsRepository(ICarsRepository):
         self._session.add(car)
 
     async def update(self, car: Car) -> None:
+        number = car.number
         try:
             await self._session.flush()
         except IntegrityError as exc:
             pgcode = getattr(exc.orig, "pgcode", None)
             # Проверяем код по официальной константе и имя констрейнта в тексте ошибки
-            if pgcode == pg_excs.UniqueViolationError.sqlstate and "cars_number_key" in str(exc.orig):
-
-                raise CarNumberAlreadyExistsException(number=car.number) from exc
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and car.UQ_NUMBER in str(
+                exc.orig
+            ):
+                raise CarNumberAlreadyExistsException(number=number) from exc
 
             raise
 
