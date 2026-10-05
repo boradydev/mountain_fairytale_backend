@@ -4,7 +4,9 @@ from uuid import UUID
 
 from pydantic import Field
 
+from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
 from src.api.fastapi.common.schemas import BaseSchema
+from src.domain.employees.entities import Employee
 
 
 class EmployeeResp(BaseSchema):
@@ -24,8 +26,12 @@ class CreateEmployeeReq(BaseSchema):
     password: Annotated[str, Field(min_length=0, max_length=50)]
 
 
-class UpdateEmployeeReq(BaseSchema):
-    username: Annotated[str | None, Field(min_length=1, max_length=50)] = None
+class UpdateEmployeeReq(create_patch_schema_for_domain(Employee)):
+    """
+    PATCH schema for Employee.
+    Allowed fields: username, is_active.
+    All fields are optional, but non-nullable.
+    """
 
 
 class ChangeEmployeePasswordReq(BaseSchema):

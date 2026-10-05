@@ -27,6 +27,7 @@ from src.domain.employees.employee_excs import (
     EmployeeDeactivateException,
     EmployeeNotFoundByUsernameException,
     EmployeeNotFoundException,
+    EmployeeDomainUpdateException,
 )
 
 
@@ -86,6 +87,10 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         InvalidRefreshTokenException: Resp(
             status_code=401,
             detail="Invalid credentials",
+        ),
+        EmployeeDomainUpdateException: Resp(
+            status_code=422,
+            detail="Employee domain update error",
         ),
     },
 )

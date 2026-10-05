@@ -1,7 +1,8 @@
 from types import NoneType
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Path, Query, status
 
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
@@ -21,10 +22,10 @@ from src.app.employees.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
 from src.app.employees.usecases.create import CreateEmployeeDTO
-from src.app.employees.usecases.deactivate import DeactivateEmployeeDTO
 from src.app.employees.usecases.get import GetEmployeeDTO
+from src.app.employees.usecases.get_all import GetEmployeesDTO
 from src.app.employees.usecases.update import UpdateEmployeeDTO
-from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.domain.employees import employee_excs
 
 
 """
@@ -36,11 +37,10 @@ API CONTRACT — EMPLOYEES
     CRUD и управление состоянием сотрудников.
 
 Основные правила:
-    1. Сотрудник не удаляется физически.
-    2. Для прекращения доступа используется деактивация.
-    3. Данные деактивированного сотрудника сохраняются.
-    4. Деактивированный сотрудник может быть восстановлен на уровне домена,
-       если для этого существует соответствующий API endpoint.
+    1. Доступ ко всем эндпоинтам этого модуля имеет только пользователь с ролью 'admin'.
+    2. Сотрудник не удаляется физически.
+    3. Для управления статусом доступа (активация/деактивация) используется обновление данных (PATCH).
+    4. Данные деактивированного сотрудника сохраняются.
     5. ID сотрудника является UUID.
     6. Пароль никогда не возвращается API.
     7. Request/response schemas используют camelCase через BaseSchema.
@@ -82,36 +82,35 @@ employees_router = APIRouter(
     description="""
     Получение списка сотрудников.
 
+    Предусловие:
+        Запрос выполняется от имени администратора.
+
+    Входные данные:
+        Query parameter:
+            include_deactivated: если true, вернуть всех сотрудников, включая деактивированных.
+
     Результат:
         HTTP 200.
         data.employees содержит список EmployeeResp.
 
-    Для каждого сотрудника возвращаются:
-        - employeeId;
-        - username;
-        - role;
-        - isActive;
-        - createdAt.
-
-    Пароль сотрудника не должен возвращаться API.
-
     Важные требования:
-        1. В списке должны корректно отображаться активные и деактивированные
-           сотрудники.
-        2. Деактивация не означает физическое удаление сотрудника.
-        3. История и идентификатор сотрудника должны сохраняться.
+        1. Если include_deactivated=false (по умолчанию) -> список только активных сотрудников.
+        2. Если include_deactivated=true -> список всех сотрудников.
+        3. Пароль сотрудника не должен возвращаться API.
 
     Критические сценарии для API-тестов:
-        1. Получение непустого списка.
-        2. Проверка структуры каждого сотрудника.
-        3. Проверка отсутствия password/passwordHash.
-        4. Наличие деактивированного сотрудника после его деактивации.
+        1. Получение списка только активных сотрудников.
+        2. Получение списка всех сотрудников (включая деактивированных).
+        3. Проверка отсутствия password/passwordHash в ответе.
     """,
 )
 async def get_employees(
     ctx: Context,
+    include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[EmployeesResp]:
-    employees = await ctx.employees_use_cases.get_employees().execute()
+    employees = await ctx.employees_use_cases.get_employees().execute(
+        GetEmployeesDTO(include_deactivated=include_deactivated)
+    )
 
     return StdResponse(
         data=EmployeesResp(
@@ -125,10 +124,13 @@ async def get_employees(
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
     responses=map_exceptions_to_responses(
-        EmployeeNotFoundException,
+        employee_excs.EmployeeNotFoundException,
     ),
     description="""
     Получение сотрудника по UUID.
+
+    Предусловие:
+        Запрос выполняется от имени администратора.
 
     Входные данные:
         employee_id — UUID сотрудника.
@@ -141,15 +143,13 @@ async def get_employees(
         404 — сотрудник с указанным UUID не найден.
 
     Важные требования:
-        1. Деактивированный сотрудник продолжает существовать.
-        2. Деактивированный сотрудник должен быть доступен по UUID.
-        3. Пароль сотрудника не возвращается.
+        1. Деактивированный сотрудник продолжает существовать и должен быть доступен по UUID.
+        2. Пароль сотрудника не возвращается.
 
     Критические сценарии для API-тестов:
-        1. Получение существующего сотрудника.
-        2. Получение деактивированного сотрудника.
+        1. Получение существующего активного сотрудника.
+        2. Получение существующего деактивированного сотрудника.
         3. Получение несуществующего UUID -> 404.
-        4. Проверка отсутствия секретных данных.
     """,
 )
 async def get_employee(
@@ -178,7 +178,7 @@ async def get_employee(
     Создание нового сотрудника.
 
     Предусловие:
-        Запрос выполняется авторизованным пользователем.
+        Запрос выполняется администратором.
 
     Входные данные:
         CreateEmployeeReq:
@@ -202,9 +202,8 @@ async def get_employee(
         1. Создание сотрудника с непустым паролем.
         2. Создание сотрудника с пустым паролем.
         3. Проверка employeeId.
-        4. Проверка isActive.
+        4. Проверка isActive == true.
         5. Проверка сохранения через GET.
-        6. Проверка отсутствия password/passwordHash в ответе.
     """,
 )
 async def create_employee(
@@ -225,19 +224,20 @@ async def create_employee(
     )
 
 
-@employees_router.put(
+@employees_router.patch(
     "/{employee_id:uuid}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[EmployeeResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        EmployeeNotFoundException,
+        employee_excs.EmployeeNotFoundException,
+        employee_excs.EmployeeDomainUpdateException,
     ),
     description="""
     Обновление данных сотрудника.
 
     Предусловие:
-        Запрос выполняется авторизованным пользователем.
+        Запрос выполняется администратором.
 
     Входные данные:
         Path:
@@ -245,7 +245,7 @@ async def create_employee(
 
         Body:
             UpdateEmployeeReq.
-            username является необязательным полем.
+            Поля: username, is_active.
 
     Результат:
         HTTP 200.
@@ -254,18 +254,20 @@ async def create_employee(
     Ошибки:
         401 — пользователь не авторизован.
         404 — сотрудник не найден.
+        422 — нарушение доменных инвариантов (EmployeeDomainUpdateException).
 
     Важные требования:
-        1. Изменяется только username, предусмотренный API-схемой.
-        2. Другие поля сотрудника не должны изменяться этим endpoint.
-        3. Пароль изменяется отдельным endpoint.
-        4. Сотрудник сохраняет свой employeeId.
+        1. Изменяются только поля, предусмотренные API-схемой.
+        2. Деактивация и повторная активация сотрудника происходят через изменение поля is_active.
+        3. Сотрудник сохраняет свой employeeId.
 
     Критические сценарии для API-тестов:
         1. Изменение username.
-        2. Проверка результата через GET.
-        3. Обновление несуществующего сотрудника -> 404.
-        4. Проверка сохранения остальных данных.
+        2. Деактивация активного сотрудника (is_active: false).
+        3. Реактивация деактивированного сотрудника (is_active: true).
+        4. Обновление несуществующего сотрудника -> 404.
+        5. Проверка результата через GET.
+        6. Пустой запрос (тело `{}`) -> 422.
     """,
 )
 async def update_employee(
@@ -278,72 +280,12 @@ async def update_employee(
         UpdateEmployeeDTO(
             actor_id=UUID(access_token_pyload.employee_id),
             employee_id=employee_id,
-            username=body.username,
+            payload=body.model_dump(exclude_unset=True),
         ),
     )
 
     return StdResponse(
         data=EmployeeResp.model_validate(employee),
-    )
-
-
-@employees_router.delete(
-    "/{employee_id:uuid}",
-    status_code=status.HTTP_200_OK,
-    response_model=StdResponse[NoneType],
-    responses=map_exceptions_to_responses(
-        UnauthorizedException,
-        EmployeeNotFoundException,
-    ),
-    description="""
-    Деактивация сотрудника.
-
-    Несмотря на HTTP DELETE, операция НЕ удаляет сотрудника физически.
-
-    Предусловие:
-        Запрос выполняется авторизованным пользователем.
-
-    Входные данные:
-        employee_id — UUID сотрудника.
-
-    Результат:
-        HTTP 200.
-        message:
-            "Сотрудник деактивирован."
-
-    Важные требования:
-        1. Сотрудник не удаляется из базы данных.
-        2. employeeId сохраняется.
-        3. История сотрудника сохраняется.
-        4. isActive становится false.
-        5. Данные сотрудника остаются доступными для получения.
-
-    Ошибки:
-        401 — пользователь не авторизован.
-        404 — сотрудник не найден.
-
-    Критические сценарии для API-тестов:
-        1. Деактивация активного сотрудника.
-        2. GET после деактивации.
-        3. Проверка isActive == false.
-        4. Проверка сохранения employeeId и username.
-        5. Деактивация несуществующего сотрудника -> 404.
-    """,
-)
-async def deactivate_employee(
-    employee_id: UUID,
-    ctx: Context,
-    access_token_pyload: AccessTokenPayloadDep,
-) -> StdResponse[NoneType]:
-    await ctx.employees_use_cases.deactivate_employee().execute(
-        DeactivateEmployeeDTO(
-            actor_id=UUID(access_token_pyload.employee_id),
-            employee_id=employee_id,
-        ),
-    )
-
-    return StdResponse(
-        message="Сотрудник деактивирован.",
     )
 
 
@@ -353,13 +295,13 @@ async def deactivate_employee(
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        EmployeeNotFoundException,
+        employee_excs.EmployeeNotFoundException,
     ),
     description="""
     Изменение пароля сотрудника.
 
     Предусловие:
-        Запрос выполняется авторизованным пользователем.
+        Запрос выполняется администратором.
 
     Входные данные:
         Path:
@@ -376,8 +318,7 @@ async def deactivate_employee(
 
     Важные требования:
         1. Пароль не возвращается API.
-        2. Изменение пароля не должно менять employeeId.
-        3. Изменение пароля не должно менять username, role или isActive.
+        2. Изменение пароля не должно менять employeeId, username, role или isActive.
 
     Ошибки:
         401 — пользователь не авторизован.
@@ -385,11 +326,9 @@ async def deactivate_employee(
 
     Критические сценарии для API-тестов:
         1. Изменение пароля существующего сотрудника.
-        2. Изменение на пустой пароль, если схема допускает такое значение.
+        2. Изменение на пустой пароль.
         3. Попытка изменить пароль несуществующего сотрудника -> 404.
-        4. Проверка, что старый пароль больше не используется,
-           если тестовый контракт авторизации это проверяет.
-        5. Проверка, что остальные поля сотрудника не изменились.
+        4. Проверка, что остальные поля сотрудника не изменились.
     """,
 )
 async def change_employee_password(
