@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import pytest
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from src.domain.common.event_record import EventRecord
 from src.infra.db.postgres.repos.events.repo import EventsRepository

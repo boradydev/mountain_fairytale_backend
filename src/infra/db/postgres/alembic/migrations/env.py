@@ -4,7 +4,7 @@ import dotenv
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from src.infra.db.postgres.models.common import BaseModel
+from src.domain.common.model import BaseModel
 from src.infra.db.postgres.settings import PostgresSettings
 
 

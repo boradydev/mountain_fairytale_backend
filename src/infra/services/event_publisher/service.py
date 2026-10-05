@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from src.app.common.abcs.services.event_publisher import IEventPublisher
 from src.domain.common.event_record import EventRecord

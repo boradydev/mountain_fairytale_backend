@@ -1,10 +1,10 @@
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
 from src.domain.employees.entities import Employee
-from src.infra.db.postgres.repos.employees.sql.registry import EmployeeSQL
 
 
 class EmployeesRepository(IEmployeesRepository):
@@ -18,100 +18,43 @@ class EmployeesRepository(IEmployeesRepository):
         self,
         employee: Employee,
     ) -> None:
-        params = {
-            "employee_id": employee.employee_id,
-            "username": employee.username,
-            "password_hash": employee.password_hash,
-            "role": employee.role,
-            "is_active": employee.is_active,
-            "created_at": employee.created_at,
-        }
+        self._session.add(employee)
 
-        await self._session.execute(
-            EmployeeSQL.ADD,
-            params,
-        )
-
-    async def update(self, employee: Employee) -> None:
-        changes = employee.get_changes()
-
-        if not changes:
-            return
-
-        await self._session.execute(
-            EmployeeSQL.UPDATE(
-                employee_id=employee.employee_id,
-                changes=changes,
-            ),
-        )
-
-        employee.clear_changes()
+    async def update(
+        self,
+        employee: Employee,
+    ) -> None:
+        pass
 
     async def get_by_id(
         self,
         employee_id: UUID,
     ) -> Employee | None:
-        result = await self._session.execute(
-            EmployeeSQL.GET_BY_ID,
-            {
-                "employee_id": employee_id,
-            },
+        stmt = select(Employee).where(
+            Employee.employee_id == employee_id,
         )
 
-        row = result.mappings().one_or_none()
+        result = await self._session.execute(stmt)
 
-        if row is None:
-            return None
-
-        return Employee(
-            _employee_id=row["employee_id"],
-            _username=row["username"],
-            _password_hash=row["password_hash"],
-            _role=row["role"],
-            _is_active=row["is_active"],
-            _created_at=row["created_at"],
-        )
+        return result.scalar_one_or_none()
 
     async def get_by_username(
         self,
         username: str,
     ) -> Employee | None:
-        result = await self._session.execute(
-            EmployeeSQL.GET_BY_USERNAME,
-            {
-                "username": username,
-            },
+        stmt = select(Employee).where(
+            Employee.username == username,
         )
 
-        row = result.mappings().one_or_none()
+        result = await self._session.execute(stmt)
 
-        if row is None:
-            return None
-
-        return Employee(
-            _employee_id=row["employee_id"],
-            _username=row["username"],
-            _password_hash=row["password_hash"],
-            _role=row["role"],
-            _is_active=row["is_active"],
-            _created_at=row["created_at"],
-        )
+        return result.scalar_one_or_none()
 
     async def get_all(self) -> list[Employee]:
-        result = await self._session.execute(
-            EmployeeSQL.GET_ALL,
+        stmt = select(Employee).order_by(
+            Employee.username,
         )
 
-        rows = result.mappings().all()
+        result = await self._session.execute(stmt)
 
-        return [
-            Employee(
-                _employee_id=row["employee_id"],
-                _username=row["username"],
-                _password_hash=row["password_hash"],
-                _role=row["role"],
-                _is_active=row["is_active"],
-                _created_at=row["created_at"],
-            )
-            for row in rows
-        ]
+        return list(result.scalars().all())

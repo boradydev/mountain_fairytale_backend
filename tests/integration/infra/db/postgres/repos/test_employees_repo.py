@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from src.domain.employees.entities import Employee
 from src.infra.db.postgres.repos.employees.repo import EmployeesRepository

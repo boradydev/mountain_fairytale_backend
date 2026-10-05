@@ -1,21 +1,23 @@
-from dataclasses import dataclass
 from typing import Any, Self
 from uuid import UUID
 
-from uuid6 import uuid7
+from sqlalchemy import Float, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
+from src.core.uuid7 import uuid7
+from src.domain.cars import events
 from src.domain.cars.car_excs import CarDomainUpdateException
 from src.domain.common.entities import BaseEntity
-from src.domain.cars import events
 
 
-@dataclass(slots=True, kw_only=True)
 class Car(BaseEntity):
-    _car_id: UUID
-    _model: str
-    _number: str
-    _current_mileage: float
-    _is_active: bool
+    __tablename__ = "cars"
+
+    car_id: Mapped[UUID] = mapped_column(primary_key=True)
+    model: Mapped[str] = mapped_column(Text, index=True)
+    number: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    current_mileage: Mapped[float] = mapped_column(Float, default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
 
     ID_FIELD = "car_id"
 
@@ -25,13 +27,6 @@ class Car(BaseEntity):
         "current_mileage",
         "is_active",
     }
-
-    UPDATABLE_DATABASE_COLUMNS = frozenset([
-        "model",
-        "number",
-        "current_mileage",
-        "is_active",
-    ])
 
     @classmethod
     def create(
@@ -43,17 +38,17 @@ class Car(BaseEntity):
         current_mileage: float = 0,
     ) -> Self:
         car = cls(
-            _car_id=uuid7(),
-            _model=model,
-            _number=number,
-            _current_mileage=current_mileage,
-            _is_active=True,
+            car_id=uuid7(),
+            model=model,
+            number=number,
+            current_mileage=current_mileage,
+            is_active=True,
         )
 
         car._add_event(
             events.CreateCarEvent(
                 actor_id=actor_id,
-                car_id=car._car_id,
+                car_id=car.car_id,
             ),
         )
 
@@ -78,7 +73,7 @@ class Car(BaseEntity):
         self._add_event(
             events.UpdateCarEvent(
                 actor_id=actor_id,
-                car_id=self._car_id,
+                car_id=self.car_id,
                 changes=changes,
             ),
         )
@@ -86,68 +81,11 @@ class Car(BaseEntity):
     def _validate_update(self, payload: dict[str, Any]) -> None:
         new_mileage = payload.get("current_mileage")
 
-        if (
-            new_mileage is not None
-            and new_mileage < self._current_mileage
-        ):
+        if new_mileage is not None and new_mileage < self.current_mileage:
             raise CarDomainUpdateException(
                 field="current_mileage",
                 message=(
                     f"New mileage ({new_mileage}) cannot be less "
-                    f"than current mileage ({self._current_mileage})."
+                    f"than current mileage ({self.current_mileage})."
                 ),
             )
-
-    def deactivate(self, actor_id: UUID) -> None:
-        if not self._is_active:
-            return
-
-        change = self._apply_update_changes(
-            payload={"is_active": False},
-            allowed_fields={"is_active"},
-        )
-
-        self._add_event(
-            events.UpdateCarEvent(
-                actor_id=actor_id,
-                car_id=self._car_id,
-                changes=change,
-            ),
-        )
-
-    def activate(self, actor_id: UUID) -> None:
-        if self._is_active:
-            return
-
-        change = self._apply_update_changes(
-            payload={"is_active": True},
-            allowed_fields={"is_active"},
-        )
-
-        self._add_event(
-            events.UpdateCarEvent(
-                actor_id=actor_id,
-                car_id=self._car_id,
-                changes=change,
-            ),
-        )
-
-    @property
-    def car_id(self) -> UUID:
-        return self._car_id
-
-    @property
-    def model(self) -> str:
-        return self._model
-
-    @property
-    def number(self) -> str:
-        return self._number
-
-    @property
-    def current_mileage(self) -> float:
-        return self._current_mileage
-
-    @property
-    def is_active(self) -> bool:
-        return self._is_active

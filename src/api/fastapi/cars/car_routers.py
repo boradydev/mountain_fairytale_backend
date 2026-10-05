@@ -307,9 +307,7 @@ async def update_car(
         UpdateCarDTO(
             actor_id=UUID(access_token_payload.employee_id),
             car_id=car_id,
-            model=body.model,
-            number=body.number,
-            current_mileage=body.current_mileage,
+            payload=body.model_dump(exclude_unset=True),
         ),
     )
 

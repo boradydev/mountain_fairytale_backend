@@ -1,9 +1,0 @@
-SELECT
-    car_id,
-    model,
-    number,
-    current_mileage,
-    is_active
-FROM cars
-WHERE is_active is true
-ORDER BY model, number;

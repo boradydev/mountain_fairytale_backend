@@ -1,38 +1,32 @@
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Self
+from uuid import UUID
 
-from uuid6 import uuid7, UUID
+from sqlalchemy import DateTime, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
+from src.core.uuid7 import uuid7
 from src.domain.common.entities import BaseEntity
 from src.domain.employees import events
 
 
-@dataclass(slots=True, kw_only=True)
 class Employee(BaseEntity):
-    _employee_id: UUID
-    _username: str
-    _password_hash: str
-    _role: str
-    _is_active: bool
-    _created_at: datetime
+    __tablename__ = "employees"
 
-    # Единственный источник правды для ID и колонок
+    employee_id: Mapped[UUID] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(Text, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
     ID_FIELD = "employee_id"
 
-    # Поля, доступные для изменения через общий метод update()
     _ALLOWED_UPDATE_FIELDS = {
         "username",
         "password_hash",
+        "is_active",
     }
-
-    # ЕДИНСТВЕННАЯ ТОЧКА ПРАВДЫ ДЛЯ БАЗЫ ДАННЫХ
-    # Сюда входят вообще все поля домена, которые могут измениться в течение жизни сущности
-    UPDATABLE_DATABASE_COLUMNS = frozenset([
-        "username",
-        "password_hash",
-        "is_active"
-    ])
 
     @classmethod
     def create(
@@ -43,20 +37,20 @@ class Employee(BaseEntity):
         role: str,
     ) -> Self:
         employee = cls(
-            _employee_id=uuid7(),
-            _username=username,
-            _password_hash=password_hash,
-            _role=role,
-            _is_active=True,
-            _created_at=datetime.now(),
+            employee_id=uuid7(),
+            username=username,
+            password_hash=password_hash,
+            role=role,
+            is_active=True,
+            created_at=datetime.now(),
         )
 
         employee._add_event(
             events.CreateEmployeeEvent(
                 actor_id=actor_id,
-                employee_id=employee._employee_id,
-                created_at=employee._created_at,
-            )
+                employee_id=employee.employee_id,
+                created_at=employee.created_at,
+            ),
         )
 
         return employee
@@ -77,65 +71,7 @@ class Employee(BaseEntity):
         self._add_event(
             events.UpdateEmployeeEvent(
                 actor_id=actor_id,
-                employee_id=self._employee_id,
+                employee_id=self.employee_id,
                 changes=changes,
-            )
+            ),
         )
-
-    def deactivate(self, actor_id: UUID) -> None:
-        if not self._is_active:
-            return
-
-        change = self._apply_update_changes(
-            payload={"is_active": False},
-            allowed_fields={"is_active"},
-        )
-
-        self._add_event(
-            events.UpdateEmployeeEvent(
-                actor_id=actor_id,
-                employee_id=self._employee_id,
-                changes=change,
-            )
-        )
-
-    def activate(self, actor_id: UUID) -> None:
-        if self._is_active:
-            return
-
-        change = self._apply_update_changes(
-            payload={"is_active": True},
-            allowed_fields={"is_active"},
-        )
-
-        self._add_event(
-            events.UpdateEmployeeEvent(
-                actor_id=actor_id,
-                employee_id=self._employee_id,
-                changes=change,
-            )
-        )
-
-    @property
-    def employee_id(self) -> UUID:
-        return self._employee_id
-
-    @property
-    def username(self) -> str:
-        return self._username
-
-    @property
-    def password_hash(self) -> str:
-        return self._password_hash
-
-    @property
-    def role(self) -> str:
-        return self._role
-
-    @property
-    def is_active(self) -> bool:
-        return self._is_active
-
-    @property
-    def created_at(self) -> datetime:
-        return self._created_at

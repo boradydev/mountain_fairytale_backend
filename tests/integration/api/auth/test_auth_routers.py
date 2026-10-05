@@ -1,5 +1,5 @@
 from httpx import AsyncClient
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from tests.integration.conftest import EmployeeTestData
 
@@ -206,8 +206,9 @@ class TestAuthFlow:
             )
             assert employee is not None
 
-            employee.deactivate(
+            employee.update(
                 actor_id=active_employee.employee_id,
+                is_active=False,
             )
 
             await uow.employees.update(employee)

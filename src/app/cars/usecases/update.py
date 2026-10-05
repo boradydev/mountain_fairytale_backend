@@ -1,21 +1,17 @@
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from src.app.cars.abcs.uow import ICarsUOW
+from src.domain.cars.car_excs import CarNotFoundException
 from src.domain.cars.entities import Car
-from src.domain.cars.car_excs import (
-    CarNotFoundException,
-    CarNumberAlreadyExistsException,
-)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class UpdateCarDTO:
     actor_id: UUID
     car_id: UUID
-    model: str | None = None
-    number: str | None = None
-    current_mileage: float | None = None
+    payload: dict[str, Any]
 
 
 class UpdateCarUseCase:
@@ -37,19 +33,9 @@ class UpdateCarUseCase:
                     car_id=dto.car_id,
                 )
 
-            if dto.number is not None and dto.number != car.number:
-                existing = await uow.cars.get_by_number(dto.number)
-
-                if existing is not None:
-                    raise CarNumberAlreadyExistsException(
-                        number=dto.number,
-                    )
-
             car.update(
                 actor_id=dto.actor_id,
-                model=dto.model,
-                number=dto.number,
-                current_mileage=dto.current_mileage,
+                **dto.payload,
             )
 
             await uow.cars.update(car)

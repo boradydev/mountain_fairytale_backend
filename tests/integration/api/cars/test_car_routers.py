@@ -1,5 +1,5 @@
 from httpx import AsyncClient
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from tests.integration.conftest import EmployeeTestData
 

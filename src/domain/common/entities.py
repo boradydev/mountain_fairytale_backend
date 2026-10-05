@@ -1,24 +1,21 @@
-from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy.orm import reconstructor
+
 from src.domain.common.events import BaseDomainEvent, FieldChange
+from src.domain.common.model import BaseModel
 
 
-@dataclass
-class BaseEntity:
-    _events: list[BaseDomainEvent] = field(
-        init=False,
-        repr=False,
-        compare=False,
-        default_factory=list,
-    )
+class BaseEntity(BaseModel):
+    __abstract__ = True
 
-    _changes: dict[str, FieldChange] = field(
-        init=False,
-        repr=False,
-        compare=False,
-        default_factory=dict,
-    )
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._events: list[BaseDomainEvent] = []
+
+    @reconstructor
+    def _init_on_load(self) -> None:
+        self._events = []
 
     def _add_event(self, event: BaseDomainEvent) -> None:
         self._events.append(event)
@@ -36,29 +33,19 @@ class BaseEntity:
         changes: dict[str, FieldChange] = {}
 
         for key, new_value in payload.items():
-            if key not in allowed_fields:
+            if key not in allowed_fields or new_value is None:
                 continue
 
-            private_attr_name = f"_{key}"
-            current_value = getattr(self, private_attr_name)
+            current_value = getattr(self, key)
 
-            if new_value is None or current_value == new_value:
+            if current_value == new_value:
                 continue
 
-            change = FieldChange(
+            changes[key] = FieldChange(
                 old=current_value,
                 new=new_value,
             )
 
-            changes[key] = change
-            self._changes[key] = change
-
-            setattr(self, private_attr_name, new_value)
+            setattr(self, key, new_value)
 
         return changes
-
-    def get_changes(self) -> dict[str, FieldChange]:
-        return self._changes.copy()
-
-    def clear_changes(self) -> None:
-        self._changes.clear()

@@ -8,7 +8,7 @@ from uuid import UUID
 import random
 import string
 import pytest
-from uuid6 import uuid7
+from src.core.uuid7 import uuid7
 
 from src.domain.employees.entities import Employee
 from src.domain.cars.entities import Car
@@ -128,7 +128,7 @@ def employee_factory(
         )
 
         if not is_active:
-            employee.deactivate(actor_id=uuid7())
+            employee.update(actor_id=uuid7(), is_active=False)
 
         async with employees_uow_factory() as uow:
             await uow.employees.add(employee)
@@ -165,7 +165,7 @@ def car_factory(
         )
 
         if not is_active:
-            car.deactivate(actor_id=uuid7())
+            car.update(actor_id=uuid7(), is_active=False)
 
         async with cars_uow_factory() as uow:
             await uow.cars.add(car)
