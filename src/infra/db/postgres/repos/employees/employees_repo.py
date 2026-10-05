@@ -24,7 +24,7 @@ class EmployeesRepository(IEmployeesRepository):
         self,
         employee: Employee,
     ) -> None:
-        pass
+        await self._session.flush()
 
     async def get_by_id(
         self,
