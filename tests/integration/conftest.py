@@ -187,6 +187,13 @@ async def active_employee(
 
 
 @pytest.fixture
+async def admin_employee(
+    employee_factory: Callable[..., Coroutine[Any, Any, EmployeeTestData]],
+) -> EmployeeTestData:
+    return await employee_factory(role="admin")
+
+
+@pytest.fixture
 async def inactive_employee(
     employee_factory: Callable[..., Coroutine[Any, Any, EmployeeTestData]],
 ) -> EmployeeTestData:

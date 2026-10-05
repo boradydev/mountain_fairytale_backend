@@ -26,10 +26,10 @@ class TestEmployeeRouters:
     async def test_get_employees_filter_active(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
 
         # Создаем одного активного и одного деактивированного
         active_emp = await employee_factory(username=unique_username("active"))
@@ -47,10 +47,10 @@ class TestEmployeeRouters:
     async def test_get_employees_include_all(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
 
         active_emp = await employee_factory(username=unique_username("active_all"))
         inactive_emp = await employee_factory(username=unique_username("inactive_all"), is_active=False)
@@ -66,10 +66,10 @@ class TestEmployeeRouters:
     async def test_get_employee_success(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         
         # Тест для активного
         active_emp = await employee_factory()
@@ -86,18 +86,18 @@ class TestEmployeeRouters:
     async def test_get_employee_not_found(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         response = await client.get(f"{BASE_PATH}/{uuid7()}")
         assert response.status_code == 404
 
     async def test_create_employee_success(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
 
         payload = {
             "username": unique_username("new_user"),
@@ -119,9 +119,9 @@ class TestEmployeeRouters:
     async def test_create_employee_empty_password(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
 
         payload = {
             "username": unique_username("empty_pass"),
@@ -134,10 +134,10 @@ class TestEmployeeRouters:
     async def test_update_employee_username(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         emp = await employee_factory()
 
         payload = {"username": unique_username("updated")}
@@ -148,10 +148,10 @@ class TestEmployeeRouters:
     async def test_update_employee_activation_cycle(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         emp = await employee_factory(is_active=True)
 
         # Деактивация
@@ -167,19 +167,19 @@ class TestEmployeeRouters:
     async def test_update_employee_not_found(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         response = await client.patch(f"{BASE_PATH}/{uuid7()}", json={"username": "any"})
         assert response.status_code == 404
 
     async def test_update_employee_empty_payload(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         emp = await employee_factory()
 
         # Пустой запрос {} должен вернуть 422 согласно контракту
@@ -189,10 +189,10 @@ class TestEmployeeRouters:
     async def test_change_password_success(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         emp = await employee_factory()
 
         # Запоминаем состояние до смены пароля
@@ -216,10 +216,10 @@ class TestEmployeeRouters:
     async def test_change_password_empty(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
         employee_factory,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         emp = await employee_factory()
 
         payload = {"password": ""}
@@ -229,8 +229,46 @@ class TestEmployeeRouters:
     async def test_change_password_not_found(
         self,
         client: AsyncClient,
-        active_employee: EmployeeTestData,
+        admin_employee: EmployeeTestData,
     ) -> None:
-        await self.login(client, active_employee)
+        await self.login(client, admin_employee)
         response = await client.put(f"{BASE_PATH}/{uuid7()}/change-password", json={"password": "any"})
         assert response.status_code == 404
+
+    async def test_get_employees_forbidden_for_regular_employee(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        """Проверка, что обычный сотрудник не может получить список сотрудников."""
+        await self.login(client, active_employee)
+        response = await client.get(f"{BASE_PATH}")
+        # Ожидаем 403 Forbidden, так как роль 'employee' не имеет доступа
+        assert response.status_code == 403
+
+    async def test_create_employee_forbidden_for_regular_employee(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        """Проверка, что обычный сотрудник не может создавать новых сотрудников."""
+        await self.login(client, active_employee)
+        payload = {
+            "username": unique_username("forbidden_user"),
+            "password": "password123"
+        }
+        response = await client.post(f"{BASE_PATH}/create", json=payload)
+        assert response.status_code == 403
+
+    async def test_update_employee_forbidden_for_regular_employee(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        employee_factory,
+    ) -> None:
+        """Проверка, что обычный сотрудник не может обновлять данные других."""
+        await self.login(client, active_employee)
+        emp = await employee_factory()
+        
+        response = await client.patch(f"{BASE_PATH}/{emp.employee_id}", json={"username": "new_name"})
+        assert response.status_code == 403
