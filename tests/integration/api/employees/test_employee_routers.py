@@ -6,7 +6,7 @@ from src.core.uuid7 import uuid7
 from tests.helpers import unique_username
 
 
-BASE_PATH = "/protected/employees"
+BASE_PATH = "/admin/employees"
 
 
 class TestEmployeeRouters:

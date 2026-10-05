@@ -1,14 +1,10 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import Depends, Request, Response
 
 from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
 from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
-from src.api.fastapi.common.api_excs import UnauthorizedException
-from src.app.employees.usecases.get import GetEmployeeDTO
-from src.domain.auth.auth_excs import InvalidCredentialsException
-from src.domain.employees.employee_entities import Employee
+from src.api.fastapi.common.api_excs import UnauthorizedException, ForbiddenException
 from src.infra.factories.app_context import AppContext
 from src.infra.web.fastapi.cookies import AuthTokenManager
 
@@ -64,23 +60,8 @@ AccessTokenPayloadDep = Annotated[
 ]
 
 
-async def get_current_employee(
+def verify_admin_access(
     access_token_payload: AccessTokenPayloadDep,
-    ctx: Context,
-) -> Employee:
-    employee = await ctx.employees_use_cases.get_employee().execute(
-        GetEmployeeDTO(
-            employee_id=UUID(access_token_payload.employee_id),
-        ),
-    )
-
-    if not employee.is_active:
-        raise InvalidCredentialsException
-
-    return employee
-
-
-CurrentEmployee = Annotated[
-    Employee,
-    Depends(get_current_employee),
-]
+) -> None:
+    if access_token_payload.role != "admin":
+        raise ForbiddenException

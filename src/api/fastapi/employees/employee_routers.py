@@ -6,8 +6,8 @@ from fastapi import APIRouter, Path, Query, status
 
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
-    AccessTokenPayloadDep,
     Context,
+    AccessTokenPayloadDep,
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
@@ -212,11 +212,11 @@ async def get_employee(
 async def create_employee(
     body: CreateEmployeeReq,
     ctx: Context,
-    access_token_pyload: AccessTokenPayloadDep,
+    access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[EmployeeResp]:
     employee = await ctx.employees_use_cases.create_employee().execute(
         CreateEmployeeDTO(
-            actor_id=UUID(access_token_pyload.employee_id),
+            actor_id=UUID(access_token_payload.employee_id),
             username=body.username,
             password=body.password,
         ),
@@ -280,11 +280,11 @@ async def update_employee(
     employee_id: UUID,
     body: UpdateEmployeeReq,
     ctx: Context,
-    access_token_pyload: AccessTokenPayloadDep,
+    access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[EmployeeResp]:
     employee = await ctx.employees_use_cases.update_employee().execute(
         UpdateEmployeeDTO(
-            actor_id=UUID(access_token_pyload.employee_id),
+            actor_id=UUID(access_token_payload.employee_id),
             employee_id=employee_id,
             payload=body.model_dump(exclude_unset=True),
         ),
@@ -341,11 +341,11 @@ async def change_employee_password(
     employee_id: UUID,
     body: ChangeEmployeePasswordReq,
     ctx: Context,
-    access_token_pyload: AccessTokenPayloadDep,
+    access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[NoneType]:
     await ctx.employees_use_cases.change_employee_password().execute(
         ChangeEmployeePasswordDTO(
-            actor_id=UUID(access_token_pyload.employee_id),
+            actor_id=UUID(access_token_payload.employee_id),
             employee_id=employee_id,
             password=body.password,
         ),

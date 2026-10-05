@@ -30,3 +30,4 @@ fastapi_app.add_exception_handler(
 
 fastapi_app.include_router(routers.public)
 fastapi_app.include_router(routers.protected)
+fastapi_app.include_router(routers.admin)

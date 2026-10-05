@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from src.infra.services.token.excs import InvalidRefreshTokenException
 from types import MappingProxyType
 
-from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException, UnauthorizedException
+from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException, UnauthorizedException, ForbiddenException
 from src.api.fastapi.common.types import Resp
 from src.core.excs import BaseAppException
 from src.domain.auth.auth_excs import AuthEmployeeNotFoundException, InvalidCredentialsException, \
@@ -44,6 +44,10 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         UnauthorizedException: Resp(
             status_code=401,
             detail="Unauthorized",
+        ),
+        ForbiddenException: Resp(
+            status_code=403,
+            detail="Forbidden",
         ),
         EmployeeNotFoundByUsernameException: Resp(
             status_code=404,

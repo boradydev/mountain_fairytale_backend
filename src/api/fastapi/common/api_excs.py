@@ -11,3 +11,8 @@ class UnauthorizedException(BaseAppException):
 @dataclass(frozen=True, slots=True)
 class RefreshTokenNotFoundException(BaseAppException):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class ForbiddenException(BaseAppException):
+    pass
