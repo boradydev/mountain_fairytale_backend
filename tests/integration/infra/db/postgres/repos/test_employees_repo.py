@@ -1,22 +1,16 @@
-from uuid import uuid4
-
 import pytest
 from src.core.uuid7 import uuid7
 
 from src.domain.employees.entities import Employee
 from src.infra.db.postgres.repos.employees.repo import EmployeesRepository
-
-
-# Хелпер для генерации гарантированно уникальных юзернеймов в рамках сессии
-def get_unique_username(base: str) -> str:
-    return f"{base}_{uuid4().hex[:6]}"
+from tests.helpers import unique_username
 
 
 @pytest.mark.integration
 async def test_add_and_get_by_id(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username = get_unique_username("alex")
+        username = unique_username("alex")
 
         employee = Employee.create(
             actor_id=uuid7(),
@@ -55,8 +49,8 @@ async def test_get_by_id_returns_none_for_unknown_employee(postgres) -> None:
 async def test_get_all(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username1 = get_unique_username("alex")
-        username2 = get_unique_username("petr")
+        username1 = unique_username("alex")
+        username2 = unique_username("petr")
 
         first = Employee.create(
             actor_id=uuid7(),
@@ -88,8 +82,8 @@ async def test_get_all(postgres) -> None:
 async def test_update_changes_only_modified_fields(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username_original = get_unique_username("alex")
-        username_new = get_unique_username("alexander")
+        username_original = unique_username("alex")
+        username_new = unique_username("alexander")
 
         employee = Employee.create(
             actor_id=uuid7(),
@@ -127,8 +121,8 @@ async def test_update_changes_only_modified_fields(postgres) -> None:
 async def test_update_multiple_fields_in_one_query(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username_original = get_unique_username("alex")
-        username_new = get_unique_username("alexander")
+        username_original = unique_username("alex")
+        username_new = unique_username("alexander")
 
         employee = Employee.create(
             actor_id=uuid7(),
@@ -170,7 +164,7 @@ async def test_update_multiple_fields_in_one_query(postgres) -> None:
 async def test_deactivate(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username = get_unique_username("alex")
+        username = unique_username("alex")
 
         employee = Employee.create(
             actor_id=uuid7(),
@@ -205,7 +199,7 @@ async def test_update_without_changes_does_nothing(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
         # 1. Защищаем тест от UniqueViolationError динамическим именем
-        username = get_unique_username("alex")
+        username = unique_username("alex")
 
         employee = Employee.create(
             actor_id=uuid7(),
@@ -255,7 +249,7 @@ async def test_update_without_changes_does_nothing(postgres) -> None:
 async def test_get_by_username(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username = get_unique_username("alex")
+        username = unique_username("alex")
 
         employee = Employee.create(
             actor_id=uuid7(),

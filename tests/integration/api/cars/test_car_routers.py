@@ -2,6 +2,7 @@ from httpx import AsyncClient
 from src.core.uuid7 import uuid7
 
 from tests.integration.conftest import EmployeeTestData
+from tests.helpers import unique_car_number
 
 
 BASE_PATH = "/protected/cars"
@@ -23,37 +24,41 @@ class TestCarRouters:
         client: AsyncClient,
         active_employee: EmployeeTestData,
         car_factory,
-        clean_cars,
     ) -> None:
         await self.login(client, active_employee)
 
-        # Создаем один активный и один деактивированный автомобиль
-        await car_factory(is_active=True)
-        await car_factory(is_active=False)
+        # Создаем конкретные объекты, чтобы знать их ID
+        active_car = await car_factory(is_active=True)
+        inactive_car = await car_factory(is_active=False)
 
         # По умолчанию include_deactivated=False
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
         data = response.json()["data"]["cars"]
-        assert len(data) == 1
-        assert data[-1]["isActive"] is True
+        
+        # Проверяем, что активный автомобиль в списке, а деактивированный — нет
+        car_ids = [car["carId"] for car in data]
+        assert str(active_car.car_id) in car_ids
+        assert str(inactive_car.car_id) not in car_ids
 
     async def test_get_cars_include_all(
         self,
         client: AsyncClient,
         active_employee: EmployeeTestData,
         car_factory,
-        clean_cars,
     ) -> None:
         await self.login(client, active_employee)
 
-        await car_factory(is_active=True)
-        await car_factory(is_active=False)
+        active_car = await car_factory(is_active=True)
+        inactive_car = await car_factory(is_active=False)
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
         data = response.json()["data"]["cars"]
-        assert len(data) == 2
+        
+        car_ids = [car["carId"] for car in data]
+        assert str(active_car.car_id) in car_ids
+        assert str(inactive_car.car_id) in car_ids
 
     async def test_check_duplicate_exists(
         self,
@@ -62,9 +67,9 @@ class TestCarRouters:
         car_factory,
     ) -> None:
         await self.login(client, active_employee)
-        car = await car_factory(number="ABC123XYZ")
+        car = await car_factory()
 
-        response = await client.get(f"{BASE_PATH}/check-duplicate", params={"number": "ABC123XYZ"})
+        response = await client.get(f"{BASE_PATH}/check-duplicate", params={"number": car.number})
         assert response.status_code == 200
         assert response.json()["data"]["carId"] == str(car.car_id)
 
@@ -88,7 +93,11 @@ class TestCarRouters:
     ) -> None:
         await self.login(client, active_employee)
 
-        payload = {"model": "Toyota Camry", "number": "T123456T", "currentMileage": 100.0}
+        payload = {
+            "model": "Toyota Camry", 
+            "number": unique_car_number(), 
+            "currentMileage": 100.0
+        }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
 
         assert response.status_code == 201
@@ -108,9 +117,9 @@ class TestCarRouters:
         car_factory,
     ) -> None:
         await self.login(client, active_employee)
-        await car_factory(number="DUP123")
+        car = await car_factory()
 
-        payload = {"model": "Tesla", "number": "DUP123"}
+        payload = {"model": "Tesla", "number": car.number}
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         assert response.status_code == 409
 
@@ -123,10 +132,10 @@ class TestCarRouters:
         await self.login(client, active_employee)
         
         # Создаем деактивированный автомобиль с определенным номером
-        await car_factory(number="DEACT123", is_active=False)
+        car = await car_factory(is_active=False)
 
         # Пытаемся создать новый активный автомобиль с тем же номером
-        payload = {"model": "Tesla", "number": "DEACT123"}
+        payload = {"model": "Tesla", "number": car.number}
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         
         # Ожидаем 409 Conflict, так как номер должен быть уникальным во всей системе
@@ -139,14 +148,14 @@ class TestCarRouters:
         car_factory,
     ) -> None:
         await self.login(client, active_employee)
-        car = await car_factory(model="Old Model", number="OLD123")
+        car = await car_factory(model="Old Model")
 
         payload = {"model": "New Model"}
         response = await client.patch(f"{BASE_PATH}/{car.car_id}", json=payload)
 
         assert response.status_code == 200
         assert response.json()["data"]["model"] == "New Model"
-        assert response.json()["data"]["number"] == "OLD123"
+        assert response.json()["data"]["number"] == car.number
 
     async def test_update_car_duplicate_number(
         self,
@@ -157,11 +166,11 @@ class TestCarRouters:
         await self.login(client, active_employee)
         
         # Создаем два автомобиля
-        car1 = await car_factory(number="CAR1")
-        await car_factory(number="CAR2")
+        car1 = await car_factory()
+        car2 = await car_factory()
 
         # Пытаемся изменить номер первого автомобиля на номер второго
-        payload = {"number": "CAR2"}
+        payload = {"number": car2.number}
         response = await client.patch(f"{BASE_PATH}/{car1.car_id}", json=payload)
         
         assert response.status_code == 409

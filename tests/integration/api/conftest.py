@@ -41,14 +41,3 @@ def token_service_factory() -> Callable[..., ITokenService]:
         )
 
     return factory
-
-
-@pytest.fixture
-async def clean_cars(postgres: Postgres) -> None:
-    await postgres.execute(
-        """
-        TRUNCATE TABLE
-            cars
-        CASCADE
-        """
-    )

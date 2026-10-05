@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-import random
-import string
 import pytest
 from src.core.uuid7 import uuid7
 
@@ -16,6 +14,7 @@ from src.infra.db.postgres.database import Postgres
 from src.infra.db.postgres.uow.employees import EmployeesUOW
 from src.infra.db.postgres.uow.cars import CarsUOW
 from src.infra.services.password.service import PasswordService
+from tests.helpers import unique_username, unique_car_number
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,17 +117,18 @@ def employee_factory(
         role: str = "employee",
         is_active: bool = True,
     ) -> EmployeeTestData:
-        username = username or f"test_{uuid7()}"
-
         employee = Employee.create(
             actor_id=uuid7(),
-            username=username,
+            username=username or unique_username(),
             password_hash=password_service.hash(password=password),
             role=role,
         )
 
         if not is_active:
-            employee.update(actor_id=uuid7(), is_active=False)
+            employee.update(
+                actor_id=uuid7(),
+                is_active=False,
+            )
 
         async with employees_uow_factory() as uow:
             await uow.employees.add(employee)
@@ -155,17 +155,18 @@ def car_factory(
         current_mileage: float = 0.0,
         is_active: bool = True,
     ) -> CarTestData:
-        number = number or f"A{''.join(random.choices(string.ascii_uppercase + string.digits, k=8))}XX"
-
         car = Car.create(
             actor_id=uuid7(),
             model=model,
-            number=number,
+            number=number or unique_car_number(),
             current_mileage=current_mileage,
         )
 
         if not is_active:
-            car.update(actor_id=uuid7(), is_active=False)
+            car.update(
+                actor_id=uuid7(),
+                is_active=False,
+            )
 
         async with cars_uow_factory() as uow:
             await uow.cars.add(car)
