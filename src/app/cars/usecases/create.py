@@ -26,12 +26,6 @@ class CreateCarUseCase:
         dto: CreateCarDTO,
     ) -> Car:
         async with self._uow as uow:
-            existing = await uow.cars.get_by_number(dto.number)
-
-            if existing is not None:
-                raise CarNumberAlreadyExistsException(
-                    number=dto.number,
-                )
 
             car = Car.create(
                 actor_id=dto.actor_id,

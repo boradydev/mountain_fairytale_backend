@@ -162,3 +162,37 @@ async def test_get_by_number_returns_none_for_unknown_number(postgres) -> None:
         result = await repository.get_by_number("NON_EXISTENT")
 
         assert result is None
+
+
+@pytest.mark.integration
+async def test_update_duplicate_number_raises_exception(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = CarsRepository(session=session)
+        
+        # Создаем два автомобиля с разными номерами
+        car1 = Car.create(
+            actor_id=uuid7(),
+            model="Model 1",
+            number=f"CAR-1-{uuid7()}",
+        )
+        car2 = Car.create(
+            actor_id=uuid7(),
+            model="Model 2",
+            number=f"CAR-2-{uuid7()}",
+        )
+
+        await repository.add(car1)
+        await repository.add(car2)
+        await session.commit()
+
+        # Пытаемся изменить номер первого автомобиля на номер второго
+        car1.update(
+            actor_id=uuid7(),
+            number=car2.number,
+        )
+
+        from src.domain.cars.car_excs import CarNumberAlreadyExistsException
+        with pytest.raises(CarNumberAlreadyExistsException) as exc_info:
+            await repository.update(car1)
+
+        assert exc_info.value.number == car2.number

@@ -22,6 +22,15 @@ class CarsRepository(ICarsRepository):
         car: Car,
     ) -> None:
         self._session.add(car)
+        number = car.number
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            pgcode = getattr(exc.orig, "pgcode", None)
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and car.UQ_NUMBER in str(exc.orig):
+                raise CarNumberAlreadyExistsException(number=number) from exc
+
+            raise
 
     async def update(self, car: Car) -> None:
         number = car.number
@@ -29,10 +38,7 @@ class CarsRepository(ICarsRepository):
             await self._session.flush()
         except IntegrityError as exc:
             pgcode = getattr(exc.orig, "pgcode", None)
-            # Проверяем код по официальной константе и имя констрейнта в тексте ошибки
-            if pgcode == pg_excs.UniqueViolationError.sqlstate and car.UQ_NUMBER in str(
-                exc.orig
-            ):
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and car.UQ_NUMBER in str(exc.orig):
                 raise CarNumberAlreadyExistsException(number=number) from exc
 
             raise
