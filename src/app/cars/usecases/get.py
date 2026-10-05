@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.cars.abcs.uow import ICarsUOW
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 from src.domain.cars.car_excs import CarNotFoundException
 
 

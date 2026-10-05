@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from src.app.cars.abcs.uow import ICarsUOW
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

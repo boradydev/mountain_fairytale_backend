@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
@@ -50,10 +50,16 @@ class EmployeesRepository(IEmployeesRepository):
 
         return result.scalar_one_or_none()
 
-    async def get_all(self) -> list[Employee]:
+    async def get_all(
+        self,
+        include_deactivated: bool,
+    ) -> list[Employee]:
         stmt = select(Employee).order_by(
-            Employee.username,
+            desc(Employee.created_at),
         )
+
+        if not include_deactivated:
+            stmt = stmt.where(Employee.is_active.is_(True))
 
         result = await self._session.execute(stmt)
 

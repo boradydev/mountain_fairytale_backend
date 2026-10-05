@@ -1,13 +1,13 @@
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.cars.abcs.cars_repo import ICarsRepository
 from src.domain.cars.car_excs import CarNumberAlreadyExistsException
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 
 
 class CarsRepository(ICarsRepository):
@@ -69,7 +69,7 @@ class CarsRepository(ICarsRepository):
 
     async def get_all(
         self,
-        include_deactivated: bool = False,
+        include_deactivated: bool,
     ) -> list[Car]:
         stmt = select(Car)
 
@@ -78,7 +78,7 @@ class CarsRepository(ICarsRepository):
                 Car.is_active.is_(True),
             )
 
-        stmt = stmt.order_by(Car.model, Car.number)
+        stmt = stmt.order_by(desc(Car.created_at))
 
         result = await self._session.execute(stmt)
 

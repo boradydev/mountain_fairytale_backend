@@ -9,7 +9,7 @@ import pytest
 from src.core.uuid7 import uuid7
 
 from src.domain.employees.employee_entities import Employee
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 from src.infra.db.postgres.database import Postgres
 from src.infra.db.postgres.uow.employees import EmployeesUOW
 from src.infra.db.postgres.uow.cars import CarsUOW

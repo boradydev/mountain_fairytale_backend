@@ -3,7 +3,8 @@ CREATE TABLE cars (
     model TEXT NOT NULL,
     number TEXT NOT NULL UNIQUE,
     current_mileage DOUBLE PRECISION NOT NULL DEFAULT 0,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL
 );
 
 CREATE INDEX ix_cars_model

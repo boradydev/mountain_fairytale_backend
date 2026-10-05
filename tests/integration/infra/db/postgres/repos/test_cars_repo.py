@@ -1,7 +1,7 @@
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 from src.infra.db.postgres.repos.cars.cars_repo import CarsRepository
 
 

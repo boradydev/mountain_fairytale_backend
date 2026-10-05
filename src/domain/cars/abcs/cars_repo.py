@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 
 
 class ICarsRepository(ABC):
@@ -29,7 +29,7 @@ class ICarsRepository(ABC):
     @abstractmethod
     async def get_all(
         self,
-        include_deactivated: bool = False,
+        include_deactivated: bool,
     ) -> list[Car]:
         """Возвращает все автомобили."""
 

@@ -1,7 +1,7 @@
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import Float, Text, UniqueConstraint
+from sqlalchemy import DateTime, Float, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
@@ -25,6 +25,7 @@ class Car(BaseEntity):
 
     current_mileage: Mapped[float] = mapped_column(Float, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime)
 
 
     _ALLOWED_UPDATE_FIELDS = {
@@ -49,6 +50,7 @@ class Car(BaseEntity):
             number=number,
             current_mileage=current_mileage,
             is_active=True,
+            created_at=func.now(),
         )
 
         car._add_event(

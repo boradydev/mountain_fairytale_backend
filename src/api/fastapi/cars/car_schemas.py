@@ -5,7 +5,7 @@ from pydantic import Field
 
 from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
 from src.api.fastapi.common.schemas import BaseSchema
-from src.domain.cars.entities import Car
+from src.domain.cars.car_entities import Car
 
 
 class CarResp(BaseSchema):
