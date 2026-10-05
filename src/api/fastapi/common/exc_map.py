@@ -28,6 +28,7 @@ from src.domain.employees.employee_excs import (
     EmployeeNotFoundByUsernameException,
     EmployeeNotFoundException,
     EmployeeDomainUpdateException,
+    EmployeeUsernameAlreadyExistsException,
 )
 
 
@@ -91,6 +92,10 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         EmployeeDomainUpdateException: Resp(
             status_code=422,
             detail="Employee domain update error",
+        ),
+        EmployeeUsernameAlreadyExistsException: Resp(
+            status_code=409,
+            detail="Employee username already exists",
         ),
     },
 )

@@ -23,3 +23,8 @@ class EmployeeDeactivateException(DomainException):
 class EmployeeDomainUpdateException(DomainException):
     field: str
     message: str
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeUsernameAlreadyExistsException(DomainException):
+    username: str

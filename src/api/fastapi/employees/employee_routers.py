@@ -173,6 +173,7 @@ async def get_employee(
     response_model=StdResponse[EmployeeResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
+        employee_excs.EmployeeUsernameAlreadyExistsException,
     ),
     description="""
     Создание нового сотрудника.
@@ -197,6 +198,7 @@ async def get_employee(
 
     Ошибки:
         401 — пользователь не авторизован.
+        409 — username уже занят другим сотрудником.
 
     Критические сценарии для API-тестов:
         1. Создание сотрудника с непустым паролем.
@@ -204,6 +206,7 @@ async def get_employee(
         3. Проверка employeeId.
         4. Проверка isActive == true.
         5. Проверка сохранения через GET.
+        6. Попытка создать сотрудника с уже существующим username -> 409.
     """,
 )
 async def create_employee(
@@ -232,6 +235,7 @@ async def create_employee(
         UnauthorizedException,
         employee_excs.EmployeeNotFoundException,
         employee_excs.EmployeeDomainUpdateException,
+        employee_excs.EmployeeUsernameAlreadyExistsException,
     ),
     description="""
     Обновление данных сотрудника.
@@ -254,6 +258,7 @@ async def create_employee(
     Ошибки:
         401 — пользователь не авторизован.
         404 — сотрудник не найден.
+        409 — новый username уже занят другим сотрудником.
         422 — нарушение доменных инвариантов (EmployeeDomainUpdateException).
 
     Важные требования:
@@ -268,6 +273,7 @@ async def create_employee(
         4. Обновление несуществующего сотрудника -> 404.
         5. Проверка результата через GET.
         6. Пустой запрос (тело `{}`) -> 422.
+        7. Изменение username на уже существующий -> 409.
     """,
 )
 async def update_employee(
