@@ -8,7 +8,7 @@ from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.app.employees.usecases.get import GetEmployeeDTO
 from src.domain.auth.auth_excs import InvalidCredentialsException
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 from src.infra.factories.app_context import AppContext
 from src.infra.web.fastapi.cookies import AuthTokenManager
 

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 
 
 class IEmployeesRepository(ABC):

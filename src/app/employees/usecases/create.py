@@ -3,7 +3,7 @@ from uuid import UUID
 
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

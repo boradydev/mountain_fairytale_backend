@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.sql.expression import Update
 
 from src.domain.common.events import FieldChange
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 from src.infra.db.postgres.repos.common.sql_reader import sql_reader
 from src.infra.db.postgres.repos.common.stmt_update_builder import StmtUpdateBuilder
 

@@ -8,7 +8,7 @@ from uuid import UUID
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 from src.domain.cars.entities import Car
 from src.infra.db.postgres.database import Postgres
 from src.infra.db.postgres.uow.employees import EmployeesUOW

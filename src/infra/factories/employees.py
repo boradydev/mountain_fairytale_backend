@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.app.employees.usecases.change_password import ChangeEmployeePasswordUseCase
 from src.app.employees.usecases.create import CreateEmployeeUseCase
-from src.app.employees.usecases.deactivate import DeactivateEmployeeUseCase
 from src.app.employees.usecases.get import GetEmployeeUseCase
 from src.app.employees.usecases.get_all import GetEmployeesUseCase
 from src.app.employees.usecases.update import UpdateEmployeeUseCase
@@ -27,11 +26,6 @@ class EmployeesUseCaseFactory:
 
     def update_employee(self) -> UpdateEmployeeUseCase:
         return UpdateEmployeeUseCase(
-            uow=self._create_uow(),
-        )
-
-    def deactivate_employee(self) -> DeactivateEmployeeUseCase:
-        return DeactivateEmployeeUseCase(
             uow=self._create_uow(),
         )
 

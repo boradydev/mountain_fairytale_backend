@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 from src.domain.employees.employee_excs import EmployeeNotFoundException
 
 

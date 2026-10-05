@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
-from src.domain.employees.entities import Employee
+from src.domain.employees.employee_entities import Employee
 
 
 class EmployeesRepository(IEmployeesRepository):
