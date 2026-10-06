@@ -2,12 +2,12 @@ from types import NoneType
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Query, status
 
 from src.api.fastapi.common.api_excs import UnauthorizedException
 from src.api.fastapi.common.deps import (
-    Context,
     AccessTokenPayloadDep,
+    Context,
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
@@ -44,6 +44,11 @@ API CONTRACT — EMPLOYEES
     5. ID сотрудника является UUID.
     6. Пароль никогда не возвращается API.
     7. Request/response schemas используют camelCase через BaseSchema.
+
+Авторизация:
+    Токен доступа (access token) может быть передан двумя способами:
+    1. Через Cookies: кука `access-token`.
+    2. Через Headers (для Flutter): заголовок `Authorization: Bearer <token>`.
 
 AI TESTING RULES:
 

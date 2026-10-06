@@ -35,6 +35,11 @@ API CONTRACT — CURRENT USER
     4. Смена собственного пароля не должна требовать передачи employee_id.
     5. Пароль никогда не возвращается API.
 
+Авторизация:
+    Токен доступа (access token) может быть передан двумя способами:
+    1. Через Cookies: кука `access-token`.
+    2. Через Headers (для Flutter): заголовок `Authorization: Bearer <token>`.
+
 AI TESTING RULES:
 
     1. Тестировать только HTTP API.

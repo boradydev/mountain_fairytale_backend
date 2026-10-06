@@ -43,6 +43,11 @@ API CONTRACT — CARS
     7. Все request/response schemas используют camelCase через BaseSchema.
     8. Все эндпоинты модуля являются защищенными (Protected) и требуют авторизации.
 
+Авторизация:
+    Токен доступа (access token) может быть передан двумя способами:
+    1. Через Cookies: кука `access-token`.
+    2. Через Headers (для Flutter): заголовок `Authorization: Bearer <token>`.
+
 AI TESTING RULES:
 
     1. Тестировать HTTP API через публичные endpoints этого router.
