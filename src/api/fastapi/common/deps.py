@@ -6,7 +6,7 @@ from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
 from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
 from src.api.fastapi.common.api_excs import UnauthorizedException, ForbiddenException
 from src.infra.factories.app_context import AppContext
-from src.infra.web.fastapi.cookies import AuthTokenManager
+from src.infra.web.fastapi.auth_token_manager import AuthTokenManager
 
 
 def get_app_ctx(request: Request) -> AppContext:
