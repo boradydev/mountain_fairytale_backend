@@ -76,6 +76,8 @@ def _unwrap_mapped(annotation: Any) -> Any:
 
 def create_patch_schema_for_domain(
     entity_cls: type[Any],
+    *,
+    exclude_fields: set[str] = None,
 ) -> type[BaseSchema]:
     """
     Создаёт PATCH-схему на основе SQLAlchemy-модели.
@@ -84,6 +86,7 @@ def create_patch_schema_for_domain(
     которые разрешено изменять.
     """
     fields_spec: dict[str, Any] = {}
+    exclude_fields = exclude_fields or set()
 
     allowed_fields = getattr(
         entity_cls,
@@ -94,7 +97,7 @@ def create_patch_schema_for_domain(
     annotations = get_type_hints(entity_cls)
 
     for field_name in allowed_fields:
-        if field_name not in annotations:
+        if field_name not in annotations or field_name in exclude_fields:
             continue
 
         domain_type = _unwrap_mapped(
