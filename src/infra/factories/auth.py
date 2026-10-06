@@ -4,7 +4,7 @@ from src.app.auth.usecases.login import LoginUseCase
 from src.app.auth.usecases.refresh import RefreshUseCase
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.infra.db.postgres.uow.employees import EmployeesUOW
-from src.api.fastapi.common.abcs import ITokenService
+from src.api.fastapi.common.api_abcs import ITokenService
 
 
 class AuthUseCaseFactory:

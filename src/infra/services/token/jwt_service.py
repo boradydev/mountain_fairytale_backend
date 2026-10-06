@@ -9,7 +9,7 @@ from src.infra.services.token.excs import (
     InvalidRefreshTokenException,
 )
 from src.infra.services.token.settings import JwtSettings
-from src.api.fastapi.common.abcs import ITokenService
+from src.api.fastapi.common.api_abcs import ITokenService
 from src.api.fastapi.auth.auth_schemas import AccessTokenPyload, RefreshTokenPyload
 
 

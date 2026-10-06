@@ -5,7 +5,7 @@ from src.app.common.abcs.services.password_service import IPasswordService
 from src.app.employees.abcs.uow import IEmployeesUOW
 from src.domain.auth import auth_excs
 from src.domain.employees.events import EmployeeLoginEvent
-from src.api.fastapi.common.abcs import ITokenService
+from src.api.fastapi.common.api_abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
