@@ -1,6 +1,6 @@
 from src.app.common.abcs.services.password_service import IPasswordService
-from src.app.employees.abcs.uow import IEmployeesUOW
-from src.app.employees.usecases.create import CreateEmployeeDTO, CreateEmployeeUseCase
+from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
+from src.feat.employees.app.usecases.create import CreateEmployeeDTO, CreateEmployeeUseCase
 from src.domain.common.const import SYSTEM_ACTOR_ID
 from src.infra.bootstrap.admins.settings import AdminSettings
 

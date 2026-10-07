@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
-from src.domain.employees.employee_entities import Employee
-from src.domain.employees.employee_excs import EmployeeUsernameAlreadyExistsException
+from src.feat.employees.domain.employee_entities import Employee
+from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExistsException
 
 
 class EmployeesRepository(IEmployeesRepository):

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.employee_entities import Employee
-from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
+from src.feat.employees.domain.employee_entities import Employee
+from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

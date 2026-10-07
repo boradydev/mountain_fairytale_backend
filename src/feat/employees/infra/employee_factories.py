@@ -1,12 +1,12 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from src.app.common.abcs.services.password_service import IPasswordService
-from src.app.employees.usecases.change_password import ChangeEmployeePasswordUseCase
-from src.app.employees.usecases.create import CreateEmployeeUseCase
-from src.app.employees.usecases.get import GetEmployeeUseCase
-from src.app.employees.usecases.get_all import GetEmployeesUseCase
-from src.app.employees.usecases.update import UpdateEmployeeUseCase
-from src.infra.db.postgres.uow.employees import EmployeesUOW
+from src.feat.employees.app.usecases.change_password import ChangeEmployeePasswordUseCase
+from src.feat.employees.app.usecases.create import CreateEmployeeUseCase
+from src.feat.employees.app.usecases.get import GetEmployeeUseCase
+from src.feat.employees.app.usecases.get_all import GetEmployeesUseCase
+from src.feat.employees.app.usecases.update import UpdateEmployeeUseCase
+from src.feat.employees.infra.employee_uow import EmployeesUOW
 
 
 class EmployeesUseCaseFactory:

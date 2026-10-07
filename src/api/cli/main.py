@@ -4,14 +4,14 @@ import getpass
 
 import dotenv
 
-from src.app.employees.usecases.change_password import (
+from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
     ChangeEmployeePasswordUseCase,
 )
 from src.domain.common.const import SYSTEM_ACTOR_ID
 from src.infra.bootstrap.admins.settings import AdminSettings
 from src.infra.db.postgres.database import Postgres
-from src.infra.db.postgres.uow.employees import EmployeesUOW
+from src.feat.employees.infra.employee_uow import EmployeesUOW
 from src.infra.services.event_publisher.service import EventPublisher
 from src.infra.services.password.service import PasswordService
 

@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.common.abcs.services.password_service import IPasswordService
-from src.app.employees.abcs.uow import IEmployeesUOW
-from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
+from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

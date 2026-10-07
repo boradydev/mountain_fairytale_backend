@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from src.app.auth.dto import AuthTokensDTO
 from src.app.common.abcs.services.password_service import IPasswordService
-from src.app.employees.abcs.uow import IEmployeesUOW
+from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.domain.auth import auth_excs
 from src.domain.employees.events import EmployeeLoginEvent
 from src.api.fastapi.common.api_abcs import ITokenService

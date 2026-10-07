@@ -11,22 +11,21 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.employees.employee_schemas import (
+from src.feat.employees.api.employee_schemas import (
     ChangeEmployeePasswordReq,
     CreateEmployeeReq,
     EmployeeResp,
     EmployeesResp,
     UpdateEmployeeReq,
 )
-from src.app.employees.usecases.change_password import (
+from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
-from src.app.employees.usecases.create import CreateEmployeeDTO
-from src.app.employees.usecases.get import GetEmployeeDTO
-from src.app.employees.usecases.get_all import GetEmployeesDTO
-from src.app.employees.usecases.update import UpdateEmployeeDTO
-from src.domain.employees import employee_excs
-
+from src.feat.employees.app.usecases.create import CreateEmployeeDTO
+from src.feat.employees.app.usecases.get import GetEmployeeDTO
+from src.feat.employees.app.usecases.get_all import GetEmployeesDTO
+from src.feat.employees.app.usecases.update import UpdateEmployeeDTO
+from src.feat.employees.domain import employee_excs
 
 """
 API CONTRACT — EMPLOYEES
@@ -74,7 +73,7 @@ AI TESTING RULES:
 
 
 employees_router = APIRouter(
-    prefix="/employees",
+    prefix="/app",
     tags=["Crud сотрудников для использования админом"],
 )
 
@@ -96,7 +95,7 @@ employees_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.employees содержит список EmployeeResp.
+        data.app содержит список EmployeeResp.
 
     Важные требования:
         1. Если include_deactivated=false (по умолчанию) -> список только активных сотрудников.

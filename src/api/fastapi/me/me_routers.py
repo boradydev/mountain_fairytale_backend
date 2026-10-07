@@ -10,11 +10,11 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.employees.employee_schemas import ChangeEmployeePasswordReq
-from src.app.employees.usecases.change_password import (
+from src.feat.employees.api.employee_schemas import ChangeEmployeePasswordReq
+from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
-from src.domain.employees.employee_excs import EmployeeNotFoundException
+from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
 from src.infra.services.token.settings import JwtSettings
 from src.infra.web.fastapi.auth_token_manager import AuthTokenManager
 

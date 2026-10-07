@@ -2,9 +2,9 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.employees.abcs.uow import IEmployeesUOW
+from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
-from src.infra.db.postgres.repos.employees.employees_repo import EmployeesRepository
+from src.feat.employees.infra.employee_repos import EmployeesRepository
 from src.infra.db.postgres.uow.common import IPostgresUOW
 from src.infra.services.event_publisher.service import EventPublisher
 

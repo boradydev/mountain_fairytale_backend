@@ -6,7 +6,7 @@ from src.app.common.abcs.services.password_service import IPasswordService
 from src.infra.factories.auth import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
-from src.infra.factories.employees import EmployeesUseCaseFactory
+from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
 from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory
 from src.infra.factories.products import ProductsUseCaseFactory
 from src.infra.factories.sales_representatives import SalesRepresentativesUseCaseFactory

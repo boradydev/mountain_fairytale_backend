@@ -11,7 +11,7 @@ from src.domain.employees import events
 
 
 class Employee(BaseEntity):
-    __tablename__ = "employees"
+    __tablename__ = "app"
 
     employee_id: Mapped[UUID] = mapped_column(primary_key=True)
 

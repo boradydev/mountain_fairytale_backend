@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
 from src.api.fastapi.common.schemas import BaseSchema
-from src.domain.employees.employee_entities import Employee
+from src.feat.employees.domain.employee_entities import Employee
 
 
 class EmployeeResp(BaseSchema):

@@ -1,8 +1,8 @@
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.employees.employee_entities import Employee
-from src.infra.db.postgres.repos.employees.employees_repo import EmployeesRepository
+from src.feat.employees.domain.employee_entities import Employee
+from src.feat.employees.infra.employee_repos import EmployeesRepository
 from tests.helpers import unique_username
 
 
