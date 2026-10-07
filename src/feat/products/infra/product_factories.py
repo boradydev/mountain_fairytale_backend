@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.products.usecases.check_duplicate import CheckProductDuplicateUseCase
-from src.app.products.usecases.create import CreateProductUseCase
-from src.app.products.usecases.get import GetProductUseCase
-from src.app.products.usecases.get_all import GetProductsUseCase
-from src.app.products.usecases.update import UpdateProductUseCase
-from src.infra.db.postgres.uow.products import ProductsUOW
+from src.feat.products.app.usecases.check_duplicate import CheckProductDuplicateUseCase
+from src.feat.products.app.usecases.create import CreateProductUseCase
+from src.feat.products.app.usecases.get import GetProductUseCase
+from src.feat.products.app.usecases.get_all import GetProductsUseCase
+from src.feat.products.app.usecases.update import UpdateProductUseCase
+from src.feat.products.infra.product_uow import ProductsUOW
 
 
 class ProductsUseCaseFactory:

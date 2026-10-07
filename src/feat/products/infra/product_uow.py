@@ -2,9 +2,9 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.products.abcs.uow import IProductsUOW
-from src.domain.products.abcs.products_repo_abcs import IProductsRepository
-from src.infra.db.postgres.repos.products.products_repo import ProductsRepository
+from src.feat.products.app.abcs.product_uow_abcs import IProductsUOW
+from src.feat.products.domain.abcs.product_repo_abcs import IProductsRepository
+from src.feat.products.infra.product_repos import ProductsRepository
 from src.infra.db.postgres.uow.common import IPostgresUOW
 from src.infra.services.event_publisher.service import EventPublisher
 

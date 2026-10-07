@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.app.products.abcs.uow import IProductsUOW
+from src.feat.products.app.abcs.product_uow_abcs import IProductsUOW
 from src.domain.products.product_entities import Product
 
 

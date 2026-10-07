@@ -6,7 +6,7 @@ from tests.integration.conftest import EmployeeTestData
 from tests.helpers import unique_product_name
 
 
-BASE_PATH = "/protected/products"
+BASE_PATH = "/protected/app"
 
 
 class TestProductRouters:
@@ -51,7 +51,7 @@ class TestProductRouters:
         # Проверка: только активные
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
-        data = response.json()["data"]["products"]
+        data = response.json()["data"]["app"]
         product_ids = [p["productId"] for p in data]
         assert p_active["productId"] in product_ids
         assert p_inactive["productId"] not in product_ids
@@ -59,7 +59,7 @@ class TestProductRouters:
         # Проверка: все товары
         response_all = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response_all.status_code == 200
-        data_all = response_all.json()["data"]["products"]
+        data_all = response_all.json()["data"]["app"]
         product_ids_all = [p["productId"] for p in data_all]
         assert p_active["productId"] in product_ids_all
         assert p_inactive["productId"] in product_ids_all

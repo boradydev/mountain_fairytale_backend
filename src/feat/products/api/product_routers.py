@@ -11,17 +11,17 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.products.product_schemas import (
+from src.feat.products.api.product_schemas import (
     ProductResp,
     ProductsResp,
     CreateProductReq,
     UpdateProductReq,
 )
-from src.app.products.usecases.check_duplicate import CheckProductDuplicateDTO
-from src.app.products.usecases.create import CreateProductDTO
-from src.app.products.usecases.get import GetProductDTO
-from src.app.products.usecases.get_all import GetProductsDTO
-from src.app.products.usecases.update import UpdateProductDTO
+from src.feat.products.app.usecases.check_duplicate import CheckProductDuplicateDTO
+from src.feat.products.app.usecases.create import CreateProductDTO
+from src.feat.products.app.usecases.get import GetProductDTO
+from src.feat.products.app.usecases.get_all import GetProductsDTO
+from src.feat.products.app.usecases.update import UpdateProductDTO
 from src.domain.products import product_excs
 
 
@@ -70,7 +70,7 @@ AI TESTING RULES:
 
 
 products_router = APIRouter(
-    prefix="/products",
+    prefix="/app",
     tags=["Товары"],
 )
 
@@ -92,7 +92,7 @@ products_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.products содержит список ProductResp.
+        data.app содержит список ProductResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных товаров (include_deactivated=false).

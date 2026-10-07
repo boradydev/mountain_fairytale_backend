@@ -2,17 +2,17 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
 from src.domain.products import events
-from src.domain.products.product_excs import ProductDomainUpdateException
+from src.feat.products.domain.product_excs import ProductDomainUpdateException
 from src.domain.common.entities import BaseEntity
 
 
 class Product(BaseEntity):
-    __tablename__ = "products"
+    __tablename__ = "app"
 
     product_id: Mapped[UUID] = mapped_column(primary_key=True)
     
