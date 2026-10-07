@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text, func
+from sqlalchemy import DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
@@ -34,7 +34,7 @@ class Driver(BaseEntity):
             driver_id=uuid7(),
             name=name,
             is_active=True,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         driver._add_event(

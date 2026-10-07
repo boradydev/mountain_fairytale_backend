@@ -50,13 +50,19 @@ class DriversRepository(IDriversRepository):
         )
 
         similarity = func.similarity(Driver.name, name)
+        length_delta = func.abs(func.length(Driver.name) - len(name))
         stmt = (
             select(Driver)
             .where(
                 Driver.name.bool_op("%")(name),
                 similarity >= self._FUZZY_THRESHOLD,
             )
-            .order_by(similarity.desc(), Driver.driver_id)
+            .order_by(
+                similarity.desc(),
+                length_delta.asc(),
+                Driver.created_at.desc(),
+                Driver.driver_id.desc(),
+            )
             .limit(1)
         )
         result = await self._session.execute(stmt)
