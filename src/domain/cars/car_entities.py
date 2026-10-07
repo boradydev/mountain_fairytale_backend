@@ -54,7 +54,7 @@ class Car(BaseEntity):
         )
 
         car._add_event(
-            events.CreateCarEvent(
+            car_events.CreateCarEvent(
                 actor_id=actor_id,
                 car_id=car.car_id,
             ),
@@ -79,7 +79,7 @@ class Car(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateCarEvent(
+            car_events.UpdateCarEvent(
                 actor_id=actor_id,
                 car_id=self.car_id,
                 changes=changes,
