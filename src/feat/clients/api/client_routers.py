@@ -11,14 +11,13 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.clients.client_schemas import (
+from src.feat.clients.api.client_schemas import (
     ClientResp,
     ClientsResp,
     CreateClientReq,
     UpdateClientReq,
 )
-from src.domain.clients import client_excs
-
+from src.feat.clients.domain import client_excs
 
 """
 API CONTRACT — CLIENTS
@@ -65,7 +64,7 @@ AI TESTING RULES:
 
 
 clients_router = APIRouter(
-    prefix="/clients",
+    prefix="/api",
     tags=["Клиенты"],
 )
 
@@ -89,7 +88,7 @@ clients_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.clients содержит список ClientResp.
+        data.api содержит список ClientResp.
         Поля offset, limit, total предоставляют информацию о пагинации.
 
     Критические сценарии для API-тестов:

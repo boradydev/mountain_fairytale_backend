@@ -11,7 +11,7 @@ from src.domain.common.entities import BaseEntity
 
 
 class Client(BaseEntity):
-    __tablename__ = "clients"
+    __tablename__ = "api"
 
     client_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)

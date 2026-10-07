@@ -5,7 +5,7 @@ from src.feat.cars.api.car_routers import cars_router
 from src.api.fastapi.common.deps import verify_access_token, verify_admin_access
 from src.feat.drivers.api.driver_routers import drivers_router
 from src.feat.employees.api.employee_routers import employees_router
-from src.api.fastapi.me.me_routers import me_router
+from src.feat.me.me_routers import me_router
 from src.feat.pay_methods.api.pay_method_routers import payment_methods_router
 from src.feat.products.api.product_routers import products_router
 from src.feat.sales_rep.api.sales_rep_routers import sales_representatives_router

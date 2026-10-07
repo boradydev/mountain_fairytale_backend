@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
 from src.api.fastapi.common.schemas import BaseSchema
-from src.domain.clients.client_entities import Client
+from src.feat.clients.domain.client_entities import Client
 
 
 class ClientResp(BaseSchema):
