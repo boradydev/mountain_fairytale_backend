@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from src.api.fastapi.auth.auth_routers import auth_router
+from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
 from src.api.fastapi.common.deps import verify_access_token, verify_admin_access
 from src.feat.drivers.api.driver_routers import drivers_router

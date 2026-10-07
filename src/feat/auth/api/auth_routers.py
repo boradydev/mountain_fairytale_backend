@@ -1,13 +1,13 @@
 from fastapi import APIRouter, status
 
 from src.api.fastapi.common.deps import AuthTokenManagerDep
-from src.api.fastapi.auth.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
+from src.feat.auth.api.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
 from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException
 from src.api.fastapi.common.deps import Context
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.app.auth.usecases.login import LoginDTO
-from src.app.auth.usecases.refresh import RefreshDTO
+from src.feat.auth.app.usecases.login import LoginDTO
+from src.feat.auth.app.usecases.refresh import RefreshDTO
 from src.domain.auth import auth_excs
 
 
@@ -21,8 +21,8 @@ API CONTRACT — AUTHENTICATION
     и обновления пары JWT-токенов.
 
 Endpoints:
-    POST /public/auth/login
-    POST /public/auth/refresh
+    POST /public/app/login
+    POST /public/app/refresh
 
 Основные правила безопасности:
 
@@ -32,7 +32,7 @@ Endpoints:
     4. Refresh token используется для получения новой пары токенов.
     5. Refresh token может передаваться в теле запроса или через cookie,
        в зависимости от предусмотренного endpoint поведения.
-    6. При успешной авторизации и обновлении токенов auth cookies
+    6. При успешной авторизации и обновлении токенов app cookies
        устанавливаются или обновляются.
     7. Необходимо исключить User Enumeration:
        API не должен раскрывать, существует ли пользователь с указанным
@@ -68,7 +68,7 @@ AI TESTING RULES:
 """
 
 auth_router = APIRouter(
-    prefix="/auth",
+    prefix="/app",
     tags=["Авторизация"],
 )
 

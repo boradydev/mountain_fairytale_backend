@@ -18,7 +18,7 @@ class TestSalesRepresentativeRouters:
     async def login(client: AsyncClient, employee: EmployeeTestData) -> None:
         """Вспомогательный метод для авторизации."""
         response = await client.post(
-            "/public/auth/login",
+            "/public/app/login",
             json={"username": employee.username, "password": employee.password},
         )
         assert response.status_code == 200

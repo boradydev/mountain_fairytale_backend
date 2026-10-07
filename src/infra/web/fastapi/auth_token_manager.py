@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import Request, Response
 
 from src.infra.services.token.settings import JwtSettings
-from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
+from src.feat.auth.api.abcs.auth_token_manager_abcs import IAuthTokenManager
 
 
 class IFastapiCookieManager(ABC):

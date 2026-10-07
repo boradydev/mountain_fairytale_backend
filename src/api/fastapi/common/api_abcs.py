@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.api.fastapi.auth.auth_schemas import AccessTokenPyload, RefreshTokenPyload
+from src.feat.auth.api.auth_schemas import AccessTokenPyload, RefreshTokenPyload
 
 
 class ITokenService(ABC):

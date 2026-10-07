@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import Depends, Request, Response
 
-from src.api.fastapi.auth.abcs.tokens import IAuthTokenManager
-from src.api.fastapi.auth.auth_schemas import AccessTokenPyload
+from src.feat.auth.api.abcs.auth_token_manager_abcs import IAuthTokenManager
+from src.feat.auth.api.auth_schemas import AccessTokenPyload
 from src.api.fastapi.common.api_excs import UnauthorizedException, ForbiddenException
 from src.infra.factories.app_context import AppContext
 from src.infra.web.fastapi.auth_token_manager import AuthTokenManager

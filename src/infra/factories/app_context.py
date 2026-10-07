@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.app.common.abcs.services.password_service import IPasswordService
-from src.infra.factories.auth import AuthUseCaseFactory
+from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
