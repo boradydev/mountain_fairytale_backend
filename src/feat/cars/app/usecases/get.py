@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.cars.abcs.uow import ICarsUOW
-from src.domain.cars.car_entities import Car
-from src.domain.cars.car_excs import CarNotFoundException
+from src.feat.cars.app.abcs.uow import ICarsUOW
+from src.feat.cars.domain.car_entities import Car
+from src.feat.cars.domain.car_excs import CarNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

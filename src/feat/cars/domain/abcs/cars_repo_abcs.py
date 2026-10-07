@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.cars.car_entities import Car
+from src.feat.cars.domain.car_entities import Car
 
 
 class ICarsRepository(ABC):

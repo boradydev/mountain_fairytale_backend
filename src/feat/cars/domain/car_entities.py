@@ -2,17 +2,17 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.cars import car_events
-from src.domain.cars.car_excs import CarDomainUpdateException
+from src.feat.cars.domain import car_events
+from src.feat.cars.domain.car_excs import CarDomainUpdateException
 from src.domain.common.entities import BaseEntity
 
 
 class Car(BaseEntity):
-    __tablename__ = "cars"
+    __tablename__ = "app"
 
     car_id: Mapped[UUID] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(Text, index=True)

@@ -1,8 +1,8 @@
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.cars.car_entities import Car
-from src.infra.db.postgres.repos.cars.cars_repo import CarsRepository
+from src.feat.cars.domain.car_entities import Car
+from src.feat.cars.infra.cars_repo import CarsRepository
 
 
 @pytest.mark.integration
@@ -191,7 +191,7 @@ async def test_update_duplicate_number_raises_exception(postgres) -> None:
             number=car2.number,
         )
 
-        from src.domain.cars.car_excs import CarNumberAlreadyExistsException
+        from src.feat.cars.domain.car_excs import CarNumberAlreadyExistsException
         with pytest.raises(CarNumberAlreadyExistsException) as exc_info:
             await repository.update(car1)
 

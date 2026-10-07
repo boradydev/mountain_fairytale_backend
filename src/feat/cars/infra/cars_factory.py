@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.cars.usecases.check_duplicate import CheckCarDuplicateUseCase
-from src.app.cars.usecases.create import CreateCarUseCase
-from src.app.cars.usecases.get import GetCarUseCase
-from src.app.cars.usecases.get_all import GetCarsUseCase
-from src.app.cars.usecases.update import UpdateCarUseCase
-from src.infra.db.postgres.uow.cars import CarsUOW
+from src.feat.cars.app.usecases.check_duplicate import CheckCarDuplicateUseCase
+from src.feat.cars.app.usecases.create import CreateCarUseCase
+from src.feat.cars.app.usecases.get import GetCarUseCase
+from src.feat.cars.app.usecases.get_all import GetCarsUseCase
+from src.feat.cars.app.usecases.update import UpdateCarUseCase
+from src.feat.cars.infra.cars_uow import CarsUOW
 
 
 class CarsUseCaseFactory:

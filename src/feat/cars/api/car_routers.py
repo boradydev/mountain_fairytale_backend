@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Path, Query, status
 
-from src.api.fastapi.cars.car_schemas import (
+from src.feat.cars.api.car_schemas import (
     CarResp,
     CarsResp,
     CreateCarReq,
@@ -17,13 +17,12 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.app.cars.usecases.check_duplicate import CheckCarDuplicateDTO
-from src.app.cars.usecases.create import CreateCarDTO
-from src.app.cars.usecases.get import GetCarDTO
-from src.app.cars.usecases.get_all import GetCarsDTO
-from src.app.cars.usecases.update import UpdateCarDTO
-from src.domain.cars import car_excs
-
+from src.feat.cars.app.usecases.check_duplicate import CheckCarDuplicateDTO
+from src.feat.cars.app.usecases.create import CreateCarDTO
+from src.feat.cars.app.usecases.get import GetCarDTO
+from src.feat.cars.app.usecases.get_all import GetCarsDTO
+from src.feat.cars.app.usecases.update import UpdateCarDTO
+from src.feat.cars.domain import car_excs
 
 """
 API CONTRACT — CARS
@@ -72,7 +71,7 @@ AI TESTING RULES:
 
 
 cars_router = APIRouter(
-    prefix="/cars",
+    prefix="/app",
     tags=["Автомобили"],
 )
 
@@ -296,7 +295,7 @@ async def create_car(
         5. Проверка результата через GET (что данные реально применились в БД).
         6. Пустой запрос (тело запроса `{}`): -> 422.
         7. Передача `null` в поля: если домен определит, что `null` не валиден для данного поля, возвращается 422.
-        8. Передача невалидного UUID в URL: отправка `/cars/123-не-uuid` -> 422.
+        8. Передача невалидного UUID в URL: отправка `/app/123-не-uuid` -> 422.
         9. Нарушение доменных инвариантов при обновлении (CarDomainUpdateException) -> 422 Unprocessable Entity.
         10. Деактивация активного автомобиля через PATCH.
         11. Повторная активация деактивированного автомобиля через PATCH.

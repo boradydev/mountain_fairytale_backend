@@ -7,7 +7,7 @@ from src.infra.bootstrap.admins.ensure_admin import ensure_admin
 from src.infra.db.postgres.database import Postgres
 from src.infra.factories.app_context import AppContext
 from src.infra.factories.auth import AuthUseCaseFactory
-from src.infra.factories.cars import CarsUseCaseFactory
+from src.feat.cars.infra.cars_factory import CarsUseCaseFactory
 from src.infra.factories.drivers import DriversUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory

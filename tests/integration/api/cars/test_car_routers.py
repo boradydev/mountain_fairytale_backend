@@ -5,7 +5,7 @@ from tests.integration.conftest import EmployeeTestData
 from tests.helpers import unique_car_number
 
 
-BASE_PATH = "/protected/cars"
+BASE_PATH = "/protected/app"
 
 
 class TestCarRouters:
@@ -34,7 +34,7 @@ class TestCarRouters:
         # По умолчанию include_deactivated=False
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
-        data = response.json()["data"]["cars"]
+        data = response.json()["data"]["app"]
         
         # Проверяем, что активный автомобиль в списке, а деактивированный — нет
         car_ids = [car["carId"] for car in data]
@@ -54,7 +54,7 @@ class TestCarRouters:
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
-        data = response.json()["data"]["cars"]
+        data = response.json()["data"]["app"]
         
         car_ids = [car["carId"] for car in data]
         assert str(active_car.car_id) in car_ids
