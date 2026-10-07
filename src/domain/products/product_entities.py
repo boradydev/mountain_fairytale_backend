@@ -44,7 +44,7 @@ class Product(BaseEntity):
             name=name,
             base_price=base_price,
             is_active=True,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         product._add_event(

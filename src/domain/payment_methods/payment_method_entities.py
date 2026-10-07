@@ -40,7 +40,7 @@ class PaymentMethod(BaseEntity):
             payment_method_id=uuid7(),
             name=name,
             is_active=True,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         method._add_event(

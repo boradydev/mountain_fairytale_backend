@@ -48,7 +48,7 @@ class SalesRepresentative(BaseEntity):
             phone=phone,
             commission_percent=commission_percent,
             is_active=True,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         rep._add_event(

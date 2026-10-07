@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
@@ -50,7 +51,7 @@ class Car(BaseEntity):
             number=number,
             current_mileage=current_mileage,
             is_active=True,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         car._add_event(

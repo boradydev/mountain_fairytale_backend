@@ -62,7 +62,7 @@ class Client(BaseEntity):
             is_active=True,
             last_delivery_date=datetime.now(),
             last_delivery_quantity=0,
-            created_at=func.now(),
+            created_at=datetime.now(),
         )
 
         client._add_event(
