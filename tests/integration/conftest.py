@@ -12,7 +12,7 @@ from src.domain.employees.employee_entities import Employee
 from src.feat.cars.domain.car_entities import Car
 from src.infra.db.postgres.database import Postgres
 from src.infra.db.postgres.uow.employees import EmployeesUOW
-from src.feat.cars.infra.cars_uow import CarsUOW
+from src.feat.cars.infra.car_uow import CarsUOW
 from src.infra.services.password.service import PasswordService
 from tests.helpers import unique_username, unique_car_number
 

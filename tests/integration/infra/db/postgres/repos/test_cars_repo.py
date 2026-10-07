@@ -2,7 +2,7 @@ import pytest
 from src.core.uuid7 import uuid7
 
 from src.feat.cars.domain.car_entities import Car
-from src.feat.cars.infra.cars_repo import CarsRepository
+from src.feat.cars.infra.car_repos import CarsRepository
 
 
 @pytest.mark.integration

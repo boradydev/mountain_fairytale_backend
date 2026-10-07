@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from src.feat.cars.app.abcs.uow import ICarsUOW
+from src.feat.cars.app.abcs.car_uow_abcs import ICarsUOW
 from src.feat.cars.domain.car_entities import Car
 
 

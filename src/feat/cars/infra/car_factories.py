@@ -5,7 +5,7 @@ from src.feat.cars.app.usecases.create import CreateCarUseCase
 from src.feat.cars.app.usecases.get import GetCarUseCase
 from src.feat.cars.app.usecases.get_all import GetCarsUseCase
 from src.feat.cars.app.usecases.update import UpdateCarUseCase
-from src.feat.cars.infra.cars_uow import CarsUOW
+from src.feat.cars.infra.car_uow import CarsUOW
 
 
 class CarsUseCaseFactory:
