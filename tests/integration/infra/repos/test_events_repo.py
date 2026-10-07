@@ -1,54 +1,33 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
-from src.core.uuid7 import uuid7
 
 from src.common.domain.event_record import EventRecord
 from src.common.infra.db.postgres.repos.events.repo import EventsRepository
+from src.core.uuid7 import uuid7
+
+
+def make_event(index: int, created_at: datetime | None = None) -> EventRecord:
+    return EventRecord(
+        event_id=uuid7(),
+        event_type="TestEvent",
+        actor_id=uuid7(),
+        created_at=created_at or datetime.now(),
+        payload={"index": index},
+    )
 
 
 @pytest.mark.integration
 async def test_add_many_and_get_all(postgres) -> None:
     async with postgres.session_factory() as session:
-        repository = EventsRepository(
-            session=session,
-        )
+        repository = EventsRepository(session=session)
 
-        actor_id = uuid7()
-
-        first = EventRecord(
-            event_id=uuid7(),
-            event_type="CreateEmployeeEvent",
-            actor_id=actor_id,
-            created_at=datetime.now(),
-            payload={
-                "employee_id": str(uuid7()),
-            },
-        )
-
-        second = EventRecord(
-            event_id=uuid7(),
-            event_type="UpdateEmployeeEvent",
-            actor_id=actor_id,
-            created_at=datetime.now(),
-            payload={
-                "employee_id": str(uuid7()),
-                "changes": {
-                    "username": {
-                        "old": "alex",
-                        "new": "alexander",
-                    },
-                },
-            },
-        )
+        first = make_event(1)
+        second = make_event(2)
 
         await repository.add_many(
-            records=[
-                first,
-                second,
-            ],
+            records=[first, second],
         )
-
         await session.commit()
 
         result = await repository.get_all(
@@ -56,69 +35,108 @@ async def test_add_many_and_get_all(postgres) -> None:
             limit=100,
         )
 
-        event_ids = {event.event_id for event in result}
+        result_ids = {event.event_id for event in result}
 
-        assert first.event_id in event_ids
-        assert second.event_id in event_ids
+        assert result_ids == {
+            first.event_id,
+            second.event_id,
+        }
 
 
 @pytest.mark.integration
 async def test_get_all_pagination(postgres) -> None:
     async with postgres.session_factory() as session:
-        repository = EventsRepository(
-            session=session,
+        repository = EventsRepository(session=session)
+
+        records = [make_event(index) for index in range(3)]
+
+        await repository.add_many(records=records)
+        await session.commit()
+
+        first_page = await repository.get_all(
+            offset=0,
+            limit=2,
         )
+        second_page = await repository.get_all(
+            offset=2,
+            limit=2,
+        )
+
+        assert len(first_page) == 2
+        assert len(second_page) == 1
+
+        first_ids = {event.event_id for event in first_page}
+        second_ids = {event.event_id for event in second_page}
+
+        assert first_ids.isdisjoint(second_ids)
+        assert first_ids | second_ids == {record.event_id for record in records}
+
+
+@pytest.mark.integration
+async def test_get_all_offset_out_of_range_returns_empty(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EventsRepository(session=session)
 
         records = [
-            EventRecord(
-                event_id=uuid7(),
-                event_type="TestEvent",
-                actor_id=uuid7(),
-                created_at=datetime.now(),
-                payload={
-                    "index": index,
-                },
-            )
-            for index in range(3)
+            make_event(1),
+            make_event(2),
         ]
 
-        await repository.add_many(
-            records=records,
+        await repository.add_many(records=records)
+        await session.commit()
+
+        result = await repository.get_all(
+            offset=10,
+            limit=10,
         )
 
+        assert result == []
+
+
+@pytest.mark.integration
+async def test_get_all_respects_limit(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EventsRepository(session=session)
+
+        records = [make_event(index) for index in range(5)]
+
+        await repository.add_many(records=records)
         await session.commit()
 
         result = await repository.get_all(
             offset=0,
-            limit=2,
+            limit=3,
         )
 
-        assert len(result) == 2
+        assert len(result) == 3
 
 
 @pytest.mark.integration
-async def test_get_all_offset_out_of_range(postgres) -> None:
+async def test_get_all_respects_offset(postgres) -> None:
     async with postgres.session_factory() as session:
-        repository = EventsRepository(
-            session=session,
-        )
+        repository = EventsRepository(session=session)
+
+        created_at = datetime.now()
 
         records = [
-            EventRecord(
-                event_id=uuid7(),
-                event_type="T",
-                actor_id=uuid7(),
-                created_at=datetime.now(),
-                payload={},
+            make_event(
+                index=index,
+                created_at=created_at + timedelta(seconds=index),
             )
-            for _ in range(2)
+            for index in range(4)
         ]
 
-        await repository.add_many(
-            records=records,
-        )
-
+        await repository.add_many(records=records)
         await session.commit()
 
-        result = await repository.get_all(offset=10, limit=10)
-        assert len(result) == 0
+        result = await repository.get_all(
+            offset=2,
+            limit=10,
+        )
+
+        result_ids = {event.event_id for event in result}
+
+        assert result_ids == {
+            records[2].event_id,
+            records[3].event_id,
+        }

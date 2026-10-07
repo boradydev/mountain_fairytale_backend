@@ -1,97 +1,65 @@
 import os
 import subprocess
 import sys
-from collections.abc import AsyncGenerator
-from pathlib import Path
+from collections.abc import Generator
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
-from src.common.infra.db.postgres.database import Postgres
+from src.common.infra.db.postgres.settings import PostgresSettings
+from src.core.paths import PROJECT_DIR
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-ALEMBIC_CONFIG = PROJECT_ROOT / "src" / "common" / "infra" / "db" / "postgres" / "alembic" / "alembic.ini"
+ALEMBIC_CONFIG = PROJECT_DIR / "src" / "common" / "infra" / "db" / "postgres" / "alembic" / "alembic.ini"
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def prepare_repository_database() -> AsyncGenerator[None]:
-    """Prepare a clean PostgreSQL schema and apply all migrations."""
+def prepare_repository_database() -> Generator[None]:
+    """
+    Выполняется строго ОДИН РАЗ на всю сессию тестов.
+    Полностью синхронно блокирует поток, пересоздает схему и накатывает миграции.
+    """
+    # 1. Принудительно выставляем тестовую БД в окружение перед чтением настроек
     test_database = os.environ["POSTGRES_TEST_DB"]
-
-    previous_database = os.environ.get("POSTGRES_DB")
     os.environ["POSTGRES_DB"] = test_database
 
-    postgres = Postgres()
+    # Инициализируем настройки (они подтянут уже измененный POSTGRES_DB)
+    settings = PostgresSettings()
 
-    try:
-        await postgres.execute(
-            """
-            DROP SCHEMA public CASCADE;
-            CREATE SCHEMA public;
-            """
-        )
+    # 2. Создаем временный синхронный движок (использует ваш DB_URL_SYNC)
+    # Изолируем его через isolation_level="AUTOCOMMIT", чтобы DROP SCHEMA выполнился без транзакций
+    sync_engine = create_engine(url=settings.DB_URL_SYNC, isolation_level="AUTOCOMMIT")
 
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "alembic",
-                "-c",
-                str(ALEMBIC_CONFIG),
-                "upgrade",
-                "head",
-            ],
-            cwd=PROJECT_ROOT,
-            env=os.environ.copy(),
-            check=True,
-        )
+    # 3. Намертво блокируем поток и сносим старую схему
+    with sync_engine.connect() as connection:
+        connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+        connection.execute(text("CREATE SCHEMA public;"))
 
-        yield
+    # Уничтожаем синхронный движок, чтобы он не держал соединений
+    sync_engine.dispose()
 
-    finally:
-        await postgres.dispose()
+    # 4. В том же синхронном потоке накатываем миграции через Alembic
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(ALEMBIC_CONFIG),
+            "upgrade",
+            "head",
+        ],
+        cwd=PROJECT_DIR,
+        env=os.environ.copy(),
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
-        if previous_database is None:
-            os.environ.pop("POSTGRES_DB", None)
-        else:
-            os.environ["POSTGRES_DB"] = previous_database
+    # База готова, миграции накатаны. Отдаем управление тестам
+    yield
 
-
-@pytest.fixture(autouse=True)
-async def clean_repository_database(
-    postgres: Postgres,
-) -> None:
-    """Remove all test data before every repository test."""
-    async with postgres.session_factory() as session:
-        result = await session.execute(
-            text(
-                """
-                SELECT tablename
-                FROM pg_tables
-                WHERE schemaname = 'public'
-                  AND tablename <> 'alembic_version'
-                ORDER BY tablename;
-                """
-            )
-        )
-
-        tables = [row.tablename for row in result]
-
-        if not tables:
-            return
-
-        quoted_tables = ", ".join(f'"{table.replace(chr(34), chr(34) * 2)}"' for table in tables)
-
-        await session.execute(
-            text(
-                f"""
-                TRUNCATE TABLE {quoted_tables}
-                RESTART IDENTITY
-                CASCADE;
-                """
-            )
-        )
-
-        await session.commit()
+    # После окончания ВСЕХ тестов возвращаем исходное имя БД в env (если нужно)
+    current_database = os.environ.get("POSTGRES_DB")
+    if current_database == test_database:
+        os.environ.pop("POSTGRES_DB", None)

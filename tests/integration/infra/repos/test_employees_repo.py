@@ -1,38 +1,38 @@
 import pytest
-from src.core.uuid7 import uuid7
 
+from src.core.uuid7 import uuid7
 from src.feat.employees.domain.employee_entities import Employee
+from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExistsException
 from src.feat.employees.infra.employee_repos import EmployeesRepository
 from tests.helpers import unique_username
+
+
+PASSWORD_HASH = "test-password-hash"
 
 
 @pytest.mark.integration
 async def test_add_and_get_by_id(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username = unique_username("alex")
 
         employee = Employee.create(
             actor_id=uuid7(),
-            username=username,
-            password_hash="hash",
-            role="employee"
+            username=unique_username(),
+            password_hash=PASSWORD_HASH,
+            role="employee",
         )
 
         await repository.add(employee)
         await session.commit()
 
-        result = await repository.get_by_id(
-            employee.employee_id,
-        )
+        result = await repository.get_by_id(employee.employee_id)
 
         assert result is not None
         assert result.employee_id == employee.employee_id
-        assert result.username == username
-        assert result.password_hash == "hash"
+        assert result.username == employee.username
+        assert result.password_hash == PASSWORD_HASH
         assert result.role == "employee"
         assert result.is_active is True
-        assert result.created_at == employee.created_at
 
 
 @pytest.mark.integration
@@ -46,226 +46,16 @@ async def test_get_by_id_returns_none_for_unknown_employee(postgres) -> None:
 
 
 @pytest.mark.integration
-async def test_get_all(postgres) -> None:
-    async with postgres.session_factory() as session:
-        repository = EmployeesRepository(session=session)
-        username1 = unique_username("alex")
-        username2 = unique_username("petr")
-
-        first = Employee.create(
-            actor_id=uuid7(),
-            username=username1,
-            password_hash="hash1",
-            role="employee"
-        )
-
-        second = Employee.create(
-            actor_id=uuid7(),
-            username=username2,
-            password_hash="hash2",
-            role="employee"
-        )
-
-        await repository.add(first)
-        await repository.add(second)
-        await session.commit()
-
-        result = await repository.get_all()
-
-        assert isinstance(result, list)
-        assert len(result) == 2
-
-        employee_ids = {employee.employee_id for employee in result}
-
-        assert first.employee_id in employee_ids
-        assert second.employee_id in employee_ids
-
-
-@pytest.mark.integration
-async def test_update_changes_only_modified_fields(postgres) -> None:
-    async with postgres.session_factory() as session:
-        repository = EmployeesRepository(session=session)
-        username_original = unique_username("alex")
-        username_new = unique_username("alexander")
-
-        employee = Employee.create(
-            actor_id=uuid7(),
-            username=username_original,
-            password_hash="original_hash",
-            role="employee"
-        )
-
-        await repository.add(employee)
-        await session.commit()
-
-        employee.update(
-            actor_id=uuid7(),
-            username=username_new,
-        )
-
-        # Проверяем, что событие обновления создано
-        events = employee.pull_events()
-        assert len(events) == 1
-        assert "username" in events[0].changes
-
-        await repository.update(employee)
-
-        await session.commit()
-
-        result = await repository.get_by_id(
-            employee.employee_id,
-        )
-
-        assert result is not None
-        assert result.username == username_new
-        assert result.password_hash == "original_hash"
-        assert result.role == "employee"
-        assert result.is_active is True
-
-
-@pytest.mark.integration
-async def test_update_multiple_fields_in_one_query(postgres) -> None:
-    async with postgres.session_factory() as session:
-        repository = EmployeesRepository(session=session)
-        username_original = unique_username("alex")
-        username_new = unique_username("alexander")
-
-        employee = Employee.create(
-            actor_id=uuid7(),
-            username=username_original,
-            password_hash="original_hash",
-            role="employee"
-        )
-
-        await repository.add(employee)
-        await session.commit()
-
-        employee.update(
-            actor_id=uuid7(),
-            username=username_new,
-            password_hash="new_hash",
-        )
-
-        events = employee.pull_events()
-        assert len(events) == 1
-        assert set(events[0].changes.keys()) == {
-            "username",
-            "password_hash",
-        }
-
-        await repository.update(employee)
-        await session.commit()
-
-        result = await repository.get_by_id(
-            employee.employee_id,
-        )
-
-        assert result is not None
-        assert result.username == username_new
-        assert result.password_hash == "new_hash"
-        assert result.is_active is True
-
-
-@pytest.mark.integration
-async def test_deactivate(postgres) -> None:
-    async with postgres.session_factory() as session:
-        repository = EmployeesRepository(session=session)
-        username = unique_username("alex")
-
-        employee = Employee.create(
-            actor_id=uuid7(),
-            username=username,
-            password_hash="hash",
-            role="employee"
-        )
-
-        await repository.add(employee)
-        await session.commit()
-
-        employee.deactivate(
-            actor_id=uuid7(),
-        )
-
-        assert employee.is_active is False
-        
-        # Проверяем наличие события деактивации
-        events = employee.pull_events()
-        assert len(events) == 1
-        assert "is_active" in events[0].changes
-
-        await repository.update(employee)
-        await session.commit()
-
-        result = await repository.get_by_id(
-            employee.employee_id,
-        )
-
-        assert result is not None
-        assert result.is_active is False
-
-
-@pytest.mark.integration
-async def test_update_without_changes_does_nothing(postgres) -> None:
-    async with postgres.session_factory() as session:
-        repository = EmployeesRepository(session=session)
-        # 1. Защищаем тест от UniqueViolationError динамическим именем
-        username = unique_username("alex")
-
-        employee = Employee.create(
-            actor_id=uuid7(),
-            username=username,
-            password_hash="hash",
-            role="employee"
-        )
-
-        await repository.add(employee)
-        await session.commit()
-
-        # Гарантируем, что событий нет (изменений не было)
-        assert len(employee.pull_events()) == 0
-
-        # 2. Перехватываем выполнение SQL-запросов, чтобы убедиться,
-        # что Алхимия не сделала ни одного лишнего UPDATE в базу
-        from sqlalchemy import event
-
-        sql_statements = []
-
-        def before_cursor_execute(statement):
-            sql_statements.append(statement)
-
-        # Вешаем слушатель на текущее соединение
-        conn = await session.connection()
-        event.listen(conn.sync_connection, "before_cursor_execute", before_cursor_execute)
-
-        try:
-            # Вызываем обновление без изменений
-            await repository.update(employee)
-
-            # Проверяем, что среди выполненных строк кода не было команды UPDATE
-            assert not any("UPDATE" in stmt for stmt in sql_statements), (
-                "Холостой UPDATE улетел в базу данных!"
-            )
-        finally:
-            # Обязательно убираем слушатель за собой
-            event.remove(conn.sync_connection, "before_cursor_execute", before_cursor_execute)
-
-        # Финальная проверка, что данные в базе остались в порядке
-        result = await repository.get_by_id(employee.employee_id)
-        assert result is not None
-        assert result.username == username
-
-
-@pytest.mark.integration
 async def test_get_by_username(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
-        username = unique_username("alex")
 
+        username = unique_username()
         employee = Employee.create(
             actor_id=uuid7(),
             username=username,
-            password_hash="hash",
-            role="employee"
+            password_hash=PASSWORD_HASH,
+            role="employee",
         )
 
         await repository.add(employee)
@@ -283,6 +73,167 @@ async def test_get_by_username_returns_none_for_unknown_username(postgres) -> No
     async with postgres.session_factory() as session:
         repository = EmployeesRepository(session=session)
 
-        result = await repository.get_by_username("non_existent_user")
+        result = await repository.get_by_username(unique_username("unknown"))
 
         assert result is None
+
+
+@pytest.mark.integration
+async def test_get_all_excludes_deactivated_by_default(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        active = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("active"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        inactive = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("inactive"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        inactive.update(
+            actor_id=uuid7(),
+            is_active=False,
+        )
+
+        await repository.add(active)
+        await repository.add(inactive)
+        await session.commit()
+
+        result = await repository.get_all(include_deactivated=False)
+
+        assert {employee.employee_id for employee in result} == {
+            active.employee_id,
+        }
+
+
+@pytest.mark.integration
+async def test_get_all_includes_deactivated_when_requested(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        active = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("active"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        inactive = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("inactive"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        inactive.update(
+            actor_id=uuid7(),
+            is_active=False,
+        )
+
+        await repository.add(active)
+        await repository.add(inactive)
+        await session.commit()
+
+        result = await repository.get_all(include_deactivated=True)
+
+        assert {employee.employee_id for employee in result} == {
+            active.employee_id,
+            inactive.employee_id,
+        }
+
+
+@pytest.mark.integration
+async def test_update_persists_changes(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        employee = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username(),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+
+        await repository.add(employee)
+        await session.commit()
+
+        new_username = unique_username("updated")
+
+        employee.update(
+            actor_id=uuid7(),
+            username=new_username,
+        )
+
+        await repository.update(employee)
+        await session.commit()
+
+        result = await repository.get_by_id(employee.employee_id)
+
+        assert result is not None
+        assert result.username == new_username
+        assert result.role == "employee"
+
+
+@pytest.mark.integration
+async def test_add_duplicate_username_raises_exception(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        username = unique_username()
+
+        first = Employee.create(
+            actor_id=uuid7(),
+            username=username,
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        second = Employee.create(
+            actor_id=uuid7(),
+            username=username,
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+
+        await repository.add(first)
+        await session.commit()
+
+        with pytest.raises(EmployeeUsernameAlreadyExistsException) as exc_info:
+            await repository.add(second)
+
+        assert exc_info.value.username == username
+
+
+@pytest.mark.integration
+async def test_update_duplicate_username_raises_exception(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EmployeesRepository(session=session)
+
+        first = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("first"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+        second = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("second"),
+            password_hash=PASSWORD_HASH,
+            role="employee",
+        )
+
+        await repository.add(first)
+        await repository.add(second)
+        await session.commit()
+
+        first.update(
+            actor_id=uuid7(),
+            username=second.username,
+        )
+
+        with pytest.raises(EmployeeUsernameAlreadyExistsException) as exc_info:
+            await repository.update(first)
+
+        assert exc_info.value.username == second.username

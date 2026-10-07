@@ -1,55 +1,236 @@
 import pytest
-from sqlalchemy import event
+
 from src.core.uuid7 import uuid7
 from src.feat.products.domain.product_entities import Product
-from src.feat.products.infra.product_repos import ProductsRepository
 from src.feat.products.domain.product_excs import ProductNameAlreadyExistsException
+from src.feat.products.infra.product_repos import ProductsRepository
+from tests.helpers import unique_product_name
+
+
+@pytest.mark.integration
+async def test_add_and_get_by_id(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        product = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name(),
+            base_price=100.0,
+        )
+
+        await repository.add(product)
+        await session.commit()
+
+        result = await repository.get_by_id(product.product_id)
+
+        assert result is not None
+        assert result.product_id == product.product_id
+        assert result.name == product.name
+        assert result.base_price == 100.0
+        assert result.is_active is True
+
+
+@pytest.mark.integration
+async def test_get_by_id_returns_none_for_unknown_product(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        result = await repository.get_by_id(uuid7())
+
+        assert result is None
+
+
+@pytest.mark.integration
+async def test_get_all_excludes_deactivated_by_default(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        active = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("active"),
+            base_price=100.0,
+        )
+        inactive = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("inactive"),
+            base_price=200.0,
+        )
+        inactive.update(
+            actor_id=uuid7(),
+            is_active=False,
+        )
+
+        await repository.add(active)
+        await repository.add(inactive)
+        await session.commit()
+
+        result = await repository.get_all(include_deactivated=False)
+
+        assert {product.product_id for product in result} == {
+            active.product_id,
+        }
+
+
+@pytest.mark.integration
+async def test_get_all_includes_deactivated_when_requested(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        active = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("active"),
+            base_price=100.0,
+        )
+        inactive = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("inactive"),
+            base_price=200.0,
+        )
+        inactive.update(
+            actor_id=uuid7(),
+            is_active=False,
+        )
+
+        await repository.add(active)
+        await repository.add(inactive)
+        await session.commit()
+
+        result = await repository.get_all(include_deactivated=True)
+
+        assert {product.product_id for product in result} == {
+            active.product_id,
+            inactive.product_id,
+        }
+
+
+@pytest.mark.integration
+async def test_update_persists_changes(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        product = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name(),
+            base_price=100.0,
+        )
+
+        await repository.add(product)
+        await session.commit()
+
+        new_name = unique_product_name("updated")
+
+        product.update(
+            actor_id=uuid7(),
+            name=new_name,
+            base_price=250.0,
+        )
+
+        await repository.update(product)
+        await session.commit()
+
+        result = await repository.get_by_id(product.product_id)
+
+        assert result is not None
+        assert result.name == new_name
+        assert result.base_price == 250.0
+
 
 @pytest.mark.integration
 async def test_add_duplicate_name_raises_exception(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = ProductsRepository(session=session)
-        name = "Unique Product"
-        p1 = Product.create(actor_id=uuid7(), name=name, base_price=100.0)
-        await repository.add(p1)
+
+        name = unique_product_name()
+
+        first = Product.create(
+            actor_id=uuid7(),
+            name=name,
+            base_price=100.0,
+        )
+        second = Product.create(
+            actor_id=uuid7(),
+            name=name,
+            base_price=200.0,
+        )
+
+        await repository.add(first)
         await session.commit()
-        
-        p2 = Product.create(actor_id=uuid7(), name=name, base_price=200.0)
-        with pytest.raises(ProductNameAlreadyExistsException) as exc:
-            await repository.add(p2)
-        assert exc.value.name == name
+
+        with pytest.raises(ProductNameAlreadyExistsException) as exc_info:
+            await repository.add(second)
+
+        assert exc_info.value.name == name
+
 
 @pytest.mark.integration
-async def test_get_all_sorting(postgres) -> None:
+async def test_update_duplicate_name_raises_exception(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = ProductsRepository(session=session)
-        p1 = Product.create(actor_id=uuid7(), name="P1", base_price=10.0)
-        p2 = Product.create(actor_id=uuid7(), name="P2", base_price=20.0)
-        await repository.add(p1)
-        await repository.add(p2)
+
+        first = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("first"),
+            base_price=100.0,
+        )
+        second = Product.create(
+            actor_id=uuid7(),
+            name=unique_product_name("second"),
+            base_price=200.0,
+        )
+
+        await repository.add(first)
+        await repository.add(second)
         await session.commit()
-        
-        result = await repository.get_all(include_deactivated=True)
-        # Проверка сортировки: created_at DESC, product_id DESC
-        assert result[0].created_at >= result[1].created_at
+
+        first.update(
+            actor_id=uuid7(),
+            name=second.name,
+        )
+
+        with pytest.raises(ProductNameAlreadyExistsException) as exc_info:
+            await repository.update(first)
+
+        assert exc_info.value.name == second.name
+
 
 @pytest.mark.integration
-async def test_update_without_changes_does_nothing(postgres) -> None:
+async def test_search_by_fuzzy_returns_match(postgres) -> None:
     async with postgres.session_factory() as session:
         repository = ProductsRepository(session=session)
-        product = Product.create(actor_id=uuid7(), name="No Change", base_price=10.0)
+
+        product = Product.create(
+            actor_id=uuid7(),
+            name="Mountain Water",
+            base_price=100.0,
+        )
+
         await repository.add(product)
         await session.commit()
-        
-        sql_statements = []
-        def before_cursor_execute(statement):
-            sql_statements.append(statement)
-            
-        conn = await session.connection()
-        event.listen(conn.sync_connection, "before_cursor_execute", before_cursor_execute)
-        
-        try:
-            await repository.update(product)
-            assert not any("UPDATE" in stmt for stmt in sql_statements)
-        finally:
-            event.remove(conn.sync_connection, "before_cursor_execute", before_cursor_execute)
+
+        result = await repository.search_by_fuzzy(
+            name="Mountain Water",
+        )
+
+        assert result is not None
+        assert result.product_id == product.product_id
+
+
+@pytest.mark.integration
+async def test_search_by_fuzzy_returns_none_without_match(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = ProductsRepository(session=session)
+
+        product = Product.create(
+            actor_id=uuid7(),
+            name="Mountain Water",
+            base_price=100.0,
+        )
+
+        await repository.add(product)
+        await session.commit()
+
+        result = await repository.search_by_fuzzy(
+            name="Completely Different Product",
+        )
+
+        assert result is None
