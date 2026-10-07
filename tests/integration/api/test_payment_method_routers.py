@@ -234,7 +234,7 @@ class TestPaymentMethodRouters:
 
         # Частичное совпадение (similarity >= 0.35)
         suffix = f"_{uuid7().hex[:6]}"
-        name_query = f"Alex_{uuid7().hex[:6]}"
+        name_query = f"Alex_{uuid7().hex[-6:]}"
         name_full = f"{name_query}{suffix}"
         pm_alex = await self.create_payment_method(client, name_full)
 
