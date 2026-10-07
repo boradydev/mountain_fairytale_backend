@@ -20,8 +20,8 @@ API CONTRACT — AUTHENTICATION
     и обновления пары JWT-токенов.
 
 Endpoints:
-    POST /public/app/login
-    POST /public/app/refresh
+    POST /public/auth/login
+    POST /public/auth/refresh
 
 Основные правила безопасности:
 
@@ -67,7 +67,7 @@ AI TESTING RULES:
 """
 
 auth_router = APIRouter(
-    prefix="/app",
+    prefix="/auth",
     tags=["Авторизация"],
 )
 

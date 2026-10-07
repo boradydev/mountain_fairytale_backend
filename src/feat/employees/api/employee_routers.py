@@ -73,7 +73,7 @@ AI TESTING RULES:
 
 
 employees_router = APIRouter(
-    prefix="/app",
+    prefix="/employees",
     tags=["Crud сотрудников для использования админом"],
 )
 
@@ -95,7 +95,7 @@ employees_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.app содержит список EmployeeResp.
+        data.employees содержит список EmployeeResp.
 
     Важные требования:
         1. Если include_deactivated=false (по умолчанию) -> список только активных сотрудников.

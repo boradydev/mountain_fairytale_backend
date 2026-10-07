@@ -5,7 +5,7 @@ from src.core.uuid7 import uuid7
 from tests.integration.conftest import EmployeeTestData
 
 
-BASE_PATH = "/protected/app"
+BASE_PATH = "/protected/drivers"
 
 
 class TestDriverRouters:
@@ -15,7 +15,7 @@ class TestDriverRouters:
     async def login(client: AsyncClient, employee: EmployeeTestData) -> None:
         """Вспомогательный метод для авторизации."""
         await client.post(
-            "/public/app/login",
+            "/public/drivers/login",
             json={"username": employee.username, "password": employee.password},
         )
 
@@ -49,7 +49,7 @@ class TestDriverRouters:
         # Проверка: только активные
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
-        data = response.json()["data"]["app"]
+        data = response.json()["data"]["drivers"]
 
         driver_ids = [d["driverId"] for d in data]
         assert driver_active["driverId"] in driver_ids
@@ -58,7 +58,7 @@ class TestDriverRouters:
         # Проверка: все водители
         response_all = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response_all.status_code == 200
-        data_all = response_all.json()["data"]["app"]
+        data_all = response_all.json()["data"]["drivers"]
 
         driver_ids_all = [d["driverId"] for d in data_all]
         assert driver_active["driverId"] in driver_ids_all

@@ -12,7 +12,7 @@ if __name__ == "__main__":
     settings = UvicornSettings()
     logger_config()
     uvicorn.run(
-        app="src.app.fastapi.app:fastapi_app",
+        app="src.common.api.app:fastapi_app",
         host=settings.APP_HOST,
         port=settings.APP_PORT,
         reload=False,

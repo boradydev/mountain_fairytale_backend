@@ -89,7 +89,7 @@ sales_representatives_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.sales_rep содержит список SalesRepresentativeResp.
+        data.salesRepresentatives содержит список SalesRepresentativeResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных торговых представителей (include_deactivated=false).

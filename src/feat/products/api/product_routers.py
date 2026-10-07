@@ -69,7 +69,7 @@ AI TESTING RULES:
 
 
 products_router = APIRouter(
-    prefix="/app",
+    prefix="/products",
     tags=["Товары"],
 )
 
@@ -91,7 +91,7 @@ products_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.app содержит список ProductResp.
+        data.products содержит список ProductResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных товаров (include_deactivated=false).

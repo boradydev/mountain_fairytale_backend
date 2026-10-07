@@ -64,7 +64,7 @@ AI TESTING RULES:
 
 
 clients_router = APIRouter(
-    prefix="/api",
+    prefix="/clients",
     tags=["Клиенты"],
 )
 
@@ -88,7 +88,7 @@ clients_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.api содержит список ClientResp.
+        data.clients содержит список ClientResp.
         Поля offset, limit, total предоставляют информацию о пагинации.
 
     Критические сценарии для API-тестов:

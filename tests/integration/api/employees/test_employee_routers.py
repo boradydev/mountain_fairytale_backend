@@ -6,7 +6,7 @@ from src.core.uuid7 import uuid7
 from tests.helpers import unique_username
 
 
-BASE_PATH = "/admin/app"
+BASE_PATH = "/admin/employees"
 
 
 class TestEmployeeRouters:
@@ -19,7 +19,7 @@ class TestEmployeeRouters:
     async def login(client: AsyncClient, employee: EmployeeTestData):
         """Вспомогательный метод для авторизации."""
         await client.post(
-            "/public/app/login",
+            "/public/employees/login",
             json={"username": employee.username, "password": employee.password},
         )
 
@@ -38,7 +38,7 @@ class TestEmployeeRouters:
         # По умолчанию include_deactivated=false
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
-        data = response.json()["data"]["app"]
+        data = response.json()["data"]["employees"]
         
         emp_ids = [emp["employeeId"] for emp in data]
         assert str(active_emp.employee_id) in emp_ids
@@ -57,7 +57,7 @@ class TestEmployeeRouters:
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
-        data = response.json()["data"]["app"]
+        data = response.json()["data"]["employees"]
         
         emp_ids = [emp["employeeId"] for emp in data]
         assert str(active_emp.employee_id) in emp_ids

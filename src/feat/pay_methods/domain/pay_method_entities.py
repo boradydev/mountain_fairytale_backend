@@ -5,9 +5,9 @@ from uuid import UUID
 from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
 from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.feat.pay_methods.domain.pay_method_events import UpdatePaymentMethodEvent, CreatePaymentMethodEvent
 
 
 class PaymentMethod(BaseEntity):
@@ -44,7 +44,7 @@ class PaymentMethod(BaseEntity):
         )
 
         method._add_event(
-            events.CreatePaymentMethodEvent(
+            CreatePaymentMethodEvent(
                 actor_id=actor_id,
                 payment_method_id=method.payment_method_id,
             ),
@@ -67,7 +67,7 @@ class PaymentMethod(BaseEntity):
             return
 
         self._add_event(
-            events.UpdatePaymentMethodEvent(
+            UpdatePaymentMethodEvent(
                 actor_id=actor_id,
                 payment_method_id=self.payment_method_id,
                 changes=changes,

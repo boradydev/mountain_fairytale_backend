@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.feat.cars.app.abcs.car_uow_abcs import ICarsUOW
 from src.feat.cars.domain.abcs.car_repo_abcs import ICarsRepository
 from src.feat.cars.infra.car_repos import CarsRepository
-from src.common.infra.db.postgres.uow.common import IPostgresUOW
+from src.common.infra.db.postgres.common import IPostgresUOW
 from src.common.infra.services.event_pud_service import EventPublisher
 
 

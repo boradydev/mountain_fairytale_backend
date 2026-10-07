@@ -4,7 +4,7 @@ from src.core.uuid7 import uuid7
 from tests.integration.conftest import EmployeeTestData
 
 
-BASE_PATH = "/public/app"
+BASE_PATH = "/public/auth"
 
 
 class TestAuthFlow:

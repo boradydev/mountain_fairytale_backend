@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.feat.employees.domain.abcs.employee_repo_abcs import IEmployeesRepository
 from src.feat.employees.infra.employee_repos import EmployeesRepository
-from src.common.infra.db.postgres.uow.common import IPostgresUOW
+from src.common.infra.db.postgres.common import IPostgresUOW
 from src.common.infra.services.event_pud_service import EventPublisher
 
 

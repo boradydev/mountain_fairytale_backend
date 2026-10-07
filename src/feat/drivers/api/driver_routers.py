@@ -66,7 +66,7 @@ AI TESTING RULES:
 
 
 drivers_router = APIRouter(
-    prefix="/app",
+    prefix="/drivers",
     tags=["Водители"],
 )
 
@@ -88,7 +88,7 @@ drivers_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.app содержит список DriverResp.
+        data.drivers содержит список DriverResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных водителей (include_deactivated=false).

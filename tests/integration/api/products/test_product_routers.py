@@ -6,7 +6,7 @@ from tests.integration.conftest import EmployeeTestData
 from tests.helpers import unique_product_name
 
 
-BASE_PATH = "/protected/app"
+BASE_PATH = "/protected/products"
 
 
 class TestProductRouters:

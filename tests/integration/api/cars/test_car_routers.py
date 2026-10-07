@@ -5,7 +5,7 @@ from tests.integration.conftest import EmployeeTestData
 from tests.helpers import unique_car_number
 
 
-BASE_PATH = "/protected/app"
+BASE_PATH = "/protected/cars"
 
 
 class TestCarRouters:
@@ -15,7 +15,7 @@ class TestCarRouters:
     async def login(client: AsyncClient, employee: EmployeeTestData):
         """Вспомогательный метод для авторизации."""
         await client.post(
-            "/public/app/login",
+            "/public/cars/login",
             json={"username": employee.username, "password": employee.password},
         )
 
@@ -34,7 +34,7 @@ class TestCarRouters:
         # По умолчанию include_deactivated=False
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
-        data = response.json()["data"]["app"]
+        data = response.json()["data"]["cars"]
         
         # Проверяем, что активный автомобиль в списке, а деактивированный — нет
         car_ids = [car["carId"] for car in data]
@@ -54,7 +54,7 @@ class TestCarRouters:
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
-        data = response.json()["data"]["app"]
+        data = response.json()["data"]["cars"]
         
         car_ids = [car["carId"] for car in data]
         assert str(active_car.car_id) in car_ids
