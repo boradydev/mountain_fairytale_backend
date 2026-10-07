@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.app.sales_representatives.abcs.uow import ISalesRepresentativesUOW
-from src.domain.sales_representatives.car_entities import SalesRepresentative # Ошибка в пути, исправляю на правильный
 from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
 from src.domain.sales_representatives.sales_representative_excs import SalesRepresentativeNotFoundException
 
