@@ -6,8 +6,11 @@ def unique_username(prefix: str = "test") -> str:
     return f"{prefix}_{uuid7().hex[-12:]}"
 
 def unique_car_number(prefix: str = "A") -> str:
-    # Берем последние 8 символов hex-строки и переводим в верхний регистр
+    # Берем последние 8 символов hex-строки и переводим их в верхний регистр
     return f"{prefix}{uuid7().hex[-8:].upper()}XX"
 
 def unique_phone() -> str:
     return uuid4().hex
+
+def unique_product_name(prefix: str = "product") -> str:
+    return f"{prefix}_{uuid7().hex}"
