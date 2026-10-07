@@ -11,18 +11,18 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.payment_methods.payment_method_schemas import (
+from src.feat.pay_methods.api.pay_method_schemas import (
     PaymentMethodResp,
     PaymentMethodsResp,
     CreatePaymentMethodReq,
     UpdatePaymentMethodReq,
 )
-from src.app.payment_methods.usecases.check_duplicate import CheckPaymentMethodDuplicateDTO
-from src.app.payment_methods.usecases.create import CreatePaymentMethodDTO
-from src.app.payment_methods.usecases.get import GetPaymentMethodDTO
-from src.app.payment_methods.usecases.get_all import GetPaymentMethodsDTO
-from src.app.payment_methods.usecases.update import UpdatePaymentMethodDTO
-from src.domain.payment_methods import payment_method_excs
+from src.feat.pay_methods.app.usecases.check_duplicate import CheckPaymentMethodDuplicateDTO
+from src.feat.pay_methods.app.usecases.create import CreatePaymentMethodDTO
+from src.feat.pay_methods.app.usecases.get import GetPaymentMethodDTO
+from src.feat.pay_methods.app.usecases.get_all import GetPaymentMethodsDTO
+from src.feat.pay_methods.app.usecases.update import UpdatePaymentMethodDTO
+from src.domain.pay_methods import payment_method_excs
 
 
 """
@@ -88,7 +88,7 @@ payment_methods_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.payment_methods содержит список PaymentMethodResp.
+        data.pay_methods содержит список PaymentMethodResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных способов оплаты (include_deactivated=false).

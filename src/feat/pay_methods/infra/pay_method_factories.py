@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.payment_methods.usecases.check_duplicate import CheckPaymentMethodDuplicateUseCase
-from src.app.payment_methods.usecases.create import CreatePaymentMethodUseCase
-from src.app.payment_methods.usecases.get import GetPaymentMethodUseCase
-from src.app.payment_methods.usecases.get_all import GetPaymentMethodsUseCase
-from src.app.payment_methods.usecases.update import UpdatePaymentMethodUseCase
-from src.infra.db.postgres.uow.payment_methods import PaymentMethodsUOW
+from src.feat.pay_methods.app.usecases.check_duplicate import CheckPaymentMethodDuplicateUseCase
+from src.feat.pay_methods.app.usecases.create import CreatePaymentMethodUseCase
+from src.feat.pay_methods.app.usecases.get import GetPaymentMethodUseCase
+from src.feat.pay_methods.app.usecases.get_all import GetPaymentMethodsUseCase
+from src.feat.pay_methods.app.usecases.update import UpdatePaymentMethodUseCase
+from src.feat.pay_methods.infra.pay_method_uow import PaymentMethodsUOW
 
 
 class PaymentMethodsUseCaseFactory:

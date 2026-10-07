@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.payment_methods.abcs.uow import IPaymentMethodsUOW
-from src.domain.payment_methods.payment_method_entities import PaymentMethod
-from src.domain.payment_methods.payment_method_excs import PaymentMethodNotFoundException
+from src.feat.pay_methods.app.abcs.pay_method_uow_abcs import IPaymentMethodsUOW
+from src.domain.pay_methods.payment_method_entities import PaymentMethod
+from src.domain.pay_methods.payment_method_excs import PaymentMethodNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -7,7 +7,7 @@ from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
-from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory
+from src.feat.pay_methods.infra.pay_method_factories import PaymentMethodsUseCaseFactory
 from src.feat.products.infra.product_factories import ProductsUseCaseFactory
 from src.feat.sales_rep.infra.sales_rep_factories import SalesRepresentativesUseCaseFactory
 from src.infra.services.token.settings import JwtSettings

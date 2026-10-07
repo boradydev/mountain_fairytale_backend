@@ -2,16 +2,15 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.payment_methods import events
 from src.domain.common.entities import BaseEntity
 
 
 class PaymentMethod(BaseEntity):
-    __tablename__ = "payment_methods"
+    __tablename__ = "pay_methods"
 
     payment_method_id: Mapped[UUID] = mapped_column(primary_key=True)
     

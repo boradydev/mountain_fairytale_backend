@@ -2,9 +2,9 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.payment_methods.abcs.uow import IPaymentMethodsUOW
-from src.domain.payment_methods.abcs.payment_methods_repo_abcs import IPaymentMethodsRepository
-from src.infra.db.postgres.repos.payment_methods.payment_methods_repo import PaymentMethodsRepository
+from src.feat.pay_methods.app.abcs.pay_method_uow_abcs import IPaymentMethodsUOW
+from src.domain.pay_methods.abcs.payment_methods_repo_abcs import IPaymentMethodsRepository
+from src.feat.pay_methods.infra.pay_method_repos import PaymentMethodsRepository
 from src.infra.db.postgres.uow.common import IPostgresUOW
 from src.infra.services.event_publisher.service import EventPublisher
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from src.app.payment_methods.abcs.uow import IPaymentMethodsUOW
-from src.domain.payment_methods.payment_method_entities import PaymentMethod
+from src.feat.pay_methods.app.abcs.pay_method_uow_abcs import IPaymentMethodsUOW
+from src.domain.pay_methods.payment_method_entities import PaymentMethod
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

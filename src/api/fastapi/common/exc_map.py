@@ -38,7 +38,7 @@ from src.domain.drivers.driver_excs import (
     DriverNotFoundException,
     DriverDomainUpdateException,
 )
-from src.domain.payment_methods.payment_method_excs import (
+from src.domain.pay_methods.payment_method_excs import (
     PaymentMethodNotFoundException,
     PaymentMethodDomainUpdateException,
     PaymentMethodNameAlreadyExistsException,
