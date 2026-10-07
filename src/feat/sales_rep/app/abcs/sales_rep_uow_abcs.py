@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.app.common.abcs.uow import InterfaceUOW
-from src.domain.sales_representatives.abcs.sales_representatives_repo_abcs import ISalesRepresentativesRepository
+from src.feat.sales_rep.domain.abcs.sales_rep_repo_abcs import ISalesRepresentativesRepository
 
 
 class ISalesRepresentativesUOW(InterfaceUOW, ABC):

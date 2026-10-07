@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.sales_representatives.abcs.uow import ISalesRepresentativesUOW
+from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
 from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
-from src.domain.sales_representatives.sales_representative_excs import SalesRepresentativeNotFoundException
+from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativeNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

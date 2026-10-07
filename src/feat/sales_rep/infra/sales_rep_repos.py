@@ -5,9 +5,9 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.sales_representatives.abcs.sales_representatives_repo_abcs import ISalesRepresentativesRepository
+from src.feat.sales_rep.domain.abcs.sales_rep_repo_abcs import ISalesRepresentativesRepository
 from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
-from src.domain.sales_representatives.sales_representative_excs import SalesRepresentativePhoneAlreadyExistsException
+from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativePhoneAlreadyExistsException
 
 
 class SalesRepresentativesRepository(ISalesRepresentativesRepository):

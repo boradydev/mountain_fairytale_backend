@@ -11,17 +11,17 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.sales_representatives.sales_representative_schemas import (
+from src.feat.sales_rep.api.sales_rep_schemas import (
     SalesRepresentativeResp,
     SalesRepresentativesResp,
     CreateSalesRepresentativeReq,
     UpdateSalesRepresentativeReq,
 )
-from src.app.sales_representatives.usecases.check_duplicate import CheckSalesRepresentativeDuplicateDTO
-from src.app.sales_representatives.usecases.create import CreateSalesRepresentativeDTO
-from src.app.sales_representatives.usecases.get import GetSalesRepresentativeDTO
-from src.app.sales_representatives.usecases.get_all import GetSalesRepresentativesDTO
-from src.app.sales_representatives.usecases.update import UpdateSalesRepresentativeDTO
+from src.feat.sales_rep.app.usecases.check_duplicate import CheckSalesRepresentativeDuplicateDTO
+from src.feat.sales_rep.app.usecases.create import CreateSalesRepresentativeDTO
+from src.feat.sales_rep.app.usecases.get import GetSalesRepresentativeDTO
+from src.feat.sales_rep.app.usecases.get_all import GetSalesRepresentativesDTO
+from src.feat.sales_rep.app.usecases.update import UpdateSalesRepresentativeDTO
 from src.domain.sales_representatives import sales_representative_excs
 
 
@@ -90,7 +90,7 @@ sales_representatives_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.sales_representatives содержит список SalesRepresentativeResp.
+        data.sales_rep содержит список SalesRepresentativeResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных торговых представителей (include_deactivated=false).

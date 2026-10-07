@@ -2,16 +2,15 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.sales_representatives import events
 from src.domain.common.entities import BaseEntity
 
 
 class SalesRepresentative(BaseEntity):
-    __tablename__ = "sales_representatives"
+    __tablename__ = "sales_rep"
 
     sales_representative_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)

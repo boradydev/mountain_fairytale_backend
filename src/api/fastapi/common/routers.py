@@ -8,7 +8,7 @@ from src.feat.employees.api.employee_routers import employees_router
 from src.api.fastapi.me.me_routers import me_router
 from src.api.fastapi.payment_methods.payment_method_routers import payment_methods_router
 from src.api.fastapi.products.product_routers import products_router
-from src.api.fastapi.sales_representatives.sales_representative_routers import sales_representatives_router
+from src.feat.sales_rep.api.sales_rep_routers import sales_representatives_router
 
 
 public = APIRouter(

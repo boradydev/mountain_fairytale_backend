@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.sales_representatives.usecases.check_duplicate import CheckSalesRepresentativeDuplicateUseCase
-from src.app.sales_representatives.usecases.create import CreateSalesRepresentativeUseCase
-from src.app.sales_representatives.usecases.get import GetSalesRepresentativeUseCase
-from src.app.sales_representatives.usecases.get_all import GetSalesRepresentativesUseCase
-from src.app.sales_representatives.usecases.update import UpdateSalesRepresentativeUseCase
-from src.infra.db.postgres.uow.sales_representatives import SalesRepresentativesUOW
+from src.feat.sales_rep.app.usecases.check_duplicate import CheckSalesRepresentativeDuplicateUseCase
+from src.feat.sales_rep.app.usecases.create import CreateSalesRepresentativeUseCase
+from src.feat.sales_rep.app.usecases.get import GetSalesRepresentativeUseCase
+from src.feat.sales_rep.app.usecases.get_all import GetSalesRepresentativesUseCase
+from src.feat.sales_rep.app.usecases.update import UpdateSalesRepresentativeUseCase
+from src.feat.sales_rep.infra.sales_rep_uow import SalesRepresentativesUOW
 
 
 class SalesRepresentativesUseCaseFactory:
