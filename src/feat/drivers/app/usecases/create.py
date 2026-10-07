@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.drivers.abcs.uow import IDriversUOW
+from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
 from src.domain.drivers.driver_entities import Driver
 
 

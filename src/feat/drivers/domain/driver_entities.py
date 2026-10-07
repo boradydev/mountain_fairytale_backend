@@ -6,12 +6,12 @@ from sqlalchemy import DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.drivers import events
+from src.feat.drivers.domain import driver_events
 from src.domain.common.entities import BaseEntity
 
 
 class Driver(BaseEntity):
-    __tablename__ = "drivers"
+    __tablename__ = "app"
 
     driver_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)

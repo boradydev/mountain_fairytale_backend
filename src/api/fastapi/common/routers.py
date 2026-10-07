@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from src.api.fastapi.auth.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
 from src.api.fastapi.common.deps import verify_access_token, verify_admin_access
-from src.api.fastapi.drivers.driver_routers import drivers_router
+from src.feat.drivers.api.driver_routers import drivers_router
 from src.api.fastapi.employees.employee_routers import employees_router
 from src.api.fastapi.me.me_routers import me_router
 from src.api.fastapi.payment_methods.payment_method_routers import payment_methods_router

@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.drivers.usecases.check_duplicate import CheckDriverDuplicateUseCase
-from src.app.drivers.usecases.create import CreateDriverUseCase
-from src.app.drivers.usecases.get import GetDriverUseCase
-from src.app.drivers.usecases.get_all import GetDriversUseCase
-from src.app.drivers.usecases.update import UpdateDriverUseCase
-from src.infra.db.postgres.uow.drivers import DriversUOW
+from src.feat.drivers.app.usecases.check_duplicate import CheckDriverDuplicateUseCase
+from src.feat.drivers.app.usecases.create import CreateDriverUseCase
+from src.feat.drivers.app.usecases.get import GetDriverUseCase
+from src.feat.drivers.app.usecases.get_all import GetDriversUseCase
+from src.feat.drivers.app.usecases.update import UpdateDriverUseCase
+from src.feat.drivers.infra.driver_uow import DriversUOW
 
 
 class DriversUseCaseFactory:

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.app.common.abcs.services.password_service import IPasswordService
 from src.infra.factories.auth import AuthUseCaseFactory
 from src.feat.cars.infra.cars_factory import CarsUseCaseFactory
-from src.infra.factories.drivers import DriversUseCaseFactory
+from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory
 from src.infra.factories.products import ProductsUseCaseFactory

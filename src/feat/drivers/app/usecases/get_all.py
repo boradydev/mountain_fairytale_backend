@@ -1,15 +1,15 @@
 from dataclasses import dataclass
 
-from src.app.drivers.abcs.uow import IDriversUOW
+from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
 from src.domain.drivers.driver_entities import Driver
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class CheckDriverDuplicateDTO:
-    name: str
+class GetDriversDTO:
+    include_deactivated: bool
 
 
-class CheckDriverDuplicateUseCase:
+class GetDriversUseCase:
     def __init__(
         self,
         uow: IDriversUOW,
@@ -18,9 +18,9 @@ class CheckDriverDuplicateUseCase:
 
     async def execute(
         self,
-        dto: CheckDriverDuplicateDTO,
-    ) -> Driver | None:
+        dto: GetDriversDTO,
+    ) -> list[Driver]:
         async with self._uow as uow:
-            return await uow.drivers.search_by_fuzzy(
-                dto.name,
+            return await uow.drivers.get_all(
+                include_deactivated=dto.include_deactivated,
             )

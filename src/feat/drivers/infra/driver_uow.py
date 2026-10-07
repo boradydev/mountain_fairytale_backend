@@ -2,9 +2,9 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.app.drivers.abcs.uow import IDriversUOW
+from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
 from src.domain.drivers.abcs.drivers_repo_abcs import IDriversRepository
-from src.infra.db.postgres.repos.drivers.drivers_repo import DriversRepository
+from src.feat.drivers.infra.driver_repos import DriversRepository
 from src.infra.db.postgres.uow.common import IPostgresUOW
 from src.infra.services.event_publisher.service import EventPublisher
 

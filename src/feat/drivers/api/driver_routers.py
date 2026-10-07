@@ -11,17 +11,17 @@ from src.api.fastapi.common.deps import (
 )
 from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
 from src.api.fastapi.common.schemas import StdResponse
-from src.api.fastapi.drivers.driver_schemas import (
+from src.feat.drivers.api.driver_schemas import (
     DriverResp,
     DriversResp,
     CreateDriverReq,
     UpdateDriverReq,
 )
-from src.app.drivers.usecases.check_duplicate import CheckDriverDuplicateDTO
-from src.app.drivers.usecases.create import CreateDriverDTO
-from src.app.drivers.usecases.get import GetDriverDTO
-from src.app.drivers.usecases.get_all import GetDriversDTO
-from src.app.drivers.usecases.update import UpdateDriverDTO
+from src.feat.drivers.app.usecases.check_duplicate import CheckDriverDuplicateDTO
+from src.feat.drivers.app.usecases.create import CreateDriverDTO
+from src.feat.drivers.app.usecases.get import GetDriverDTO
+from src.feat.drivers.app.usecases.get_all import GetDriversDTO
+from src.feat.drivers.app.usecases.update import UpdateDriverDTO
 from src.domain.drivers import driver_excs
 
 
@@ -67,7 +67,7 @@ AI TESTING RULES:
 
 
 drivers_router = APIRouter(
-    prefix="/drivers",
+    prefix="/app",
     tags=["Водители"],
 )
 
@@ -89,7 +89,7 @@ drivers_router = APIRouter(
 
     Результат:
         HTTP 200.
-        data.drivers содержит список DriverResp.
+        data.app содержит список DriverResp.
 
     Критические сценарии для API-тестов:
         1. Получение списка только активных водителей (include_deactivated=false).
