@@ -6,6 +6,7 @@ from src.api.fastapi.common.deps import verify_access_token, verify_admin_access
 from src.api.fastapi.drivers.driver_routers import drivers_router
 from src.api.fastapi.employees.employee_routers import employees_router
 from src.api.fastapi.me.me_routers import me_router
+from src.api.fastapi.payment_methods.payment_method_routers import payment_methods_router
 
 
 public = APIRouter(
@@ -23,6 +24,7 @@ protected = APIRouter(
 protected.include_router(me_router)
 protected.include_router(cars_router)
 protected.include_router(drivers_router)
+protected.include_router(payment_methods_router)
 
 
 admin = APIRouter(

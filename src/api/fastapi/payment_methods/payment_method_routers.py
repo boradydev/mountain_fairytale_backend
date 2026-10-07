@@ -17,6 +17,11 @@ from src.api.fastapi.payment_methods.payment_method_schemas import (
     CreatePaymentMethodReq,
     UpdatePaymentMethodReq,
 )
+from src.app.payment_methods.usecases.check_duplicate import CheckPaymentMethodDuplicateDTO
+from src.app.payment_methods.usecases.create import CreatePaymentMethodDTO
+from src.app.payment_methods.usecases.get import GetPaymentMethodDTO
+from src.app.payment_methods.usecases.get_all import GetPaymentMethodsDTO
+from src.app.payment_methods.usecases.update import UpdatePaymentMethodDTO
 from src.domain.payment_methods import payment_method_excs
 
 
@@ -95,7 +100,15 @@ async def get_payment_methods(
     access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[PaymentMethodsResp]:
-    pass
+    payment_methods = await ctx.payment_methods_use_cases.get_payment_methods().execute(
+        GetPaymentMethodsDTO(include_deactivated=include_deactivated),
+    )
+
+    return StdResponse(
+        data=PaymentMethodsResp(
+            payment_methods=[PaymentMethodResp.model_validate(pm) for pm in payment_methods],
+        ),
+    )
 
 
 @payment_methods_router.get(
@@ -134,7 +147,13 @@ async def get_payment_method(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[PaymentMethodResp]:
-    pass
+    payment_method = await ctx.payment_methods_use_cases.get_payment_method().execute(
+        GetPaymentMethodDTO(payment_method_id=payment_method_id),
+    )
+
+    return StdResponse(
+        data=PaymentMethodResp.model_validate(payment_method),
+    )
 
 
 @payment_methods_router.post(
@@ -178,7 +197,16 @@ async def create_payment_method(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[PaymentMethodResp]:
-    pass
+    payment_method = await ctx.payment_methods_use_cases.create_payment_method().execute(
+        CreatePaymentMethodDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            name=body.name,
+        ),
+    )
+
+    return StdResponse(
+        data=PaymentMethodResp.model_validate(payment_method),
+    )
 
 
 @payment_methods_router.patch(
@@ -230,7 +258,17 @@ async def update_payment_method(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[PaymentMethodResp]:
-    pass
+    payment_method = await ctx.payment_methods_use_cases.update_payment_method().execute(
+        UpdatePaymentMethodDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            payment_method_id=payment_method_id,
+            payload=body.model_dump(exclude_unset=True),
+        ),
+    )
+
+    return StdResponse(
+        data=PaymentMethodResp.model_validate(payment_method),
+    )
 
 
 @payment_methods_router.get(
@@ -251,15 +289,17 @@ async def update_payment_method(
         1. Порог similarity: name >= 0.35.
         2. Поиск осуществляется среди всех записей (и активных, и деактивированных).
         3. Из всех подходящих кандидатов выбирается один лучший по similarity score.
+        4. Порядок выбора при равном similarity: created_at DESC, payment_method_id DESC.
 
     Результат:
         HTTP 200.
         data содержит PaymentMethodResp (лучший кандидат) или null, если совпадений не найдено.
+        Проверка является подсказкой и не блокирует создание похожего имени. Точное совпадение приводит к 409.
 
     Критические сценарии для API-тестов:
         1. Поиск по имени с точным совпадением -> возвращается способ оплаты.
         2. Поиск по имени с частичным совпадением выше порога (0.35) -> возвращается способ оплаты.
-        3. Поиск по имени, не достигающему порога -> data == null.
+        3. Поиск по имени, не достигающего порога -> data == null.
         4. Поиск деактивированного способа оплаты -> возвращается способ оплаты.
     """,
 )
@@ -268,4 +308,10 @@ async def check_duplicate_payment_method(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[PaymentMethodResp | None]:
-    pass
+    payment_method = await ctx.payment_methods_use_cases.check_duplicate().execute(
+        CheckPaymentMethodDuplicateDTO(name=name),
+    )
+
+    return StdResponse(
+        data=(PaymentMethodResp.model_validate(payment_method) if payment_method is not None else None),
+    )
