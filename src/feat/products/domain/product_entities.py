@@ -5,14 +5,14 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
 from src.core.uuid7 import uuid7
+from src.feat.products.domain.product_events import CreateProductEvent, UpdateProductEvent
 from src.feat.products.domain.product_excs import ProductDomainUpdateException
 from src.common.domain.entities import BaseEntity
 
 
 class Product(BaseEntity):
-    __tablename__ = "app"
+    __tablename__ = "products"
 
     product_id: Mapped[UUID] = mapped_column(primary_key=True)
     
@@ -49,7 +49,7 @@ class Product(BaseEntity):
         )
 
         product._add_event(
-            events.CreateProductEvent(
+            CreateProductEvent(
                 actor_id=actor_id,
                 product_id=product.product_id,
             ),
@@ -74,7 +74,7 @@ class Product(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateProductEvent(
+            UpdateProductEvent(
                 actor_id=actor_id,
                 product_id=self.product_id,
                 changes=changes,

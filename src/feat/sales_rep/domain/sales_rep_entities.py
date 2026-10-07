@@ -5,13 +5,13 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
 from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.feat.sales_rep.domain.sales_rep_events import CreateSalesRepresentativeEvent, UpdateSalesRepresentativeEvent
 
 
 class SalesRepresentative(BaseEntity):
-    __tablename__ = "sales_rep"
+    __tablename__ = "sales_representatives"
 
     sales_representative_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -52,7 +52,7 @@ class SalesRepresentative(BaseEntity):
         )
 
         rep._add_event(
-            events.CreateSalesRepresentativeEvent(
+            CreateSalesRepresentativeEvent(
                 actor_id=actor_id,
                 sales_representative_id=rep.sales_representative_id,
             ),
@@ -75,7 +75,7 @@ class SalesRepresentative(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateSalesRepresentativeEvent(
+            UpdateSalesRepresentativeEvent(
                 actor_id=actor_id,
                 sales_representative_id=self.sales_representative_id,
                 changes=changes,

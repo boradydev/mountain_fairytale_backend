@@ -5,13 +5,13 @@ from uuid import UUID
 from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
 from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.feat.employees.domain.employee_events import UpdateEmployeeEvent, CreateEmployeeEvent
 
 
 class Employee(BaseEntity):
-    __tablename__ = "app"
+    __tablename__ = "employees"
 
     employee_id: Mapped[UUID] = mapped_column(primary_key=True)
 
@@ -51,7 +51,7 @@ class Employee(BaseEntity):
         )
 
         employee._add_event(
-            events.CreateEmployeeEvent(
+            CreateEmployeeEvent(
                 actor_id=actor_id,
                 employee_id=employee.employee_id,
                 created_at=employee.created_at,
@@ -74,7 +74,7 @@ class Employee(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateEmployeeEvent(
+            UpdateEmployeeEvent(
                 actor_id=actor_id,
                 employee_id=self.employee_id,
                 changes=changes,
@@ -89,7 +89,7 @@ class Employee(BaseEntity):
         self.password_hash = new_password_hash
 
         self._add_event(
-            events.UpdateEmployeeEvent(
+            UpdateEmployeeEvent(
                 actor_id=actor_id,
                 employee_id=self.employee_id,
                 changes={"password_hash": new_password_hash},

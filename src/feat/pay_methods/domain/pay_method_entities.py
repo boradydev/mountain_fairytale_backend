@@ -11,7 +11,7 @@ from src.common.domain.entities import BaseEntity
 
 
 class PaymentMethod(BaseEntity):
-    __tablename__ = "pay_methods"
+    __tablename__ = "payment_methods"
 
     payment_method_id: Mapped[UUID] = mapped_column(primary_key=True)
     

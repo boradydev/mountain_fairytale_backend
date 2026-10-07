@@ -5,13 +5,12 @@ from uuid import UUID
 from sqlalchemy import DateTime, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
 from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
 
 
 class Client(BaseEntity):
-    __tablename__ = "api"
+    __tablename__ = "clients"
 
     client_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -66,7 +65,7 @@ class Client(BaseEntity):
         )
 
         client._add_event(
-            events.CreateClientEvent(
+            CreateClientEvent(
                 actor_id=actor_id,
                 client_id=client.client_id,
             ),
@@ -89,7 +88,7 @@ class Client(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateClientEvent(
+            UpdateClientEvent(
                 actor_id=actor_id,
                 client_id=self.client_id,
                 changes=changes,

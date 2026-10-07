@@ -12,7 +12,7 @@ from src.common.domain.entities import BaseEntity
 
 
 class Car(BaseEntity):
-    __tablename__ = "app"
+    __tablename__ = "cars"
 
     car_id: Mapped[UUID] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(Text, index=True)

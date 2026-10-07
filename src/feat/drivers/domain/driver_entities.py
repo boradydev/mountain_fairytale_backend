@@ -8,10 +8,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.common.domain import events
 from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.feat.drivers.domain.driver_events import CreateDriverEvent, UpdateDriverEvent
 
 
 class Driver(BaseEntity):
-    __tablename__ = "app"
+    __tablename__ = "drivers"
 
     driver_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -38,7 +39,7 @@ class Driver(BaseEntity):
         )
 
         driver._add_event(
-            events.CreateDriverEvent(
+            CreateDriverEvent(
                 actor_id=actor_id,
                 driver_id=driver.driver_id,
             ),
@@ -61,7 +62,7 @@ class Driver(BaseEntity):
             return
 
         self._add_event(
-            events.UpdateDriverEvent(
+            UpdateDriverEvent(
                 actor_id=actor_id,
                 driver_id=self.driver_id,
                 changes=changes,
