@@ -8,6 +8,7 @@ from src.infra.db.postgres.database import Postgres
 from src.infra.factories.app_context import AppContext
 from src.infra.factories.auth import AuthUseCaseFactory
 from src.infra.factories.cars import CarsUseCaseFactory
+from src.infra.factories.drivers import DriversUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.services.password.service import PasswordService
 from src.infra.services.token.jwt_service import JwtTokenService
@@ -44,6 +45,10 @@ async def lifespan(app: FastAPI):
         session_factory=postgres.session_factory,
     )
 
+    drivers_use_cases = DriversUseCaseFactory(
+        session_factory=postgres.session_factory,
+    )
+
     ctx = AppContext(
         postgres_session_factory=postgres.session_factory,
         token_service=token_service,
@@ -51,6 +56,7 @@ async def lifespan(app: FastAPI):
         employees_use_cases=employees_use_cases,
         auth_use_cases=auth_use_cases,
         cars_use_cases=cars_use_cases,
+        drivers_use_cases=drivers_use_cases,
         token_settings=token_settings,
     )
 

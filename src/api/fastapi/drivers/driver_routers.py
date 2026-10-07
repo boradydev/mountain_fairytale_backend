@@ -17,6 +17,11 @@ from src.api.fastapi.drivers.driver_schemas import (
     CreateDriverReq,
     UpdateDriverReq,
 )
+from src.app.drivers.usecases.check_duplicate import CheckDriverDuplicateDTO
+from src.app.drivers.usecases.create import CreateDriverDTO
+from src.app.drivers.usecases.get import GetDriverDTO
+from src.app.drivers.usecases.get_all import GetDriversDTO
+from src.app.drivers.usecases.update import UpdateDriverDTO
 from src.domain.drivers import driver_excs
 
 
@@ -95,7 +100,15 @@ async def get_drivers(
     access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[DriversResp]:
-    pass
+    drivers = await ctx.drivers_use_cases.get_drivers().execute(
+        GetDriversDTO(include_deactivated=include_deactivated),
+    )
+
+    return StdResponse(
+        data=DriversResp(
+            drivers=[DriverResp.model_validate(driver) for driver in drivers],
+        ),
+    )
 
 
 @drivers_router.get(
@@ -134,7 +147,13 @@ async def get_driver(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[DriverResp]:
-    pass
+    driver = await ctx.drivers_use_cases.get_driver().execute(
+        GetDriverDTO(driver_id=driver_id),
+    )
+
+    return StdResponse(
+        data=DriverResp.model_validate(driver),
+    )
 
 
 @drivers_router.post(
@@ -175,7 +194,16 @@ async def create_driver(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[DriverResp]:
-    pass
+    driver = await ctx.drivers_use_cases.create_driver().execute(
+        CreateDriverDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            name=body.name,
+        ),
+    )
+
+    return StdResponse(
+        data=DriverResp.model_validate(driver),
+    )
 
 
 @drivers_router.patch(
@@ -224,7 +252,17 @@ async def update_driver(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[DriverResp]:
-    pass
+    driver = await ctx.drivers_use_cases.update_driver().execute(
+        UpdateDriverDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            driver_id=driver_id,
+            payload=body.model_dump(exclude_unset=True),
+        ),
+    )
+
+    return StdResponse(
+        data=DriverResp.model_validate(driver),
+    )
 
 
 @drivers_router.get(
@@ -262,4 +300,10 @@ async def check_duplicate_driver(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[DriverResp | None]:
-    pass
+    driver = await ctx.drivers_use_cases.check_duplicate().execute(
+        CheckDriverDuplicateDTO(name=name),
+    )
+
+    return StdResponse(
+        data=(DriverResp.model_validate(driver) if driver is not None else None),
+    )
