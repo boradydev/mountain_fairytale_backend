@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Float, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.cars import events
+from src.domain.cars import car_events
 from src.domain.cars.car_excs import CarDomainUpdateException
 from src.domain.common.entities import BaseEntity
 

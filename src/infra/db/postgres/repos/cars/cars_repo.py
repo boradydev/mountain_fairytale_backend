@@ -5,7 +5,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.cars.abcs.cars_repo import ICarsRepository
+from src.domain.cars.abcs.cars_repo_abcs import ICarsRepository
 from src.domain.cars.car_excs import CarNumberAlreadyExistsException
 from src.domain.cars.car_entities import Car
 
