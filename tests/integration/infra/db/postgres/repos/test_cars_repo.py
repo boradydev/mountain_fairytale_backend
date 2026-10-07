@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import event
 from src.core.uuid7 import uuid7
 
 from src.feat.cars.domain.car_entities import Car
@@ -55,7 +56,7 @@ async def test_get_all(postgres) -> None:
         await repository.add(car2)
         await session.commit()
 
-        result = await repository.get_all()
+        result = await repository.get_all(include_deactivated=False)
 
         car_ids = {car.car_id for car in result}
 
@@ -83,9 +84,14 @@ async def test_update_changes_only_modified_fields(postgres) -> None:
             model="New Model",
         )
 
-        await repository.update(car)
+        # Проверяем, что событие обновления создано и содержит только измененное поле
+        events = car.pull_events()
+        assert len(events) == 1
+        update_event = events[0]
+        assert "model" in update_event.changes
+        assert "number" not in update_event.changes
 
-        assert car.get_changes() == {}
+        await repository.update(car)
 
         await session.commit()
 
@@ -119,7 +125,11 @@ async def test_deactivate(postgres) -> None:
         )
 
         assert car.is_active is False
-        assert "is_active" in car.get_changes()
+        
+        # Проверяем наличие события деактивации
+        events = car.pull_events()
+        assert len(events) == 1
+        assert "is_active" in events[0].changes
 
         await repository.update(car)
         await session.commit()
@@ -196,3 +206,35 @@ async def test_update_duplicate_number_raises_exception(postgres) -> None:
             await repository.update(car1)
 
         assert exc_info.value.number == car2.number
+
+
+@pytest.mark.integration
+async def test_update_without_changes_does_nothing(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = CarsRepository(session=session)
+        car = Car.create(
+            actor_id=uuid7(),
+            model="No Change Model",
+            number=f"CAR-{uuid7()}",
+        )
+
+        await repository.add(car)
+        await session.commit()
+
+        # Гарантируем, что событий нет (изменений не было)
+        assert len(car.pull_events()) == 0
+
+        sql_statements = []
+        def before_cursor_execute(statement):
+            sql_statements.append(statement)
+
+        conn = await session.connection()
+        event.listen(conn.sync_connection, "before_cursor_execute", before_cursor_execute)
+
+        try:
+            await repository.update(car)
+            assert not any("UPDATE" in stmt for stmt in sql_statements), (
+                "Холостой UPDATE улетел в базу данных!"
+            )
+        finally:
+            event.remove(conn.sync_connection, "before_cursor_execute", before_cursor_execute)

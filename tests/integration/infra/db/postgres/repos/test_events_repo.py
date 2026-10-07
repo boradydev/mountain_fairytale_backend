@@ -94,3 +94,31 @@ async def test_get_all_pagination(postgres) -> None:
         )
 
         assert len(result) == 2
+
+
+@pytest.mark.integration
+async def test_get_all_offset_out_of_range(postgres) -> None:
+    async with postgres.session_factory() as session:
+        repository = EventsRepository(
+            session=session,
+        )
+
+        records = [
+            EventRecord(
+                event_id=uuid7(),
+                event_type="T",
+                actor_id=uuid7(),
+                created_at=datetime.now(),
+                payload={},
+            )
+            for _ in range(2)
+        ]
+
+        await repository.add_many(
+            records=records,
+        )
+
+        await session.commit()
+
+        result = await repository.get_all(offset=10, limit=10)
+        assert len(result) == 0

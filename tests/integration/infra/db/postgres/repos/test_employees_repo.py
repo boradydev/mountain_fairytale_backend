@@ -72,6 +72,9 @@ async def test_get_all(postgres) -> None:
 
         result = await repository.get_all()
 
+        assert isinstance(result, list)
+        assert len(result) == 2
+
         employee_ids = {employee.employee_id for employee in result}
 
         assert first.employee_id in employee_ids
@@ -100,9 +103,12 @@ async def test_update_changes_only_modified_fields(postgres) -> None:
             username=username_new,
         )
 
-        await repository.update(employee)
+        # Проверяем, что событие обновления создано
+        events = employee.pull_events()
+        assert len(events) == 1
+        assert "username" in events[0].changes
 
-        assert employee.get_changes() == {}
+        await repository.update(employee)
 
         await session.commit()
 
@@ -140,9 +146,9 @@ async def test_update_multiple_fields_in_one_query(postgres) -> None:
             password_hash="new_hash",
         )
 
-        changes = employee.get_changes()
-
-        assert set(changes) == {
+        events = employee.pull_events()
+        assert len(events) == 1
+        assert set(events[0].changes.keys()) == {
             "username",
             "password_hash",
         }
@@ -181,7 +187,11 @@ async def test_deactivate(postgres) -> None:
         )
 
         assert employee.is_active is False
-        assert "is_active" in employee.get_changes()
+        
+        # Проверяем наличие события деактивации
+        events = employee.pull_events()
+        assert len(events) == 1
+        assert "is_active" in events[0].changes
 
         await repository.update(employee)
         await session.commit()
@@ -211,8 +221,8 @@ async def test_update_without_changes_does_nothing(postgres) -> None:
         await repository.add(employee)
         await session.commit()
 
-        # Гарантируем, что изменений нет
-        assert employee.get_changes() == {}
+        # Гарантируем, что событий нет (изменений не было)
+        assert len(employee.pull_events()) == 0
 
         # 2. Перехватываем выполнение SQL-запросов, чтобы убедиться,
         # что Алхимия не сделала ни одного лишнего UPDATE в базу
