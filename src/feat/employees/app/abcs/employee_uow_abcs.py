@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.app.common.abcs.uow import InterfaceUOW
+from src.common.app.abcs.uow_abcs import InterfaceUOW
 from src.domain.employees.abcs.employees_repo import IEmployeesRepository
 
 

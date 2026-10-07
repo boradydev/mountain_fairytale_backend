@@ -3,8 +3,8 @@ from datetime import datetime
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.common.event_record import EventRecord
-from src.infra.db.postgres.repos.events.repo import EventsRepository
+from src.common.domain.event_record import EventRecord
+from src.common.infra.db.postgres.repos.events.repo import EventsRepository
 
 
 @pytest.mark.integration

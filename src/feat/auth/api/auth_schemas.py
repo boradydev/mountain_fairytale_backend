@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from src.api.fastapi.common.schemas import BaseSchema
+from src.common.api.schemas import BaseSchema
 
 
 class CredsReq(BaseSchema):

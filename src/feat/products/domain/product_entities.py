@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.core.uuid7 import uuid7
 from src.domain.products import events
 from src.feat.products.domain.product_excs import ProductDomainUpdateException
-from src.domain.common.entities import BaseEntity
+from src.common.domain.entities import BaseEntity
 
 
 class Product(BaseEntity):

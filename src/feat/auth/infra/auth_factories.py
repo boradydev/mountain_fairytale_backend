@@ -2,9 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.feat.auth.app.usecases.login import LoginUseCase
 from src.feat.auth.app.usecases.refresh import RefreshUseCase
-from src.app.common.abcs.services.password_service import IPasswordService
+from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.employees.infra.employee_uow import EmployeesUOW
-from src.api.fastapi.common.api_abcs import ITokenService
+from src.common.api.api_abcs import ITokenService
 
 
 class AuthUseCaseFactory:

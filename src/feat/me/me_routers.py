@@ -3,20 +3,20 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request, Response, status
 
-from src.api.fastapi.common.api_excs import UnauthorizedException
-from src.api.fastapi.common.deps import (
+from src.common.api.api_excs import UnauthorizedException
+from src.common.api.deps import (
     AccessTokenPayloadDep,
     Context,
 )
-from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
-from src.api.fastapi.common.schemas import StdResponse
+from src.common.api.excs_handlers import map_exceptions_to_responses
+from src.common.api.schemas import StdResponse
 from src.feat.employees.api.employee_schemas import ChangeEmployeePasswordReq
 from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
 from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
-from src.infra.services.token.settings import JwtSettings
-from src.infra.web.fastapi.auth_token_manager import AuthTokenManager
+from src.common.infra.services.token.settings import JwtSettings
+from src.common.infra.web.fastapi.auth_token_manager import AuthTokenManager
 
 
 """

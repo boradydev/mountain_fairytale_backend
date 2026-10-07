@@ -4,11 +4,10 @@ from typing import Any
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.api.fastapi.app import fastapi_app
-from src.api.fastapi.common.api_abcs import ITokenService
-from src.infra.db.postgres.database import Postgres
-from src.infra.services.token.jwt_service import JwtTokenService
-from src.infra.services.token.settings import JwtSettings
+from src.common.api.app import fastapi_app
+from src.common.api.api_abcs import ITokenService
+from src.common.infra.services.token.jwt_service import JwtTokenService
+from src.common.infra.services.token.settings import JwtSettings
 
 
 @pytest.fixture

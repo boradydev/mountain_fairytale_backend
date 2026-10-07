@@ -2,12 +2,12 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Integer, Text, func
+from sqlalchemy import DateTime, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
 from src.domain.clients import events
-from src.domain.common.entities import BaseEntity
+from src.common.domain.entities import BaseEntity
 
 
 class Client(BaseEntity):

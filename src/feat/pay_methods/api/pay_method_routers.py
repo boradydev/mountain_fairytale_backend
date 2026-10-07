@@ -4,13 +4,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, status
 
-from src.api.fastapi.common.api_excs import UnauthorizedException
-from src.api.fastapi.common.deps import (
+from src.common.api.api_excs import UnauthorizedException
+from src.common.api.deps import (
     AccessTokenPayloadDep,
     Context,
 )
-from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
-from src.api.fastapi.common.schemas import StdResponse
+from src.common.api.excs_handlers import map_exceptions_to_responses
+from src.common.api.schemas import StdResponse
 from src.feat.pay_methods.api.pay_method_schemas import (
     PaymentMethodResp,
     PaymentMethodsResp,

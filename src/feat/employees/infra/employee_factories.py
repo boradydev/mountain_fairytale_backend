@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-from src.app.common.abcs.services.password_service import IPasswordService
+from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.employees.app.usecases.change_password import ChangeEmployeePasswordUseCase
 from src.feat.employees.app.usecases.create import CreateEmployeeUseCase
 from src.feat.employees.app.usecases.get import GetEmployeeUseCase

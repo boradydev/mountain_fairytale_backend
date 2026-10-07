@@ -1,11 +1,11 @@
 from fastapi import APIRouter, status
 
-from src.api.fastapi.common.deps import AuthTokenManagerDep
+from src.common.api.deps import AuthTokenManagerDep
 from src.feat.auth.api.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
-from src.api.fastapi.common.api_excs import RefreshTokenNotFoundException
-from src.api.fastapi.common.deps import Context
-from src.api.fastapi.common.excs_handlers import map_exceptions_to_responses
-from src.api.fastapi.common.schemas import StdResponse
+from src.common.api.api_excs import RefreshTokenNotFoundException
+from src.common.api.deps import Context
+from src.common.api.excs_handlers import map_exceptions_to_responses
+from src.common.api.schemas import StdResponse
 from src.feat.auth.app.usecases.login import LoginDTO
 from src.feat.auth.app.usecases.refresh import RefreshDTO
 from src.domain.auth import auth_excs

@@ -4,8 +4,8 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.api.fastapi.common.patch_schema import create_patch_schema_for_domain
-from src.api.fastapi.common.schemas import BaseSchema
+from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.schemas import BaseSchema
 from src.feat.employees.domain.employee_entities import Employee
 
 

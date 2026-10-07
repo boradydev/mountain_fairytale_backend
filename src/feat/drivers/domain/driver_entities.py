@@ -6,8 +6,7 @@ from sqlalchemy import DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.feat.drivers.domain import driver_events
-from src.domain.common.entities import BaseEntity
+from src.common.domain.entities import BaseEntity
 
 
 class Driver(BaseEntity):

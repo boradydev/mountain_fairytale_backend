@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from src.app.common.abcs.services.password_service import IPasswordService
+from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
 

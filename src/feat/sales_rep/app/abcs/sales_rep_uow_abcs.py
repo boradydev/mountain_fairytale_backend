@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.app.common.abcs.uow import InterfaceUOW
+from src.common.app.abcs.uow_abcs import InterfaceUOW
 from src.feat.sales_rep.domain.abcs.sales_rep_repo_abcs import ISalesRepresentativesRepository
 
 

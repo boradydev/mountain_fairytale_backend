@@ -2,7 +2,7 @@ import pytest
 from src.core.uuid7 import uuid7
 
 from src.domain.employees.events import CreateEmployeeEvent
-from src.infra.services.event_publisher.service import EventPublisher
+from src.common.infra.services.event_pud_service import EventPublisher
 
 
 @pytest.mark.integration
@@ -26,7 +26,7 @@ async def test_publish_many_saves_events(postgres) -> None:
     await publisher.wait_pending()
 
     async with postgres.session_factory() as session:
-        from src.infra.db.postgres.repos.events.repo import EventsRepository
+        from src.common.infra.db.postgres.repos.events.repo import EventsRepository
 
         repository = EventsRepository(
             session=session,

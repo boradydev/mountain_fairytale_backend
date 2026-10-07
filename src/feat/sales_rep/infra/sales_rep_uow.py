@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
 from src.feat.sales_rep.domain.abcs.sales_rep_repo_abcs import ISalesRepresentativesRepository
 from src.feat.sales_rep.infra.sales_rep_repos import SalesRepresentativesRepository
-from src.infra.db.postgres.uow.common import IPostgresUOW
-from src.infra.services.event_publisher.service import EventPublisher
+from src.common.infra.db.postgres.uow.common import IPostgresUOW
+from src.common.infra.services.event_pud_service import EventPublisher
 
 
 class SalesRepresentativesUOW(IPostgresUOW, ISalesRepresentativesUOW):

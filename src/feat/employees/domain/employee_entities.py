@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
-from src.domain.common.entities import BaseEntity
+from src.common.domain.entities import BaseEntity
 from src.domain.employees import events
 
 

@@ -4,7 +4,7 @@ from uuid import UUID
 from src.feat.auth.app.auth_dtos import AuthTokensDTO
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.domain.auth import auth_excs
-from src.api.fastapi.common.api_abcs import ITokenService
+from src.common.api.api_abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
