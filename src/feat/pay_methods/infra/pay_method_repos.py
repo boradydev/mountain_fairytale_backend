@@ -5,9 +5,9 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.pay_methods.abcs.payment_methods_repo_abcs import IPaymentMethodsRepository
-from src.domain.pay_methods.payment_method_entities import PaymentMethod
-from src.domain.pay_methods.payment_method_excs import PaymentMethodNameAlreadyExistsException
+from src.feat.pay_methods.domain.abcs.pay_method_repo_abcs import IPaymentMethodsRepository
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
+from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNameAlreadyExistsException
 
 
 class PaymentMethodsRepository(IPaymentMethodsRepository):

@@ -22,8 +22,7 @@ from src.feat.sales_rep.app.usecases.create import CreateSalesRepresentativeDTO
 from src.feat.sales_rep.app.usecases.get import GetSalesRepresentativeDTO
 from src.feat.sales_rep.app.usecases.get_all import GetSalesRepresentativesDTO
 from src.feat.sales_rep.app.usecases.update import UpdateSalesRepresentativeDTO
-from src.domain.sales_representatives import sales_representative_excs
-
+from src.feat.sales_rep.domain import sales_rep_excs
 
 """
 API CONTRACT — SALES REPRESENTATIVES
@@ -119,7 +118,7 @@ async def get_sales_representatives(
     response_model=StdResponse[SalesRepresentativeResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        sales_representative_excs.SalesRepresentativeNotFoundException,
+        sales_rep_excs.SalesRepresentativeNotFoundException,
     ),
     description="""
     Получение торгового представителя по UUID.
@@ -164,8 +163,8 @@ async def get_sales_representative(
     response_model=StdResponse[SalesRepresentativeResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        sales_representative_excs.SalesRepresentativePhoneAlreadyExistsException,
-        sales_representative_excs.SalesRepresentativeDomainUpdateException,
+        sales_rep_excs.SalesRepresentativePhoneAlreadyExistsException,
+        sales_rep_excs.SalesRepresentativeDomainUpdateException,
     ),
     description="""
     Создание нового торгового представителя.
@@ -221,9 +220,9 @@ async def create_sales_representative(
     response_model=StdResponse[SalesRepresentativeResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        sales_representative_excs.SalesRepresentativeNotFoundException,
-        sales_representative_excs.SalesRepresentativePhoneAlreadyExistsException,
-        sales_representative_excs.SalesRepresentativeDomainUpdateException,
+        sales_rep_excs.SalesRepresentativeNotFoundException,
+        sales_rep_excs.SalesRepresentativePhoneAlreadyExistsException,
+        sales_rep_excs.SalesRepresentativeDomainUpdateException,
     ),
     description="""
     Обновление данных торгового представителя.

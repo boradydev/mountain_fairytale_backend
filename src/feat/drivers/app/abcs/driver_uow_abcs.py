@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.common.app.abcs.uow_abcs import InterfaceUOW
-from src.domain.drivers.abcs.drivers_repo_abcs import IDriversRepository
+from src.feat.drivers.domain.abcs.driver_repo_abcs import IDriversRepository
 
 
 class IDriversUOW(InterfaceUOW, ABC):

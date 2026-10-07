@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.feat.products.domain.abcs.product_repo_abcs import IProductsRepository
-from src.domain.products.product_entities import Product
+from src.feat.products.domain.product_entities import Product
 from src.feat.products.domain.product_excs import ProductNameAlreadyExistsException
 
 

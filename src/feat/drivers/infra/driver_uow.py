@@ -3,7 +3,7 @@ from typing import Self
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
-from src.domain.drivers.abcs.drivers_repo_abcs import IDriversRepository
+from src.feat.drivers.domain.abcs.driver_repo_abcs import IDriversRepository
 from src.feat.drivers.infra.driver_repos import DriversRepository
 from src.common.infra.db.postgres.uow.common import IPostgresUOW
 from src.common.infra.services.event_pud_service import EventPublisher

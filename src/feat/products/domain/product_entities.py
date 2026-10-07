@@ -5,8 +5,8 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.common.domain import events
 from src.core.uuid7 import uuid7
-from src.domain.products import events
 from src.feat.products.domain.product_excs import ProductDomainUpdateException
 from src.common.domain.entities import BaseEntity
 

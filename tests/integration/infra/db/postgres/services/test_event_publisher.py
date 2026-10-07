@@ -1,8 +1,8 @@
 import pytest
 from src.core.uuid7 import uuid7
 
-from src.domain.employees.events import CreateEmployeeEvent
 from src.common.infra.services.event_pud_service import EventPublisher
+from src.feat.employees.domain.employee_events import CreateEmployeeEvent
 
 
 @pytest.mark.integration

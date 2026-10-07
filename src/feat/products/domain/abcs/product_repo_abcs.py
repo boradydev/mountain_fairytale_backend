@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.products.product_entities import Product
+from src.feat.products.domain.product_entities import Product
 
 
 class IProductsRepository(ABC):

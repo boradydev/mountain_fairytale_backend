@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.common.api.patch_schema import create_patch_schema_for_domain
 from src.common.api.schemas import BaseSchema
-from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class SalesRepresentativeResp(BaseSchema):

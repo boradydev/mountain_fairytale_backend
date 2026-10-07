@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.drivers.driver_entities import Driver
+from src.feat.drivers.domain.driver_entities import Driver
 
 
 class IDriversRepository(ABC):

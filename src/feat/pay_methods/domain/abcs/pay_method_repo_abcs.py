@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.pay_methods.payment_method_entities import PaymentMethod
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 
 
 class IPaymentMethodsRepository(ABC):

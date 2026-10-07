@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
-from src.domain.drivers.driver_entities import Driver
+from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.drivers.domain.driver_excs import DriverNotFoundException
 
 

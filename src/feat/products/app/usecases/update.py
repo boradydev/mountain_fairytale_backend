@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from src.feat.products.app.abcs.product_uow_abcs import IProductsUOW
-from src.domain.products.product_entities import Product
+from src.feat.products.domain.product_entities import Product
 from src.feat.products.domain.product_excs import ProductNotFoundException
 
 

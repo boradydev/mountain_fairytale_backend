@@ -5,7 +5,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.employees.abcs.employees_repo import IEmployeesRepository
+from src.feat.employees.domain.abcs.employee_repo_abcs import IEmployeesRepository
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExistsException
 

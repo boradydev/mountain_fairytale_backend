@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.common.api.patch_schema import create_patch_schema_for_domain
 from src.common.api.schemas import BaseSchema
-from src.domain.products.product_entities import Product
+from src.feat.products.domain.product_entities import Product
 
 
 class ProductResp(BaseSchema):

@@ -2,10 +2,10 @@ from dataclasses import dataclass
 
 from src.feat.auth.app.auth_dtos import AuthTokensDTO
 from src.common.app.abcs.password_service_abcs import IPasswordService
+from src.feat.auth.domain import auth_excs
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
-from src.domain.auth import auth_excs
-from src.domain.employees.events import EmployeeLoginEvent
 from src.common.api.api_abcs import ITokenService
+from src.feat.employees.domain.employee_events import EmployeeLoginEvent
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

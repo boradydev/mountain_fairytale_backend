@@ -22,8 +22,7 @@ from src.feat.products.app.usecases.create import CreateProductDTO
 from src.feat.products.app.usecases.get import GetProductDTO
 from src.feat.products.app.usecases.get_all import GetProductsDTO
 from src.feat.products.app.usecases.update import UpdateProductDTO
-from src.domain.products import product_excs
-
+from src.feat.products.domain import product_excs
 
 """
 API CONTRACT — PRODUCTS

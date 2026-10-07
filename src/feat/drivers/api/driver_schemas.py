@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.common.api.patch_schema import create_patch_schema_for_domain
 from src.common.api.schemas import BaseSchema
-from src.domain.drivers.driver_entities import Driver
+from src.feat.drivers.domain.driver_entities import Driver
 
 
 class DriverResp(BaseSchema):

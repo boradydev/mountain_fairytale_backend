@@ -5,8 +5,8 @@ from uuid import UUID
 from sqlalchemy import DateTime, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.common.domain import events
 from src.core.uuid7 import uuid7
-from src.domain.clients import events
 from src.common.domain.entities import BaseEntity
 
 

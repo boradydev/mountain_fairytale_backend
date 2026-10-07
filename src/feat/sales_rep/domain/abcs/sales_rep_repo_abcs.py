@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class ISalesRepresentativesRepository(ABC):

@@ -11,47 +11,27 @@ AI Note:
 from collections.abc import Mapping
 
 from src.common.infra.services.token.excs import InvalidRefreshTokenException
-from types import MappingProxyType
+from src.feat.auth.domain.auth_excs import InvalidCredentialsException, AuthEmployeeNotFoundByUsernameException, \
+    AuthEmployeeDeactivateException, AuthEmployeeNotFoundException
+from src.feat.clients.domain.client_excs import ClientNotFoundException, ClientDomainUpdateException
+from src.feat.drivers.domain.driver_excs import DriverNotFoundException, DriverDomainUpdateException
+from src.feat.employees.domain.employee_excs import EmployeeNotFoundByUsernameException, EmployeeNotFoundException, \
+    EmployeeDeactivateException, EmployeeDomainUpdateException, EmployeeUsernameAlreadyExistsException
+from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNotFoundException, \
+    PaymentMethodDomainUpdateException, PaymentMethodNameAlreadyExistsException
+from src.feat.products.domain.product_excs import ProductNotFoundException, ProductDomainUpdateException, \
+    ProductNameAlreadyExistsException
+from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativeNotFoundException, \
+    SalesRepresentativePhoneAlreadyExistsException, SalesRepresentativeDomainUpdateException
+from types import MappingProxyType # noqa
 
 from src.common.api.api_excs import RefreshTokenNotFoundException, UnauthorizedException, ForbiddenException
 from src.common.api.types import Resp
 from src.core.excs import BaseAppException
-from src.domain.auth.auth_excs import AuthEmployeeNotFoundException, InvalidCredentialsException, \
-    AuthEmployeeNotFoundByUsernameException, AuthEmployeeDeactivateException
 from src.feat.cars.domain.car_excs import (
     CarNotFoundException,
     CarNumberAlreadyExistsException,
     CarAlreadyActivateException,
-)
-from src.domain.employees.employee_excs import (
-    EmployeeDeactivateException,
-    EmployeeNotFoundByUsernameException,
-    EmployeeNotFoundException,
-    EmployeeDomainUpdateException,
-    EmployeeUsernameAlreadyExistsException,
-)
-from src.domain.clients.client_excs import (
-    ClientNotFoundException,
-    ClientDomainUpdateException,
-)
-from src.domain.drivers.driver_excs import (
-    DriverNotFoundException,
-    DriverDomainUpdateException,
-)
-from src.domain.pay_methods.payment_method_excs import (
-    PaymentMethodNotFoundException,
-    PaymentMethodDomainUpdateException,
-    PaymentMethodNameAlreadyExistsException,
-)
-from src.domain.products.product_excs import (
-    ProductNotFoundException,
-    ProductDomainUpdateException,
-    ProductNameAlreadyExistsException,
-)
-from src.domain.sales_representatives.sales_representative_excs import (
-    SalesRepresentativeNotFoundException,
-    SalesRepresentativeDomainUpdateException,
-    SalesRepresentativePhoneAlreadyExistsException,
 )
 
 

@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.drivers.abcs.drivers_repo_abcs import IDriversRepository
-from src.domain.drivers.driver_entities import Driver
+from src.feat.drivers.domain.abcs.driver_repo_abcs import IDriversRepository
+from src.feat.drivers.domain.driver_entities import Driver
 
 
 class DriversRepository(IDriversRepository):

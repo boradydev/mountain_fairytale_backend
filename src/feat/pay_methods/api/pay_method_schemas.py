@@ -6,7 +6,7 @@ from pydantic import Field
 
 from src.common.api.patch_schema import create_patch_schema_for_domain
 from src.common.api.schemas import BaseSchema
-from src.domain.pay_methods.payment_method_entities import PaymentMethod
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 
 
 class PaymentMethodResp(BaseSchema):

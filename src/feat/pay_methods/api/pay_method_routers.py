@@ -22,8 +22,7 @@ from src.feat.pay_methods.app.usecases.create import CreatePaymentMethodDTO
 from src.feat.pay_methods.app.usecases.get import GetPaymentMethodDTO
 from src.feat.pay_methods.app.usecases.get_all import GetPaymentMethodsDTO
 from src.feat.pay_methods.app.usecases.update import UpdatePaymentMethodDTO
-from src.domain.pay_methods import payment_method_excs
-
+from src.feat.pay_methods.domain import pay_method_excs
 
 """
 API CONTRACT — PAYMENT METHODS
@@ -117,7 +116,7 @@ async def get_payment_methods(
     response_model=StdResponse[PaymentMethodResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        payment_method_excs.PaymentMethodNotFoundException,
+        pay_method_excs.PaymentMethodNotFoundException,
     ),
     description="""
     Получение способа оплаты по UUID.
@@ -162,8 +161,8 @@ async def get_payment_method(
     response_model=StdResponse[PaymentMethodResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        payment_method_excs.PaymentMethodNameAlreadyExistsException,
-        payment_method_excs.PaymentMethodDomainUpdateException,
+        pay_method_excs.PaymentMethodNameAlreadyExistsException,
+        pay_method_excs.PaymentMethodDomainUpdateException,
     ),
     description="""
     Создание нового способа оплаты.
@@ -216,9 +215,9 @@ async def create_payment_method(
     response_model=StdResponse[PaymentMethodResp],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
-        payment_method_excs.PaymentMethodNotFoundException,
-        payment_method_excs.PaymentMethodNameAlreadyExistsException,
-        payment_method_excs.PaymentMethodDomainUpdateException,
+        pay_method_excs.PaymentMethodNotFoundException,
+        pay_method_excs.PaymentMethodNameAlreadyExistsException,
+        pay_method_excs.PaymentMethodDomainUpdateException,
     ),
     description="""
     Обновление данных способа оплаты.

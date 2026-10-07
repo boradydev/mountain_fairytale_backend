@@ -8,8 +8,7 @@ from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
 from src.feat.auth.app.usecases.login import LoginDTO
 from src.feat.auth.app.usecases.refresh import RefreshDTO
-from src.domain.auth import auth_excs
-
+from src.feat.auth.domain import auth_excs
 
 """
 API CONTRACT — AUTHENTICATION

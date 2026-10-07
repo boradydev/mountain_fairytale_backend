@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
-from src.domain.sales_representatives.sales_representative_entities import SalesRepresentative
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

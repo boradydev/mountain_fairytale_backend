@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.common.app.abcs.uow_abcs import InterfaceUOW
-from src.domain.pay_methods.abcs.payment_methods_repo_abcs import IPaymentMethodsRepository
+from src.feat.pay_methods.domain.abcs.pay_method_repo_abcs import IPaymentMethodsRepository
 
 
 class IPaymentMethodsUOW(InterfaceUOW, ABC):

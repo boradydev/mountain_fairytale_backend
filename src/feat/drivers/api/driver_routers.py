@@ -22,8 +22,7 @@ from src.feat.drivers.app.usecases.create import CreateDriverDTO
 from src.feat.drivers.app.usecases.get import GetDriverDTO
 from src.feat.drivers.app.usecases.get_all import GetDriversDTO
 from src.feat.drivers.app.usecases.update import UpdateDriverDTO
-from src.domain.drivers import driver_excs
-
+from src.feat.drivers.domain import driver_excs
 
 """
 API CONTRACT — DRIVERS
