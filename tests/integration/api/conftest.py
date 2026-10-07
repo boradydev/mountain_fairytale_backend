@@ -19,7 +19,7 @@ async def client() -> AsyncGenerator[AsyncClient, Any]:
 
         async with AsyncClient(
             transport=transport,
-            base_url="http://testserver/api/v1",
+            base_url="http://testserver",
         ) as client:
             yield client
 

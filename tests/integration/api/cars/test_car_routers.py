@@ -15,7 +15,7 @@ class TestCarRouters:
     async def login(client: AsyncClient, employee: EmployeeTestData):
         """Вспомогательный метод для авторизации."""
         await client.post(
-            "/public/cars/login",
+            "/public/auth/login",
             json={"username": employee.username, "password": employee.password},
         )
 
