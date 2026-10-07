@@ -17,6 +17,11 @@ from src.api.fastapi.sales_representatives.sales_representative_schemas import (
     CreateSalesRepresentativeReq,
     UpdateSalesRepresentativeReq,
 )
+from src.app.sales_representatives.usecases.check_duplicate import CheckSalesRepresentativeDuplicateDTO
+from src.app.sales_representatives.usecases.create import CreateSalesRepresentativeDTO
+from src.app.sales_representatives.usecases.get import GetSalesRepresentativeDTO
+from src.app.sales_representatives.usecases.get_all import GetSalesRepresentativesDTO
+from src.app.sales_representatives.usecases.update import UpdateSalesRepresentativeDTO
 from src.domain.sales_representatives import sales_representative_excs
 
 
@@ -97,7 +102,15 @@ async def get_sales_representatives(
     access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[SalesRepresentativesResp]:
-    pass
+    reps = await ctx.sales_representatives_use_cases.get_sales_representatives().execute(
+        GetSalesRepresentativesDTO(include_deactivated=include_deactivated),
+    )
+
+    return StdResponse(
+        data=SalesRepresentativesResp(
+            sales_representatives=[SalesRepresentativeResp.model_validate(rep) for rep in reps],
+        ),
+    )
 
 
 @sales_representatives_router.get(
@@ -136,7 +149,13 @@ async def get_sales_representative(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[SalesRepresentativeResp]:
-    pass
+    rep = await ctx.sales_representatives_use_cases.get_sales_representative().execute(
+        GetSalesRepresentativeDTO(sales_representative_id=sales_representative_id),
+    )
+
+    return StdResponse(
+        data=SalesRepresentativeResp.model_validate(rep),
+    )
 
 
 @sales_representatives_router.post(
@@ -182,7 +201,18 @@ async def create_sales_representative(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[SalesRepresentativeResp]:
-    pass
+    rep = await ctx.sales_representatives_use_cases.create_sales_representative().execute(
+        CreateSalesRepresentativeDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            name=body.name,
+            phone=body.phone,
+            commission_percent=body.commission_percent,
+        ),
+    )
+
+    return StdResponse(
+        data=SalesRepresentativeResp.model_validate(rep),
+    )
 
 
 @sales_representatives_router.patch(
@@ -234,7 +264,17 @@ async def update_sales_representative(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[SalesRepresentativeResp]:
-    pass
+    rep = await ctx.sales_representatives_use_cases.update_sales_representative().execute(
+        UpdateSalesRepresentativeDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            sales_representative_id=sales_representative_id,
+            payload=body.model_dump(exclude_unset=True),
+        ),
+    )
+
+    return StdResponse(
+        data=SalesRepresentativeResp.model_validate(rep),
+    )
 
 
 @sales_representatives_router.get(
@@ -253,20 +293,29 @@ async def update_sales_representative(
 
     Логика поиска:
         1. Требуются оба поля: name и phone.
-        2. Пороги similarity: name >= 0.35, phone >= 0.50.
-        3. Кандидат должен совпасть по обоим полям.
-        4. Поиск осуществляется среди всех записей (и активных, и деактивированных).
-        5. Из всех подходящих кандидатов выбирается один лучший по совокупному similarity score.
+        2. Кандидат подходит, только если:
+           - similarity(name) >= 0.35 И
+           - similarity(phone) >= 0.50.
+        3. Совокупный score для ранжирования: (similarity(name) + similarity(phone)) / 2.
+        4. Сортировка кандидатов:
+           - По убыванию совокупного score.
+           - При равенстве — по убыванию даты создания (created_at DESC).
+           - При равенстве — по убыванию sales_representative_id DESC.
+        5. Поиск осуществляется среди всех записей (и активных, и деактивированных).
+        6. Из подходящих кандидатов выбирается один лучший.
 
     Результат:
         HTTP 200.
         data содержит SalesRepresentativeResp (лучший кандидат) или null, если совпадений не найдено.
+        Поиск является справочным и не блокирует создание записей с похожими данными.
 
     Критические сценарии для API-тестов:
         1. Поиск по обоим полям с точным совпадением -> возвращается торговый представитель.
-        2. Поиск по обоим полям с частичным совпадением выше порогов -> возвращается торговый представитель.
-        3. Поиск, где одно из полей не проходит порог -> data == null.
-        4. Поиск деактивированного торгового представителя -> возвращается торговый представитель.
+        2. Поиск, где name_similarity >= 0.35 и phone_similarity >= 0.50 -> возвращается торговый представитель.
+        3. Поиск, где name_similarity < 0.35 (даже если phone совпадает точно) -> data == null.
+        4. Поиск, где phone_similarity < 0.50 (даже если name совпадает точно) -> data == null.
+        5. Поиск деактивированного торгового представителя -> возвращается торговый представитель.
+        6. При нескольких кандидатах с одинаковым совокупным score возвращается самый новый.
     """,
 )
 async def check_duplicate_sales_representative(
@@ -275,4 +324,10 @@ async def check_duplicate_sales_representative(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[SalesRepresentativeResp | None]:
-    pass
+    rep = await ctx.sales_representatives_use_cases.check_duplicate().execute(
+        CheckSalesRepresentativeDuplicateDTO(name=name, phone=phone),
+    )
+
+    return StdResponse(
+        data=(SalesRepresentativeResp.model_validate(rep) if rep is not None else None),
+    )

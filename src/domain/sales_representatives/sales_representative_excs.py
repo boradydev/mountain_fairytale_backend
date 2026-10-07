@@ -1,14 +1,20 @@
 from dataclasses import dataclass
-from src.core.excs import BaseAppException
+from uuid import UUID
+
+from src.domain.common.excs import DomainException
+
 
 @dataclass(frozen=True, slots=True)
-class SalesRepresentativeNotFoundException(BaseAppException):
-    pass
+class SalesRepresentativeNotFoundException(DomainException):
+    sales_representative_id: UUID
+
 
 @dataclass(frozen=True, slots=True)
-class SalesRepresentativeDomainUpdateException(BaseAppException):
-    pass
+class SalesRepresentativeDomainUpdateException(DomainException):
+    field: str
+    message: str
+
 
 @dataclass(frozen=True, slots=True)
-class SalesRepresentativePhoneAlreadyExistsException(BaseAppException):
-    pass
+class SalesRepresentativePhoneAlreadyExistsException(DomainException):
+    phone: str
