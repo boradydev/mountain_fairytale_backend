@@ -11,6 +11,7 @@ from src.infra.factories.cars import CarsUseCaseFactory
 from src.infra.factories.drivers import DriversUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory
+from src.infra.factories.products import ProductsUseCaseFactory
 from src.infra.factories.sales_representatives import SalesRepresentativesUseCaseFactory
 from src.infra.services.password.service import PasswordService
 from src.infra.services.token.jwt_service import JwtTokenService
@@ -55,6 +56,10 @@ async def lifespan(app: FastAPI):
         session_factory=postgres.session_factory,
     )
 
+    products_use_cases = ProductsUseCaseFactory(
+        session_factory=postgres.session_factory,
+    )
+
     sales_representatives_use_cases = SalesRepresentativesUseCaseFactory(
         session_factory=postgres.session_factory,
     )
@@ -68,6 +73,7 @@ async def lifespan(app: FastAPI):
         cars_use_cases=cars_use_cases,
         drivers_use_cases=drivers_use_cases,
         payment_methods_use_cases=payment_methods_use_cases,
+        products_use_cases=products_use_cases,
         sales_representatives_use_cases=sales_representatives_use_cases,
         token_settings=token_settings,
     )

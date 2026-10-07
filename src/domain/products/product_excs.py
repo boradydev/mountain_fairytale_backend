@@ -1,14 +1,20 @@
 from dataclasses import dataclass
-from src.core.excs import BaseAppException
+from uuid import UUID
+
+from src.domain.common.excs import DomainException
+
 
 @dataclass(frozen=True, slots=True)
-class ProductNotFoundException(BaseAppException):
-    pass
+class ProductNotFoundException(DomainException):
+    product_id: UUID
+
 
 @dataclass(frozen=True, slots=True)
-class ProductDomainUpdateException(BaseAppException):
-    pass
+class ProductDomainUpdateException(DomainException):
+    field: str
+    message: str
+
 
 @dataclass(frozen=True, slots=True)
-class ProductNameAlreadyExistsException(BaseAppException):
-    pass
+class ProductNameAlreadyExistsException(DomainException):
+    name: str

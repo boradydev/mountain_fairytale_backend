@@ -7,6 +7,7 @@ from src.api.fastapi.drivers.driver_routers import drivers_router
 from src.api.fastapi.employees.employee_routers import employees_router
 from src.api.fastapi.me.me_routers import me_router
 from src.api.fastapi.payment_methods.payment_method_routers import payment_methods_router
+from src.api.fastapi.products.product_routers import products_router
 from src.api.fastapi.sales_representatives.sales_representative_routers import sales_representatives_router
 
 
@@ -26,6 +27,7 @@ protected.include_router(me_router)
 protected.include_router(cars_router)
 protected.include_router(drivers_router)
 protected.include_router(payment_methods_router)
+protected.include_router(products_router)
 protected.include_router(sales_representatives_router)
 
 

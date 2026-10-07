@@ -17,6 +17,11 @@ from src.api.fastapi.products.product_schemas import (
     CreateProductReq,
     UpdateProductReq,
 )
+from src.app.products.usecases.check_duplicate import CheckProductDuplicateDTO
+from src.app.products.usecases.create import CreateProductDTO
+from src.app.products.usecases.get import GetProductDTO
+from src.app.products.usecases.get_all import GetProductsDTO
+from src.app.products.usecases.update import UpdateProductDTO
 from src.domain.products import product_excs
 
 
@@ -41,7 +46,10 @@ API CONTRACT — PRODUCTS
 Особенности данных:
     - name: 1–120 символов.
     - base_price: 0–1 000 000 000.
-    - Поле name уникально; попытка создания или обновления на существующее имя вызывает 409 Conflict.
+    - Поле name уникально: проверка выполняется по точному совпадению, регистрозависимо, 
+      без обрезки пробелов и нормализации. "Product" и "product" — разные имена.
+      Похожее, но не идентичное имя допустимо. Попытка создания или обновления на 
+      точно такое же имя вызывает 409 Conflict.
 
 Авторизация:
     Токен доступа (access token) может быть передан двумя способами:
@@ -96,7 +104,15 @@ async def get_products(
     access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[ProductsResp]:
-    pass
+    products = await ctx.products_use_cases.get_products().execute(
+        GetProductsDTO(include_deactivated=include_deactivated),
+    )
+
+    return StdResponse(
+        data=ProductsResp(
+            products=[ProductResp.model_validate(p) for p in products],
+        ),
+    )
 
 
 @products_router.get(
@@ -135,7 +151,13 @@ async def get_product(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp]:
-    pass
+    product = await ctx.products_use_cases.get_product().execute(
+        GetProductDTO(product_id=product_id),
+    )
+
+    return StdResponse(
+        data=ProductResp.model_validate(product),
+    )
 
 
 @products_router.post(
@@ -145,7 +167,6 @@ async def get_product(
     responses=map_exceptions_to_responses(
         UnauthorizedException,
         product_excs.ProductNameAlreadyExistsException,
-        product_excs.ProductDomainUpdateException,
     ),
     description="""
     Создание нового товара.
@@ -180,7 +201,17 @@ async def create_product(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp]:
-    pass
+    product = await ctx.products_use_cases.create_product().execute(
+        CreateProductDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            name=body.name,
+            base_price=body.base_price,
+        ),
+    )
+
+    return StdResponse(
+        data=ProductResp.model_validate(product),
+    )
 
 
 @products_router.patch(
@@ -232,7 +263,17 @@ async def update_product(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp]:
-    pass
+    product = await ctx.products_use_cases.update_product().execute(
+        UpdateProductDTO(
+            actor_id=UUID(access_token_payload.employee_id),
+            product_id=product_id,
+            payload=body.model_dump(exclude_unset=True),
+        ),
+    )
+
+    return StdResponse(
+        data=ProductResp.model_validate(product),
+    )
 
 
 @products_router.get(
@@ -250,13 +291,17 @@ async def update_product(
         Query parameter: name (1-120).
 
     Логика поиска:
-        1. Порог similarity: name >= 0.35.
+        1. Порог similarity: name >= 0.35 (включительно).
         2. Поиск осуществляется среди всех записей (и активных, и деактивированных).
-        3. Из всех подходящих кандидатов выбирается один лучший по similarity score.
+        3. Выбор лучшего кандидата:
+            - Сначала по убыванию similarity score (DESC).
+            - При равном score — по убыванию даты создания (created_at DESC).
+            - При равной дате — по убыванию product_id (DESC).
 
     Результат:
         HTTP 200.
         data содержит ProductResp (лучший кандидат) или null, если совпадений не найдено.
+        Проверка является справочной и не блокирует создание товара с похожим именем.
 
     Критические сценарии для API-тестов:
         1. Поиск по имени с точным совпадением -> возвращается товар.
@@ -270,4 +315,10 @@ async def check_duplicate_product(
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp | None]:
-    pass
+    product = await ctx.products_use_cases.check_duplicate().execute(
+        CheckProductDuplicateDTO(name=name),
+    )
+
+    return StdResponse(
+        data=(ProductResp.model_validate(product) if product is not None else None),
+    )

@@ -8,6 +8,7 @@ from src.infra.factories.cars import CarsUseCaseFactory
 from src.infra.factories.drivers import DriversUseCaseFactory
 from src.infra.factories.employees import EmployeesUseCaseFactory
 from src.infra.factories.payment_methods import PaymentMethodsUseCaseFactory
+from src.infra.factories.products import ProductsUseCaseFactory
 from src.infra.factories.sales_representatives import SalesRepresentativesUseCaseFactory
 from src.infra.services.token.settings import JwtSettings
 from src.api.fastapi.common.api_abcs import ITokenService
@@ -24,6 +25,7 @@ class AppContext:
     cars_use_cases: CarsUseCaseFactory
     drivers_use_cases: DriversUseCaseFactory
     payment_methods_use_cases: PaymentMethodsUseCaseFactory
+    products_use_cases: ProductsUseCaseFactory
     sales_representatives_use_cases: SalesRepresentativesUseCaseFactory
 
     token_settings: JwtSettings

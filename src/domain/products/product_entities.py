@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
 from src.domain.products import events
+from src.domain.products.product_excs import ProductDomainUpdateException
 from src.domain.common.entities import BaseEntity
 
 
@@ -62,6 +63,8 @@ class Product(BaseEntity):
         actor_id: UUID,
         **payload: Any,
     ) -> None:
+        self._validate_update(payload)
+        
         changes = self._apply_update_changes(
             payload=payload,
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
@@ -77,3 +80,11 @@ class Product(BaseEntity):
                 changes=changes,
             ),
         )
+
+    def _validate_update(self, payload: dict[str, Any]) -> None:
+        price = payload.get("base_price")
+        if price is not None and (price < 0 or price > 1_000_000_000):
+            raise ProductDomainUpdateException(
+                field="base_price",
+                message="base_price must be between 0 and 1,000,000,000",
+            )
