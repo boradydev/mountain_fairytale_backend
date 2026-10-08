@@ -74,12 +74,14 @@ class EmployeesRepository(IEmployeesRepository):
         self,
         include_deactivated: bool,
     ) -> list[Employee]:
-        stmt = select(Employee).order_by(
-            desc(Employee.created_at),
-        )
+        stmt = select(Employee)
 
         if not include_deactivated:
             stmt = stmt.where(Employee.is_active.is_(True))
+
+        stmt = stmt.order_by(
+            desc(Employee.created_at),
+        )
 
         result = await self._session.execute(stmt)
 
