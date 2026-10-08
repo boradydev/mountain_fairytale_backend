@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.products.domain.product_entities import Product
 
@@ -26,10 +26,9 @@ class CreateProductReq(BaseSchema):
     base_price: Annotated[float, Field(ge=0, le=1_000_000_000)]
 
 
-class UpdateProductReq(create_patch_schema_for_domain(
-    Product, 
-    exclude_fields={"product_id", "created_at"}
-)):
-    """
-    PATCH schema for Product.
-    """
+class UpdateProductReq(BasePatchSchema):
+    __entity__ = Product
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    base_price: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    is_active: bool | None = None

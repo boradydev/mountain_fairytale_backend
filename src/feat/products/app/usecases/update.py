@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
+from src.feat.products.api.product_schemas import UpdateProductReq
 from src.feat.products.app.abcs.product_uow_abcs import IProductsUOW
 from src.feat.products.domain.product_entities import Product
 from src.feat.products.domain.product_excs import ProductNotFoundException
@@ -11,7 +11,7 @@ from src.feat.products.domain.product_excs import ProductNotFoundException
 class UpdateProductDTO:
     actor_id: UUID
     product_id: UUID
-    payload: dict[str, Any]
+    payload: UpdateProductReq
 
 
 class UpdateProductUseCase:
@@ -35,7 +35,7 @@ class UpdateProductUseCase:
 
             product.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.products.update(product)

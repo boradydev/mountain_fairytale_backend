@@ -266,7 +266,7 @@ async def update_product(
         UpdateProductDTO(
             actor_id=UUID(access_token_payload.employee_id),
             product_id=product_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 
@@ -305,7 +305,7 @@ async def update_product(
     Критические сценарии для API-тестов:
         1. Поиск по имени с точным совпадением -> возвращается товар.
         2. Поиск по имени с частичным совпадением выше порога (0.35) -> возвращается товар.
-        3. Поиск по имени, не достигающему порога -> data == null.
+        3. Поиск по имени, не достигающего порога -> data == null.
         4. Поиск деактивированного товара -> возвращается товар.
     """,
 )
