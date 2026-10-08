@@ -28,7 +28,10 @@ class ClientsRepository(IClientsRepository):
         await self._refresh_relationships(client.client_id)
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
+        # Нужно переменные создать заранее, иначе после ошибка от asyncpg к атрибутам уже не обратится.
         phone = client.phone
+        sales_representative_id = client.sales_representative_id
+        default_payment_method_id = client.default_payment_method_id
 
         try:
             await self._session.flush()
@@ -45,20 +48,18 @@ class ClientsRepository(IClientsRepository):
 
             # 2. Проверка внешнего ключа торгового представителя
             if pgcode == pg_excs.ForeignKeyViolationError.sqlstate and client.FK_SALES_REPRESENTATIVE in err_msg:
-                entity_id = client.sales_representative_id
-                if entity_id is not None:
+                if sales_representative_id is not None:
                     raise ClientRelatedEntityNotFoundException(
                         field="sales_representative_id",
-                        entity_id=entity_id,
+                        entity_id=sales_representative_id,
                     ) from exc
 
             # 3. Проверка внешнего ключа метода оплаты
             if pgcode == pg_excs.ForeignKeyViolationError.sqlstate and client.FK_PAYMENT_METHOD in err_msg:
-                entity_id = client.default_payment_method_id
-                if entity_id is not None:
+                if default_payment_method_id is not None:
                     raise ClientRelatedEntityNotFoundException(
                         field="default_payment_method_id",
-                        entity_id=entity_id,
+                        entity_id=default_payment_method_id,
                     ) from exc
 
             raise
