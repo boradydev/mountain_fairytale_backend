@@ -12,8 +12,6 @@ from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
-from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
-from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class ClientsRepository(IClientsRepository):
@@ -23,9 +21,11 @@ class ClientsRepository(IClientsRepository):
     async def add(self, client: Client) -> None:
         self._session.add(client)
         await self._flush_with_constraint_handling(client)
+        await self._refresh_relationships(client.client_id)
 
     async def update(self, client: Client) -> None:
         await self._flush_with_constraint_handling(client)
+        await self._refresh_relationships(client.client_id)
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
         phone = client.phone
@@ -63,9 +63,28 @@ class ClientsRepository(IClientsRepository):
 
             raise
 
+    async def _refresh_relationships(self, client_id: UUID) -> None:
+        stmt = (
+            select(Client)
+            .options(
+                joinedload(Client.sales_representative),
+                joinedload(Client.default_payment_method),
+            )
+            .where(Client.client_id == client_id)
+            .execution_options(populate_existing=True)
+        )
+        result = await self._session.execute(stmt)
+        result.unique().scalar_one()
 
     async def get_by_id(self, client_id: UUID) -> Client | None:
-        stmt = select(Client).options(joinedload(Client.sales_representative)).where(Client.client_id == client_id)
+        stmt = (
+            select(Client)
+            .options(
+                joinedload(Client.sales_representative),
+                joinedload(Client.default_payment_method),
+            )
+            .where(Client.client_id == client_id)
+        )
         result = await self._session.execute(stmt)
         return result.unique().scalar_one_or_none()
 
@@ -85,7 +104,10 @@ class ClientsRepository(IClientsRepository):
 
         stmt = (
             select(Client)
-            .options(joinedload(Client.sales_representative))
+            .options(
+                joinedload(Client.sales_representative),
+                joinedload(Client.default_payment_method),
+            )
             .where(*filters)
             .order_by(Client.created_at.desc(), Client.client_id.desc())
             .offset(offset)
@@ -114,7 +136,10 @@ class ClientsRepository(IClientsRepository):
 
         stmt = (
             select(Client)
-            .options(joinedload(Client.sales_representative))
+            .options(
+                joinedload(Client.sales_representative),
+                joinedload(Client.default_payment_method),
+            )
             .where(matching_fields >= 2)
             .order_by(
                 total_similarity.desc(),
@@ -125,13 +150,3 @@ class ClientsRepository(IClientsRepository):
         )
         result = await self._session.execute(stmt)
         return result.unique().scalar_one_or_none()
-
-    async def sales_representative_exists(self, entity_id: UUID) -> bool:
-        stmt = select(SalesRepresentative.sales_representative_id).where(
-            SalesRepresentative.sales_representative_id == entity_id
-        )
-        return (await self._session.execute(stmt)).scalar_one_or_none() is not None
-
-    async def payment_method_exists(self, entity_id: UUID) -> bool:
-        stmt = select(PaymentMethod.payment_method_id).where(PaymentMethod.payment_method_id == entity_id)
-        return (await self._session.execute(stmt)).scalar_one_or_none() is not None

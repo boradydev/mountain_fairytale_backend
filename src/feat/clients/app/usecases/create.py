@@ -4,7 +4,6 @@ from uuid import UUID
 
 from src.feat.clients.app.abcs.client_uow_abcs import IClientsUOW
 from src.feat.clients.domain.client_entities import Client
-from src.feat.clients.domain.client_excs import ClientRelatedEntityNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -25,26 +24,6 @@ class CreateClientUseCase:
 
     async def execute(self, dto: CreateClientDTO) -> Client:
         async with self._uow as uow:
-            if dto.sales_representative_id is not None:
-                exists = await uow.clients.sales_representative_exists(
-                    dto.sales_representative_id,
-                )
-                if not exists:
-                    raise ClientRelatedEntityNotFoundException(
-                        field="sales_representative_id",
-                        entity_id=dto.sales_representative_id,
-                    )
-
-            if dto.default_payment_method_id is not None:
-                exists = await uow.clients.payment_method_exists(
-                    dto.default_payment_method_id,
-                )
-                if not exists:
-                    raise ClientRelatedEntityNotFoundException(
-                        field="default_payment_method_id",
-                        entity_id=dto.default_payment_method_id,
-                    )
-
             client = Client.create(
                 actor_id=dto.actor_id,
                 name=dto.name,

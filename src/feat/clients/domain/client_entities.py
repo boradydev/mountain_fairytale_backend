@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
@@ -46,6 +47,8 @@ class Client(BaseEntity):
         lazy="joined",
     )
 
+    default_payment_method: Mapped[PaymentMethod | None] = relationship(lazy="joined")
+
     _ALLOWED_UPDATE_FIELDS = {
         "name",
         "phone",
@@ -63,6 +66,12 @@ class Client(BaseEntity):
             return None
 
         return self.sales_representative.name
+
+    @property
+    def default_payment_method_name(self) -> str | None:
+        if self.default_payment_method is None:
+            return None
+        return self.default_payment_method.name
 
     @classmethod
     def create(

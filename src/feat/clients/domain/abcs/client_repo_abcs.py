@@ -36,11 +36,3 @@ class IClientsRepository(ABC):
         address: str,
     ) -> Client | None:
         """Ищет лучший подходящий дубликат по трём значениям."""
-
-    @abstractmethod
-    async def sales_representative_exists(self, entity_id: UUID) -> bool:
-        """Проверяет существование торгового представителя независимо от его статуса."""
-
-    @abstractmethod
-    async def payment_method_exists(self, entity_id: UUID) -> bool:
-        """Проверяет существование способа оплаты независимо от его статуса."""
