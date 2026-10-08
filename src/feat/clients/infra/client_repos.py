@@ -21,11 +21,11 @@ class ClientsRepository(IClientsRepository):
     async def add(self, client: Client) -> None:
         self._session.add(client)
         await self._flush_with_constraint_handling(client)
-        await self._refresh_relationships(client.client_id)
+        await self._session.refresh(client)
 
     async def update(self, client: Client) -> None:
         await self._flush_with_constraint_handling(client)
-        await self._refresh_relationships(client.client_id)
+        await self._session.refresh(client)
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
         # Нужно переменные создать заранее, иначе после ошибка от asyncpg к атрибутам уже не обратится.
@@ -64,28 +64,8 @@ class ClientsRepository(IClientsRepository):
 
             raise
 
-    async def _refresh_relationships(self, client_id: UUID) -> None:
-        stmt = (
-            select(Client)
-            .options(
-                joinedload(Client.sales_representative),
-                joinedload(Client.default_payment_method),
-            )
-            .where(Client.client_id == client_id)
-            .execution_options(populate_existing=True)
-        )
-        result = await self._session.execute(stmt)
-        result.unique().scalar_one()
-
     async def get_by_id(self, client_id: UUID) -> Client | None:
-        stmt = (
-            select(Client)
-            .options(
-                joinedload(Client.sales_representative),
-                joinedload(Client.default_payment_method),
-            )
-            .where(Client.client_id == client_id)
-        )
+        stmt = select(Client).where(Client.client_id == client_id)
         result = await self._session.execute(stmt)
         return result.unique().scalar_one_or_none()
 
@@ -105,10 +85,6 @@ class ClientsRepository(IClientsRepository):
 
         stmt = (
             select(Client)
-            .options(
-                joinedload(Client.sales_representative),
-                joinedload(Client.default_payment_method),
-            )
             .where(*filters)
             .order_by(Client.created_at.desc(), Client.client_id.desc())
             .offset(offset)
