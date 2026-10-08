@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
+from src.feat.sales_rep.api.sales_rep_schemas import UpdateSalesRepresentativeReq
 from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativeNotFoundException
@@ -11,7 +11,7 @@ from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativeNotFound
 class UpdateSalesRepresentativeDTO:
     actor_id: UUID
     sales_representative_id: UUID
-    payload: dict[str, Any]
+    payload: UpdateSalesRepresentativeReq
 
 
 class UpdateSalesRepresentativeUseCase:
@@ -35,7 +35,7 @@ class UpdateSalesRepresentativeUseCase:
 
             rep.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.sales_representatives.update(rep)

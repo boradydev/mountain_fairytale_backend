@@ -267,7 +267,7 @@ async def update_sales_representative(
         UpdateSalesRepresentativeDTO(
             actor_id=UUID(access_token_payload.employee_id),
             sales_representative_id=sales_representative_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 

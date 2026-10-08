@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
@@ -28,10 +28,10 @@ class CreateSalesRepresentativeReq(BaseSchema):
     commission_percent: Annotated[float, Field(ge=0, le=100)]
 
 
-class UpdateSalesRepresentativeReq(create_patch_schema_for_domain(
-    SalesRepresentative, 
-    exclude_fields={"sales_representative_id", "created_at"}
-)):
-    """
-    PATCH schema for SalesRepresentative.
-    """
+class UpdateSalesRepresentativeReq(BasePatchSchema):
+    __entity__ = SalesRepresentative
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    phone: str | None = Field(default=None, min_length=1, max_length=32)
+    commission_percent: float | None = Field(default=None, ge=0, le=100)
+    is_active: bool | None = None
