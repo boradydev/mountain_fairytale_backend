@@ -28,24 +28,23 @@ class ClientsRepository(IClientsRepository):
         await self._flush_with_constraint_handling(client)
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
+        phone = client.phone
+
         try:
             await self._session.flush()
         except IntegrityError as exc:
-            constraint_name = self._constraint_name(exc)
-            sqlstate = self._sqlstate(exc)
+            # Получаем код ошибки (работает как для asyncpg, так и для большинства других драйверов)
+            pgcode = getattr(exc.orig, "pgcode", None)
+            err_msg = str(exc.orig)
 
-            if (
-                sqlstate == pg_excs.UniqueViolationError.sqlstate
-                and constraint_name == Client.UQ_PHONE
-            ):
+            # 1. Проверка уникальности телефона
+            if pgcode == pg_excs.UniqueViolationError.sqlstate and client.UQ_PHONE in err_msg:
                 raise ClientPhoneAlreadyExistsException(
-                    phone=client.phone,
+                    phone=phone,
                 ) from exc
 
-            if (
-                sqlstate == pg_excs.ForeignKeyViolationError.sqlstate
-                and constraint_name == Client.FK_SALES_REPRESENTATIVE
-            ):
+            # 2. Проверка внешнего ключа торгового представителя
+            if pgcode == pg_excs.ForeignKeyViolationError.sqlstate and client.FK_SALES_REPRESENTATIVE in err_msg:
                 entity_id = client.sales_representative_id
                 if entity_id is not None:
                     raise ClientRelatedEntityNotFoundException(
@@ -53,10 +52,8 @@ class ClientsRepository(IClientsRepository):
                         entity_id=entity_id,
                     ) from exc
 
-            if (
-                sqlstate == pg_excs.ForeignKeyViolationError.sqlstate
-                and constraint_name == Client.FK_PAYMENT_METHOD
-            ):
+            # 3. Проверка внешнего ключа метода оплаты
+            if pgcode == pg_excs.ForeignKeyViolationError.sqlstate and client.FK_PAYMENT_METHOD in err_msg:
                 entity_id = client.default_payment_method_id
                 if entity_id is not None:
                     raise ClientRelatedEntityNotFoundException(
@@ -66,31 +63,9 @@ class ClientsRepository(IClientsRepository):
 
             raise
 
-    @staticmethod
-    def _constraint_name(exc: IntegrityError) -> str | None:
-        orig = exc.orig
-        constraint_name = getattr(orig, "constraint_name", None)
-        if constraint_name:
-            return str(constraint_name)
-
-        diagnostic = getattr(orig, "diag", None)
-        constraint_name = getattr(diagnostic, "constraint_name", None)
-        if constraint_name:
-            return str(constraint_name)
-
-        return None
-
-    @staticmethod
-    def _sqlstate(exc: IntegrityError) -> str | None:
-        orig = exc.orig
-        return getattr(orig, "sqlstate", getattr(orig, "pgcode", None))
 
     async def get_by_id(self, client_id: UUID) -> Client | None:
-        stmt = (
-            select(Client)
-            .options(joinedload(Client.sales_representative))
-            .where(Client.client_id == client_id)
-        )
+        stmt = select(Client).options(joinedload(Client.sales_representative)).where(Client.client_id == client_id)
         result = await self._session.execute(stmt)
         return result.unique().scalar_one_or_none()
 
@@ -152,15 +127,11 @@ class ClientsRepository(IClientsRepository):
         return result.unique().scalar_one_or_none()
 
     async def sales_representative_exists(self, entity_id: UUID) -> bool:
-        stmt = (
-            select(SalesRepresentative.sales_representative_id)
-            .where(SalesRepresentative.sales_representative_id == entity_id)
+        stmt = select(SalesRepresentative.sales_representative_id).where(
+            SalesRepresentative.sales_representative_id == entity_id
         )
         return (await self._session.execute(stmt)).scalar_one_or_none() is not None
 
     async def payment_method_exists(self, entity_id: UUID) -> bool:
-        stmt = (
-            select(PaymentMethod.payment_method_id)
-            .where(PaymentMethod.payment_method_id == entity_id)
-        )
+        stmt = select(PaymentMethod.payment_method_id).where(PaymentMethod.payment_method_id == entity_id)
         return (await self._session.execute(stmt)).scalar_one_or_none() is not None
