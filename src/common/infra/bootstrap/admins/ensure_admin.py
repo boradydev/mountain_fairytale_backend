@@ -21,6 +21,7 @@ async def ensure_admin(
             username=settings.ADMIN_USERNAME,
             password=settings.ADMIN_PASSWORD,
             role="admin",
+            commission_percent=0
         )
 
         use_case = CreateEmployeeUseCase(

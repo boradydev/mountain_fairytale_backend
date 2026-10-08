@@ -1,3 +1,6 @@
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 
 from src.core.uuid7 import uuid7
@@ -5,11 +8,10 @@ from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExistsException
 from src.feat.employees.infra.employee_repos import EmployeesRepository
 from tests.helpers import unique_username
-from collections.abc import AsyncGenerator
-from typing import Any
 
 
 PASSWORD_HASH = "test-password-hash"
+COMMISSION_PERCENT = 0.0
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +33,7 @@ async def test_add_and_get_by_id(postgres) -> None:
             username=unique_username(),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
 
         await repository.add(employee)
@@ -43,6 +46,7 @@ async def test_add_and_get_by_id(postgres) -> None:
         assert result.username == employee.username
         assert result.password_hash == PASSWORD_HASH
         assert result.role == "employee"
+        assert result.commission_percent == COMMISSION_PERCENT
         assert result.is_active is True
 
 
@@ -67,6 +71,7 @@ async def test_get_by_username(postgres) -> None:
             username=username,
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
 
         await repository.add(employee)
@@ -99,12 +104,14 @@ async def test_get_all_excludes_deactivated_by_default(postgres) -> None:
             username=unique_username("active"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         inactive = Employee.create(
             actor_id=uuid7(),
             username=unique_username("inactive"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         inactive.update(
             actor_id=uuid7(),
@@ -132,12 +139,14 @@ async def test_get_all_includes_deactivated_when_requested(postgres) -> None:
             username=unique_username("active"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         inactive = Employee.create(
             actor_id=uuid7(),
             username=unique_username("inactive"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         inactive.update(
             actor_id=uuid7(),
@@ -166,16 +175,19 @@ async def test_update_persists_changes(postgres) -> None:
             username=unique_username(),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
 
         await repository.add(employee)
         await session.commit()
 
         new_username = unique_username("updated")
+        new_commission_percent = 15.5
 
         employee.update(
             actor_id=uuid7(),
             username=new_username,
+            commission_percent=new_commission_percent,
         )
 
         await repository.update(employee)
@@ -185,6 +197,7 @@ async def test_update_persists_changes(postgres) -> None:
 
         assert result is not None
         assert result.username == new_username
+        assert result.commission_percent == new_commission_percent
         assert result.role == "employee"
 
 
@@ -200,12 +213,14 @@ async def test_add_duplicate_username_raises_exception(postgres) -> None:
             username=username,
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         second = Employee.create(
             actor_id=uuid7(),
             username=username,
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
 
         await repository.add(first)
@@ -227,12 +242,14 @@ async def test_update_duplicate_username_raises_exception(postgres) -> None:
             username=unique_username("first"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
         second = Employee.create(
             actor_id=uuid7(),
             username=unique_username("second"),
             password_hash=PASSWORD_HASH,
             role="employee",
+            commission_percent=COMMISSION_PERCENT,
         )
 
         await repository.add(first)

@@ -115,6 +115,7 @@ def employee_factory(
         username: str | None = None,
         password: str = "test_password",
         role: str = "employee",
+        commission_percent: float = 0.0,
         is_active: bool = True,
     ) -> EmployeeTestData:
         employee = Employee.create(
@@ -122,6 +123,7 @@ def employee_factory(
             username=username or unique_username(),
             password_hash=password_service.hash(password=password),
             role=role,
+            commission_percent=commission_percent,
         )
 
         if not is_active:

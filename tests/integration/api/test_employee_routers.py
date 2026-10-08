@@ -1,5 +1,5 @@
+import pytest
 from httpx import AsyncClient
-from uuid import UUID
 
 from tests.integration.conftest import EmployeeTestData
 from src.core.uuid7 import uuid7
@@ -11,17 +11,18 @@ BASE_PATH = "/admin/employees"
 
 class TestEmployeeRouters:
     """Интеграционные тесты API сотрудников.
-    
+
     Согласно контракту: доступ только для администраторов.
     """
 
     @staticmethod
-    async def login(client: AsyncClient, employee: EmployeeTestData):
+    async def login(client: AsyncClient, employee: EmployeeTestData) -> None:
         """Вспомогательный метод для авторизации."""
-        await client.post(
+        response = await client.post(
             "/public/auth/login",
             json={"username": employee.username, "password": employee.password},
         )
+        assert response.status_code == 200
 
     async def test_get_employees_filter_active(
         self,
@@ -33,13 +34,16 @@ class TestEmployeeRouters:
 
         # Создаем одного активного и одного деактивированного
         active_emp = await employee_factory(username=unique_username("active"))
-        inactive_emp = await employee_factory(username=unique_username("inactive"), is_active=False)
+        inactive_emp = await employee_factory(
+            username=unique_username("inactive"),
+            is_active=False,
+        )
 
         # По умолчанию include_deactivated=false
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
         data = response.json()["data"]["employees"]
-        
+
         emp_ids = [emp["employeeId"] for emp in data]
         assert str(active_emp.employee_id) in emp_ids
         assert str(inactive_emp.employee_id) not in emp_ids
@@ -53,12 +57,15 @@ class TestEmployeeRouters:
         await self.login(client, admin_employee)
 
         active_emp = await employee_factory(username=unique_username("active_all"))
-        inactive_emp = await employee_factory(username=unique_username("inactive_all"), is_active=False)
+        inactive_emp = await employee_factory(
+            username=unique_username("inactive_all"),
+            is_active=False,
+        )
 
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
         data = response.json()["data"]["employees"]
-        
+
         emp_ids = [emp["employeeId"] for emp in data]
         assert str(active_emp.employee_id) in emp_ids
         assert str(inactive_emp.employee_id) in emp_ids
@@ -70,18 +77,20 @@ class TestEmployeeRouters:
         employee_factory,
     ) -> None:
         await self.login(client, admin_employee)
-        
+
         # Тест для активного
         active_emp = await employee_factory()
         resp_active = await client.get(f"{BASE_PATH}/{active_emp.employee_id}")
         assert resp_active.status_code == 200
         assert resp_active.json()["data"]["employeeId"] == str(active_emp.employee_id)
+        assert resp_active.json()["data"]["commissionPercent"] == 0.0
 
         # Тест для деактивированного
         inactive_emp = await employee_factory(is_active=False)
         resp_inactive = await client.get(f"{BASE_PATH}/{inactive_emp.employee_id}")
         assert resp_inactive.status_code == 200
         assert resp_inactive.json()["data"]["employeeId"] == str(inactive_emp.employee_id)
+        assert resp_inactive.json()["data"]["commissionPercent"] == 0.0
 
     async def test_get_employee_not_found(
         self,
@@ -101,13 +110,15 @@ class TestEmployeeRouters:
 
         payload = {
             "username": unique_username("new_user"),
-            "password": "strong_password123"
+            "password": "strong_password123",
+            "commissionPercent": 12.5,
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         assert response.status_code == 201
-        
+
         data = response.json()["data"]
         assert data["username"] == payload["username"]
+        assert data["commissionPercent"] == payload["commissionPercent"]
         assert data["isActive"] is True
         assert "employeeId" in data
 
@@ -115,6 +126,7 @@ class TestEmployeeRouters:
         get_resp = await client.get(f"{BASE_PATH}/{data['employeeId']}")
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["username"] == payload["username"]
+        assert get_resp.json()["data"]["commissionPercent"] == payload["commissionPercent"]
 
     async def test_create_employee_empty_password(
         self,
@@ -125,11 +137,44 @@ class TestEmployeeRouters:
 
         payload = {
             "username": unique_username("empty_pass"),
-            "password": ""
+            "password": "",
+            "commissionPercent": 0.0,
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         assert response.status_code == 201
         assert response.json()["data"]["username"] == payload["username"]
+        assert response.json()["data"]["commissionPercent"] == payload["commissionPercent"]
+
+    async def test_create_employee_without_commission_percent(
+        self,
+        client: AsyncClient,
+        admin_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, admin_employee)
+
+        payload = {
+            "username": unique_username("missing_commission"),
+            "password": "strong_password123",
+        }
+        response = await client.post(f"{BASE_PATH}/create", json=payload)
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize("commission_percent", [-0.01, 100.01])
+    async def test_create_employee_commission_percent_out_of_range(
+        self,
+        commission_percent: float,
+        client: AsyncClient,
+        admin_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, admin_employee)
+
+        payload = {
+            "username": unique_username("invalid_commission"),
+            "password": "strong_password123",
+            "commissionPercent": commission_percent,
+        }
+        response = await client.post(f"{BASE_PATH}/create", json=payload)
+        assert response.status_code == 422
 
     async def test_update_employee_username(
         self,
@@ -144,6 +189,41 @@ class TestEmployeeRouters:
         response = await client.patch(f"{BASE_PATH}/{emp.employee_id}", json=payload)
         assert response.status_code == 200
         assert response.json()["data"]["username"] == payload["username"]
+
+    async def test_update_employee_commission_percent(
+        self,
+        client: AsyncClient,
+        admin_employee: EmployeeTestData,
+        employee_factory,
+    ) -> None:
+        await self.login(client, admin_employee)
+        emp = await employee_factory(commission_percent=10.0)
+
+        payload = {"commissionPercent": 25.5}
+        response = await client.patch(f"{BASE_PATH}/{emp.employee_id}", json=payload)
+        assert response.status_code == 200
+        assert response.json()["data"]["commissionPercent"] == payload["commissionPercent"]
+
+        get_response = await client.get(f"{BASE_PATH}/{emp.employee_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["data"]["commissionPercent"] == payload["commissionPercent"]
+
+    @pytest.mark.parametrize("commission_percent", [-0.01, 100.01])
+    async def test_update_employee_commission_percent_out_of_range(
+        self,
+        commission_percent: float,
+        client: AsyncClient,
+        admin_employee: EmployeeTestData,
+        employee_factory,
+    ) -> None:
+        await self.login(client, admin_employee)
+        emp = await employee_factory()
+
+        response = await client.patch(
+            f"{BASE_PATH}/{emp.employee_id}",
+            json={"commissionPercent": commission_percent},
+        )
+        assert response.status_code == 422
 
     async def test_update_employee_activation_cycle(
         self,
@@ -207,9 +287,10 @@ class TestEmployeeRouters:
         # Проверяем, что остальные поля не изменились
         after_resp = await client.get(f"{BASE_PATH}/{emp.employee_id}")
         after_data = after_resp.json()["data"]
-        
+
         assert after_data["username"] == before_data["username"]
         assert after_data["role"] == before_data["role"]
+        assert after_data["commissionPercent"] == before_data["commissionPercent"]
         assert after_data["isActive"] == before_data["isActive"]
         assert after_data["employeeId"] == before_data["employeeId"]
 
@@ -255,7 +336,8 @@ class TestEmployeeRouters:
         await self.login(client, active_employee)
         payload = {
             "username": unique_username("forbidden_user"),
-            "password": "password123"
+            "password": "password123",
+            "commissionPercent": 10.0,
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
         assert response.status_code == 403
@@ -269,6 +351,9 @@ class TestEmployeeRouters:
         """Проверка, что обычный сотрудник не может обновлять данные других."""
         await self.login(client, active_employee)
         emp = await employee_factory()
-        
-        response = await client.patch(f"{BASE_PATH}/{emp.employee_id}", json={"username": "new_name"})
+
+        response = await client.patch(
+            f"{BASE_PATH}/{emp.employee_id}",
+            json={"username": "new_name"},
+        )
         assert response.status_code == 403

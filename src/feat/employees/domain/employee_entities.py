@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text, UniqueConstraint
+from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.uuid7 import uuid7
@@ -24,12 +24,13 @@ class Employee(BaseEntity):
 
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text)
+    commission_percent: Mapped[float] = mapped_column(Float)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
-
     _ALLOWED_UPDATE_FIELDS = {
         "username",
+        "commission_percent",
         "is_active",
     }
 
@@ -40,12 +41,14 @@ class Employee(BaseEntity):
         username: str,
         password_hash: str,
         role: str,
+        commission_percent: float,
     ) -> Self:
         employee = cls(
             employee_id=uuid7(),
             username=username,
             password_hash=password_hash,
             role=role,
+            commission_percent=commission_percent,
             is_active=True,
             created_at=datetime.now(),
         )

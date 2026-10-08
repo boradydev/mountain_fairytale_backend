@@ -13,6 +13,7 @@ class EmployeeResp(BaseSchema):
     employee_id: UUID
     username: str
     role: str
+    commission_percent: float
     is_active: bool
     created_at: datetime
 
@@ -24,12 +25,14 @@ class EmployeesResp(BaseSchema):
 class CreateEmployeeReq(BaseSchema):
     username: Annotated[str, Field(min_length=1, max_length=50)]
     password: Annotated[str, Field(min_length=0, max_length=50)]
+    commission_percent: Annotated[float, Field(ge=0, le=100)]
 
 
 class UpdateEmployeeReq(BasePatchSchema):
     __entity__ = Employee
 
     username: str | None = Field(default=None, min_length=1, max_length=50)
+    commission_percent: float | None = Field(default=None, ge=0, le=100)
     is_active: bool | None = None
 
 
