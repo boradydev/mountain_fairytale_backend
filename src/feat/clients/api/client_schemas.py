@@ -14,13 +14,18 @@ class ClientResp(BaseSchema):
     name: str
     phone: str
     address: str
+    sleeping_threshold_days: int
+
     last_delivery_date: datetime | None
     last_delivery_quantity: int | None
     cooldown_until: datetime | None
-    sleeping_threshold_days: int
+
     sales_representative_id: UUID | None
     sales_representative_name: str | None
+
     default_payment_method_id: UUID | None
+    default_payment_method_name: str | None
+
     created_at: datetime
     is_active: bool
 
