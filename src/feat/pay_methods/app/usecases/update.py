@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
+from src.feat.pay_methods.api.pay_method_schemas import UpdatePaymentMethodReq
 from src.feat.pay_methods.app.abcs.pay_method_uow_abcs import IPaymentMethodsUOW
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNotFoundException
@@ -11,7 +11,7 @@ from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNotFoundExc
 class UpdatePaymentMethodDTO:
     actor_id: UUID
     payment_method_id: UUID
-    payload: dict[str, Any]
+    payload: UpdatePaymentMethodReq
 
 
 class UpdatePaymentMethodUseCase:
@@ -33,7 +33,7 @@ class UpdatePaymentMethodUseCase:
 
             payment_method.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.payment_methods.update(payment_method)

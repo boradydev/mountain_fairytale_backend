@@ -262,7 +262,7 @@ async def update_payment_method(
         UpdatePaymentMethodDTO(
             actor_id=UUID(access_token_payload.employee_id),
             payment_method_id=payment_method_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 

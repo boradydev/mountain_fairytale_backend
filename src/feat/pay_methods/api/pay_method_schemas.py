@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 
@@ -24,10 +24,8 @@ class CreatePaymentMethodReq(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=120)]
 
 
-class UpdatePaymentMethodReq(create_patch_schema_for_domain(
-    PaymentMethod, 
-    exclude_fields={"payment_method_id", "created_at"}
-)):
-    """
-    PATCH schema for PaymentMethod.
-    """
+class UpdatePaymentMethodReq(BasePatchSchema):
+    __entity__ = PaymentMethod
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    is_active: bool | None = None
