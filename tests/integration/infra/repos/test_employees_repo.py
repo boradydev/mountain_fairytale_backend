@@ -5,9 +5,20 @@ from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExistsException
 from src.feat.employees.infra.employee_repos import EmployeesRepository
 from tests.helpers import unique_username
+from collections.abc import AsyncGenerator
+from typing import Any
 
 
 PASSWORD_HASH = "test-password-hash"
+
+
+@pytest.fixture(autouse=True)
+async def clean_employees_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу сотрудников перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE employees RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

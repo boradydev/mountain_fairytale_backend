@@ -1,3 +1,6 @@
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 
 from src.core.uuid7 import uuid7
@@ -5,6 +8,15 @@ from src.feat.cars.domain.car_entities import Car
 from src.feat.cars.domain.car_excs import CarNumberAlreadyExistsException
 from src.feat.cars.infra.car_repos import CarsRepository
 from tests.helpers import unique_car_number
+
+
+@pytest.fixture(autouse=True)
+async def clean_cars_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу машин перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE cars RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

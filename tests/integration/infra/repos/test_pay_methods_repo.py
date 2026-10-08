@@ -1,9 +1,21 @@
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 
 from src.core.uuid7 import uuid7
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNameAlreadyExistsException
 from src.feat.pay_methods.infra.pay_method_repos import PaymentMethodsRepository
+
+
+@pytest.fixture(autouse=True)
+async def clean_payment_methods_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу событий перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE payment_methods RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

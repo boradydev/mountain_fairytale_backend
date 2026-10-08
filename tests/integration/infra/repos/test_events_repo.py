@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 
 import pytest
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from src.common.domain.event_record import EventRecord
 from src.common.infra.db.postgres.repos.events.repo import EventsRepository
@@ -15,6 +17,15 @@ def make_event(index: int, created_at: datetime | None = None) -> EventRecord:
         created_at=created_at or datetime.now(),
         payload={"index": index},
     )
+
+
+@pytest.fixture(autouse=True)
+async def clean_events_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу событий перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE events RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

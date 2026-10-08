@@ -5,6 +5,17 @@ from src.feat.products.domain.product_entities import Product
 from src.feat.products.domain.product_excs import ProductNameAlreadyExistsException
 from src.feat.products.infra.product_repos import ProductsRepository
 from tests.helpers import unique_product_name
+from collections.abc import AsyncGenerator
+from typing import Any
+
+
+@pytest.fixture(autouse=True)
+async def clean_products_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу продуктов перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE products RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

@@ -3,6 +3,17 @@ import pytest
 from src.core.uuid7 import uuid7
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.drivers.infra.driver_repos import DriversRepository
+from collections.abc import AsyncGenerator
+from typing import Any
+
+
+@pytest.fixture(autouse=True)
+async def clean_drivers_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу водителей перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE drivers RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration

@@ -5,6 +5,8 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativePhoneAlreadyExistsException
 from src.feat.sales_rep.infra.sales_rep_repos import SalesRepresentativesRepository
 from tests.helpers import unique_phone
+from collections.abc import AsyncGenerator
+from typing import Any
 
 
 def make_sales_rep(
@@ -19,6 +21,15 @@ def make_sales_rep(
         phone=phone or unique_phone(),
         commission_percent=commission_percent,
     )
+
+
+@pytest.fixture(autouse=True)
+async def clean_sales_rep_table(postgres) -> AsyncGenerator[None, Any]:
+    """Автоматически очищает таблицу торговых представителей перед каждым тестом в модуле."""
+    await postgres.execute("TRUNCATE TABLE sales_representatives RESTART IDENTITY CASCADE;")
+
+    yield
+    pass
 
 
 @pytest.mark.integration
