@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.cars.domain.car_entities import Car
 
@@ -26,9 +26,10 @@ class CreateCarReq(BaseSchema):
     current_mileage: Annotated[float, Field(ge=0)] = 0
 
 
-class UpdateCarReq(create_patch_schema_for_domain(Car)):
-    """
-    PATCH schema for Car.
-    Allowed fields: model, number, current_mileage, is_active.
-    All fields are optional, but non-nullable.
-    """
+class UpdateCarReq(BasePatchSchema):
+    __entity__ = Car
+
+    model: str | None = Field(default=None, min_length=1, max_length=100)
+    number: str | None = Field(default=None, min_length=1, max_length=30)
+    current_mileage: float | None = Field(default=None, ge=0)
+    is_active: bool | None = None

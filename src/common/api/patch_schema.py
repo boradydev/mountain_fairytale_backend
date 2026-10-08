@@ -1,123 +1,126 @@
 import types
-from typing import Any, Union, get_args, get_origin, get_type_hints
+from typing import Any, ClassVar, Union, get_args, get_origin
 
-from pydantic import Field, create_model, model_validator
-from sqlalchemy.orm import Mapped
+from pydantic import model_validator
+from sqlalchemy import inspect
 
 from src.common.api.schemas import BaseSchema
 
 
-_PATCH_NULLABLE_MARKER = "patch_nullable"
-
-
-class StrictPatchModel(BaseSchema):
+class BasePatchSchema(BaseSchema):
     """
-    Базовая модель для PATCH-схем.
+    Базовая схема для PATCH-запросов.
 
-    Поля PATCH-схемы всегда необязательны:
-    отсутствие поля означает «не изменять значение».
+    Все поля PATCH-схемы должны быть объявлены явно.
 
-    Явный `null` разрешён только для nullable-полей.
+    Правила:
+    - отсутствие поля означает «не изменять»;
+    - пустой объект запрещён;
+    - `null` разрешён только для nullable-полей сущности;
+    - поля должны существовать в SQLAlchemy-сущности;
+    - поля должны входить в `_ALLOWED_UPDATE_FIELDS`.
     """
+
+    __entity__: ClassVar[type[Any] | None] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_not_empty(cls, data: Any) -> Any:
+        if isinstance(data, dict) and not data:
+            raise ValueError("Request body cannot be empty.")
+
+        return data
 
     @model_validator(mode="before")
     @classmethod
     def validate_explicit_nulls(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
+        if not isinstance(data, dict) or cls.__entity__ is None:
             return data
 
-        for field_name, field_info in cls.model_fields.items():
+        mapper = inspect(cls.__entity__)
+
+        for field_name in cls.model_fields:
             if field_name not in data or data[field_name] is not None:
                 continue
 
-            extra = field_info.json_schema_extra or {}
+            column = mapper.columns.get(field_name)
 
-            if extra.get(_PATCH_NULLABLE_MARKER) is False:
+            if column is None:
+                continue
+
+            if not column.nullable:
                 raise ValueError(
                     f"Field '{field_name}' cannot be null.",
                 )
 
         return data
 
-    @model_validator(mode="before")
     @classmethod
-    def validate_not_empty(cls, data: Any) -> Any:
-        """Проверяет, что в PATCH-запросе передано хотя бы одно поле."""
-        if isinstance(data, dict) and not data:
-            raise ValueError("Request body cannot be empty.")
-        return data
+    def __pydantic_on_complete__(cls) -> None:
+        super().__pydantic_on_complete__()
+
+        if cls.__entity__ is None:
+            return
+
+        cls._validate_entity_contract()
+
+    @classmethod
+    def _validate_entity_contract(cls) -> None:
+        entity = cls.__entity__
+
+        if entity is None:
+            return
+
+        mapper = inspect(entity)
+
+        allowed_fields = getattr(
+            entity,
+            "_ALLOWED_UPDATE_FIELDS",
+            set(),
+        )
+
+        entity_fields = {
+            column.key
+            for column in mapper.columns
+        }
+
+        schema_fields = set(cls.model_fields)
+
+        unknown_fields = schema_fields - entity_fields
+
+        if unknown_fields:
+            fields = ", ".join(sorted(unknown_fields))
+            raise AttributeError(
+                f"{cls.__name__}: fields do not exist "
+                f"in {entity.__name__}: {fields}",
+            )
+
+        forbidden_fields = schema_fields - allowed_fields
+
+        if forbidden_fields:
+            fields = ", ".join(sorted(forbidden_fields))
+            raise AttributeError(
+                f"{cls.__name__}: fields are not allowed "
+                f"for update in {entity.__name__}: {fields}",
+            )
+
+        for field_name, field_info in cls.model_fields.items():
+            if not _is_nullable(field_info.annotation):
+                raise TypeError(
+                    f"{cls.__name__}.{field_name} must allow None "
+                    "because PATCH fields must distinguish "
+                    "an omitted field from an explicit null.",
+                )
+
+    def changes(self) -> dict[str, Any]:
+        """Возвращает только поля, переданные в PATCH-запросе."""
+        return self.model_dump(exclude_unset=True)
 
 
 def _is_nullable(annotation: Any) -> bool:
-    """Возвращает True, если тип допускает None."""
     origin = get_origin(annotation)
 
     if origin not in (Union, types.UnionType):
         return False
 
     return type(None) in get_args(annotation)
-
-
-def _make_optional(annotation: Any) -> Any:
-    """Делает тип необязательным для PATCH."""
-    if _is_nullable(annotation):
-        return annotation
-
-    return annotation | None
-
-
-def _unwrap_mapped(annotation: Any) -> Any:
-    """Извлекает Python-тип из SQLAlchemy Mapped[T]."""
-    if get_origin(annotation) is Mapped:
-        return get_args(annotation)[0]
-
-    return annotation
-
-
-def create_patch_schema_for_domain(
-    entity_cls: type[Any],
-    *,
-    exclude_fields: set[str] = None,
-) -> type[BaseSchema]:
-    """
-    Создаёт PATCH-схему на основе SQLAlchemy-модели.
-
-    `_ALLOWED_UPDATE_FIELDS` определяет поля,
-    которые разрешено изменять.
-    """
-    fields_spec: dict[str, Any] = {}
-    exclude_fields = exclude_fields or set()
-
-    allowed_fields = getattr(
-        entity_cls,
-        "_ALLOWED_UPDATE_FIELDS",
-        set(),
-    )
-
-    annotations = get_type_hints(entity_cls)
-
-    for field_name in allowed_fields:
-        if field_name not in annotations or field_name in exclude_fields:
-            continue
-
-        domain_type = _unwrap_mapped(
-            annotations[field_name],
-        )
-
-        nullable = _is_nullable(domain_type)
-
-        fields_spec[field_name] = (
-            _make_optional(domain_type),
-            Field(
-                default=None,
-                json_schema_extra={
-                    _PATCH_NULLABLE_MARKER: nullable,
-                },
-            ),
-        )
-
-    return create_model(
-        f"{entity_cls.__name__}PatchReq",
-        __base__=StrictPatchModel,
-        **fields_spec,
-    )

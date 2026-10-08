@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from src.feat.cars.api.car_schemas import UpdateCarReq
 from src.feat.cars.app.abcs.car_uow_abcs import ICarsUOW
 from src.feat.cars.domain.car_excs import CarNotFoundException
 from src.feat.cars.domain.car_entities import Car
@@ -11,7 +12,7 @@ from src.feat.cars.domain.car_entities import Car
 class UpdateCarDTO:
     actor_id: UUID
     car_id: UUID
-    payload: dict[str, Any]
+    payload: UpdateCarReq
 
 
 class UpdateCarUseCase:
@@ -35,7 +36,7 @@ class UpdateCarUseCase:
 
             car.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.cars.update(car)

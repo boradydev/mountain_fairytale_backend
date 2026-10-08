@@ -33,7 +33,7 @@ class BaseEntity(BaseModel):
         changes: dict[str, FieldChange] = {}
 
         for key, new_value in payload.items():
-            if key not in allowed_fields or new_value is None:
+            if key not in allowed_fields:
                 continue
 
             current_value = getattr(self, key)

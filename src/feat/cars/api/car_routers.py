@@ -4,12 +4,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Path, Query, status
 
-from src.feat.cars.api.car_schemas import (
-    CarResp,
-    CarsResp,
-    CreateCarReq,
-    UpdateCarReq,
-)
 from src.common.api.api_excs import UnauthorizedException
 from src.common.api.deps import (
     AccessTokenPayloadDep,
@@ -17,12 +11,19 @@ from src.common.api.deps import (
 )
 from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
+from src.feat.cars.api.car_schemas import (
+    CarResp,
+    CarsResp,
+    CreateCarReq,
+    UpdateCarReq,
+)
 from src.feat.cars.app.usecases.check_duplicate import CheckCarDuplicateDTO
 from src.feat.cars.app.usecases.create import CreateCarDTO
 from src.feat.cars.app.usecases.get import GetCarDTO
 from src.feat.cars.app.usecases.get_all import GetCarsDTO
 from src.feat.cars.app.usecases.update import UpdateCarDTO
 from src.feat.cars.domain import car_excs
+
 
 """
 API CONTRACT — CARS
@@ -110,9 +111,7 @@ async def get_cars(
     ctx: Context,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[CarsResp]:
-    cars = await ctx.cars_use_cases.get_cars().execute(
-        GetCarsDTO(include_deactivated=include_deactivated)
-    )
+    cars = await ctx.cars_use_cases.get_cars().execute(GetCarsDTO(include_deactivated=include_deactivated))
 
     return StdResponse(
         data=CarsResp(
@@ -311,7 +310,7 @@ async def update_car(
         UpdateCarDTO(
             actor_id=UUID(access_token_payload.employee_id),
             car_id=car_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 
