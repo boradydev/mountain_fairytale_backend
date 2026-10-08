@@ -193,15 +193,20 @@ async def test_update_duplicate_name_raises_exception(postgres) -> None:
         await repository.add(second)
         await session.commit()
 
+        # Сохраняем имя в обычную Python-строку ДО того, как упадет база данных.
+        # Это защитит нас от PendingRollbackError при финальной проверке.
+        expected_name = second.name
+
         first.update(
             actor_id=uuid7(),
-            name=second.name,
+            name=expected_name,
         )
 
         with pytest.raises(ProductNameAlreadyExistsException) as exc_info:
             await repository.update(first)
 
-        assert exc_info.value.name == second.name
+        # Сравниваем с сохраненной чистой строкой, не трогая заблокированный объект `second`
+        assert exc_info.value.name == expected_name
 
 
 @pytest.mark.integration

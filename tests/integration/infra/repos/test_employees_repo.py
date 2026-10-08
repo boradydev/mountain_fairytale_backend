@@ -244,7 +244,9 @@ async def test_update_duplicate_username_raises_exception(postgres) -> None:
             username=second.username,
         )
 
+        expected_username = second.username
+
         with pytest.raises(EmployeeUsernameAlreadyExistsException) as exc_info:
             await repository.update(first)
 
-        assert exc_info.value.username == second.username
+        assert exc_info.value.username == expected_username

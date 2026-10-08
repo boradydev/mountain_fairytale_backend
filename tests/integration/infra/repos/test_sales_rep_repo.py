@@ -218,10 +218,12 @@ async def test_update_duplicate_phone_raises_exception(postgres) -> None:
             phone=second.phone,
         )
 
+        expected_phone = second.phone
+
         with pytest.raises(SalesRepresentativePhoneAlreadyExistsException) as exc_info:
             await repository.update(first)
 
-        assert exc_info.value.phone == second.phone
+        assert exc_info.value.phone == expected_phone
 
 
 @pytest.mark.integration
