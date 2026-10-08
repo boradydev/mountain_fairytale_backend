@@ -4,9 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
 from src.common.api.schemas import BaseSchema
-from src.feat.clients.domain.client_entities import Client
 
 
 class ClientResp(BaseSchema):
@@ -37,12 +35,3 @@ class CreateClientReq(BaseSchema):
     sleeping_threshold_days: Annotated[int, Field(ge=0, le=3650)]
     sales_representative_id: UUID | None = None
     default_payment_method_id: UUID | None = None
-
-
-class UpdateClientReq(create_patch_schema_for_domain(
-    Client, 
-    exclude_fields={"client_id", "created_at", "last_delivery_date", "last_delivery_quantity", "sales_representative_name"}
-)):
-    """
-    PATCH schema for Client.
-    """
