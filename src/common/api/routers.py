@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 
+from src.common.api.deps import verify_access_token, verify_admin_access
 from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
-from src.common.api.deps import verify_access_token, verify_admin_access
+from src.feat.clients.api.client_routers import clients_router
 from src.feat.drivers.api.driver_routers import drivers_router
 from src.feat.employees.api.employee_routers import employees_router
 from src.feat.me.me_routers import me_router
@@ -11,20 +12,17 @@ from src.feat.products.api.product_routers import products_router
 from src.feat.sales_rep.api.sales_rep_routers import sales_representatives_router
 
 
-public = APIRouter(
-    prefix="/public",
-)
-
+public = APIRouter(prefix="/public")
 public.include_router(auth_router)
 
 
 protected = APIRouter(
     prefix="/protected",
-    dependencies=[Depends(verify_access_token)]
+    dependencies=[Depends(verify_access_token)],
 )
-
 protected.include_router(me_router)
 protected.include_router(cars_router)
+protected.include_router(clients_router)
 protected.include_router(drivers_router)
 protected.include_router(payment_methods_router)
 protected.include_router(products_router)
@@ -33,7 +31,6 @@ protected.include_router(sales_representatives_router)
 
 admin = APIRouter(
     prefix="/admin",
-    dependencies=[Depends(verify_admin_access)]
+    dependencies=[Depends(verify_admin_access)],
 )
-
 admin.include_router(employees_router)

@@ -9,145 +9,92 @@ AI Note:
 """
 
 from collections.abc import Mapping
+from types import MappingProxyType
 
-from src.common.infra.services.token.excs import InvalidRefreshTokenException
-from src.feat.auth.domain.auth_excs import InvalidCredentialsException, AuthEmployeeNotFoundByUsernameException, \
-    AuthEmployeeDeactivateException, AuthEmployeeNotFoundException
-from src.feat.clients.domain.client_excs import ClientNotFoundException, ClientDomainUpdateException
-from src.feat.drivers.domain.driver_excs import DriverNotFoundException, DriverDomainUpdateException
-from src.feat.employees.domain.employee_excs import EmployeeNotFoundByUsernameException, EmployeeNotFoundException, \
-    EmployeeDeactivateException, EmployeeDomainUpdateException, EmployeeUsernameAlreadyExistsException
-from src.feat.pay_methods.domain.pay_method_excs import PaymentMethodNotFoundException, \
-    PaymentMethodDomainUpdateException, PaymentMethodNameAlreadyExistsException
-from src.feat.products.domain.product_excs import ProductNotFoundException, ProductDomainUpdateException, \
-    ProductNameAlreadyExistsException
-from src.feat.sales_rep.domain.sales_rep_excs import SalesRepresentativeNotFoundException, \
-    SalesRepresentativePhoneAlreadyExistsException, SalesRepresentativeDomainUpdateException
-from types import MappingProxyType # noqa
-
-from src.common.api.api_excs import RefreshTokenNotFoundException, UnauthorizedException, ForbiddenException
+from src.common.api.api_excs import (
+    ForbiddenException,
+    RefreshTokenNotFoundException,
+    UnauthorizedException,
+)
 from src.common.api.types import Resp
+from src.common.infra.services.token.excs import InvalidRefreshTokenException
 from src.core.excs import BaseAppException
+from src.feat.auth.domain.auth_excs import (
+    AuthEmployeeDeactivateException,
+    AuthEmployeeNotFoundByUsernameException,
+    AuthEmployeeNotFoundException,
+    InvalidCredentialsException,
+)
 from src.feat.cars.domain.car_excs import (
+    CarAlreadyActivateException,
     CarNotFoundException,
     CarNumberAlreadyExistsException,
-    CarAlreadyActivateException,
+)
+from src.feat.clients.domain.client_excs import (
+    ClientDomainUpdateException,
+    ClientNotFoundException,
+    ClientPhoneAlreadyExistsException,
+    ClientRelatedEntityNotFoundException,
+)
+from src.feat.drivers.domain.driver_excs import (
+    DriverDomainUpdateException,
+    DriverNotFoundException,
+)
+from src.feat.employees.domain.employee_excs import (
+    EmployeeDeactivateException,
+    EmployeeDomainUpdateException,
+    EmployeeNotFoundByUsernameException,
+    EmployeeNotFoundException,
+    EmployeeUsernameAlreadyExistsException,
+)
+from src.feat.pay_methods.domain.pay_method_excs import (
+    PaymentMethodDomainUpdateException,
+    PaymentMethodNameAlreadyExistsException,
+    PaymentMethodNotFoundException,
+)
+from src.feat.products.domain.product_excs import (
+    ProductDomainUpdateException,
+    ProductNameAlreadyExistsException,
+    ProductNotFoundException,
+)
+from src.feat.sales_rep.domain.sales_rep_excs import (
+    SalesRepresentativeDomainUpdateException,
+    SalesRepresentativeNotFoundException,
+    SalesRepresentativePhoneAlreadyExistsException,
 )
 
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
-    # AI Note: Не объединять исключения из auth_excs и employee_excs.
-    # Разные доменные области -> разные HTTP-ответы (например, 401 vs 404)
-    # для защиты от перебора пользователей (User Enumeration).
     {
-        InvalidCredentialsException: Resp(
-            status_code=401,
-            detail="Invalid credentials",
-        ),
-        UnauthorizedException: Resp(
-            status_code=401,
-            detail="Unauthorized",
-        ),
-        ForbiddenException: Resp(
-            status_code=403,
-            detail="Forbidden",
-        ),
-        EmployeeNotFoundByUsernameException: Resp(
-            status_code=404,
-            detail="Employee not found",
-        ),
-        EmployeeNotFoundException: Resp(
-            status_code=404,
-            detail="Employee not found",
-        ),
-        CarNotFoundException: Resp(
-            status_code=404,
-            detail="Car not found",
-        ),
-        CarNumberAlreadyExistsException: Resp(
-            status_code=409,
-            detail="Car number already exists",
-        ),
-        CarAlreadyActivateException: Resp(
-            status_code=409,
-            detail="Car is already active",
-        ),
-        RefreshTokenNotFoundException: Resp(
-            status_code=401,
-            detail="Refresh token not found",
-        ),
-        EmployeeDeactivateException: Resp(
-            status_code=403,
-            detail="Employee account is deactivated",
-        ),
-        AuthEmployeeNotFoundByUsernameException: Resp(
-            status_code=401,
-            detail="Invalid credentials",
-        ),
-        AuthEmployeeDeactivateException: Resp(
-            status_code=403,
-            detail="Employee account is deactivated",
-        ),
-        AuthEmployeeNotFoundException: Resp(
-            status_code=401,
-            detail="Invalid credentials",
-        ),
-        InvalidRefreshTokenException: Resp(
-            status_code=401,
-            detail="Invalid credentials",
-        ),
-        EmployeeDomainUpdateException: Resp(
-            status_code=422,
-            detail="Employee domain update error",
-        ),
-        EmployeeUsernameAlreadyExistsException: Resp(
-            status_code=409,
-            detail="Employee username already exists",
-        ),
-        ClientNotFoundException: Resp(
-            status_code=404,
-            detail="Client not found",
-        ),
-        ClientDomainUpdateException: Resp(
-            status_code=422,
-            detail="Client domain update error",
-        ),
-        DriverNotFoundException: Resp(
-            status_code=404,
-            detail="Driver not found",
-        ),
-        DriverDomainUpdateException: Resp(
-            status_code=422,
-            detail="Driver domain update error",
-        ),
-        PaymentMethodNotFoundException: Resp(
-            status_code=404,
-            detail="Payment method not found",
-        ),
-        PaymentMethodDomainUpdateException: Resp(
-            status_code=422,
-            detail="Payment method domain update error",
-        ),
-        PaymentMethodNameAlreadyExistsException: Resp(
-            status_code=409,
-            detail="Payment method name already exists",
-        ),
-        ProductNotFoundException: Resp(
-            status_code=404,
-            detail="Product not found",
-        ),
-        ProductDomainUpdateException: Resp(
-            status_code=422,
-            detail="Product domain update error",
-        ),
-        ProductNameAlreadyExistsException: Resp(
-            status_code=409,
-            detail="Product name already exists",
-        ),
-        SalesRepresentativeNotFoundException: Resp(
-            status_code=404,
-            detail="Sales representative not found",
-        ),
+        InvalidCredentialsException: Resp(status_code=401, detail="Invalid credentials"),
+        UnauthorizedException: Resp(status_code=401, detail="Unauthorized"),
+        ForbiddenException: Resp(status_code=403, detail="Forbidden"),
+        EmployeeNotFoundByUsernameException: Resp(status_code=404, detail="Employee not found"),
+        EmployeeNotFoundException: Resp(status_code=404, detail="Employee not found"),
+        CarNotFoundException: Resp(status_code=404, detail="Car not found"),
+        CarNumberAlreadyExistsException: Resp(status_code=409, detail="Car number already exists"),
+        CarAlreadyActivateException: Resp(status_code=409, detail="Car is already active"),
+        RefreshTokenNotFoundException: Resp(status_code=401, detail="Refresh token not found"),
+        EmployeeDeactivateException: Resp(status_code=403, detail="Employee account is deactivated"),
+        AuthEmployeeNotFoundByUsernameException: Resp(status_code=401, detail="Invalid credentials"),
+        AuthEmployeeDeactivateException: Resp(status_code=403, detail="Employee account is deactivated"),
+        AuthEmployeeNotFoundException: Resp(status_code=401, detail="Invalid credentials"),
+        InvalidRefreshTokenException: Resp(status_code=401, detail="Invalid credentials"),
+        EmployeeDomainUpdateException: Resp(status_code=422, detail="Employee domain update error"),
+        EmployeeUsernameAlreadyExistsException: Resp(status_code=409, detail="Employee username already exists"),
+        ClientNotFoundException: Resp(status_code=404, detail="Client not found"),
+        ClientDomainUpdateException: Resp(status_code=422, detail="Client domain update error"),
+        ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),
+        ClientRelatedEntityNotFoundException: Resp(status_code=422, detail="Client related entity not found"),
+        DriverNotFoundException: Resp(status_code=404, detail="Driver not found"),
+        DriverDomainUpdateException: Resp(status_code=422, detail="Driver domain update error"),
+        PaymentMethodNotFoundException: Resp(status_code=404, detail="Payment method not found"),
+        PaymentMethodDomainUpdateException: Resp(status_code=422, detail="Payment method domain update error"),
+        PaymentMethodNameAlreadyExistsException: Resp(status_code=409, detail="Payment method name already exists"),
+        ProductNotFoundException: Resp(status_code=404, detail="Product not found"),
+        ProductDomainUpdateException: Resp(status_code=422, detail="Product domain update error"),
+        ProductNameAlreadyExistsException: Resp(status_code=409, detail="Product name already exists"),
+        SalesRepresentativeNotFoundException: Resp(status_code=404, detail="Sales representative not found"),
         SalesRepresentativeDomainUpdateException: Resp(
             status_code=422,
             detail="Sales representative domain update error",

@@ -6,15 +6,17 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from src.core.uuid7 import uuid7
 
-from src.feat.employees.domain.employee_entities import Employee
-from src.feat.cars.domain.car_entities import Car
 from src.common.infra.db.postgres.database import Postgres
-from src.feat.employees.infra.employee_uow import EmployeesUOW
-from src.feat.cars.infra.car_uow import CarsUOW
 from src.common.infra.services.password_service import PasswordService
-from tests.helpers import unique_username, unique_car_number
+from src.core.uuid7 import uuid7
+from src.feat.cars.domain.car_entities import Car
+from src.feat.cars.infra.car_uow import CarsUOW
+from src.feat.clients.domain.client_entities import Client
+from src.feat.clients.infra.client_uow import ClientsUOW
+from src.feat.employees.domain.employee_entities import Employee
+from src.feat.employees.infra.employee_uow import EmployeesUOW
+from tests.helpers import unique_car_number, unique_username
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +58,33 @@ class CarTestData:
         return self.car.is_active
 
 
+@dataclass(frozen=True, slots=True)
+class ClientTestData:
+    """Данные клиента, подготовленного для интеграционного теста."""
+
+    client: Client
+
+    @property
+    def client_id(self) -> UUID:
+        return self.client.client_id
+
+    @property
+    def name(self) -> str:
+        return self.client.name
+
+    @property
+    def phone(self) -> str:
+        return self.client.phone
+
+    @property
+    def address(self) -> str:
+        return self.client.address
+
+    @property
+    def is_active(self) -> bool:
+        return self.client.is_active
+
+
 @pytest.fixture
 def config_dir() -> Path:
     return Path(environ["CONFIG_DIR"])
@@ -72,12 +101,8 @@ async def postgres() -> AsyncGenerator[Postgres, Any]:
 def employees_uow_factory(
     postgres: Postgres,
 ) -> Callable[[], EmployeesUOW]:
-    """Возвращает фабрику UOW с новой AsyncSession на каждый UOW."""
-
     def factory() -> EmployeesUOW:
-        return EmployeesUOW(
-            session_factory=postgres.session_factory,
-        )
+        return EmployeesUOW(session_factory=postgres.session_factory)
 
     return factory
 
@@ -86,12 +111,18 @@ def employees_uow_factory(
 def cars_uow_factory(
     postgres: Postgres,
 ) -> Callable[[], CarsUOW]:
-    """Возвращает фабрику UOW с новой AsyncSession на каждый UOW."""
-
     def factory() -> CarsUOW:
-        return CarsUOW(
-            session_factory=postgres.session_factory,
-        )
+        return CarsUOW(session_factory=postgres.session_factory)
+
+    return factory
+
+
+@pytest.fixture
+def clients_uow_factory(
+    postgres: Postgres,
+) -> Callable[[], ClientsUOW]:
+    def factory() -> ClientsUOW:
+        return ClientsUOW(session_factory=postgres.session_factory)
 
     return factory
 
@@ -99,7 +130,6 @@ def cars_uow_factory(
 @pytest.fixture
 def password_service() -> PasswordService:
     """Реальный сервис паролей приложения для подготовки тестовых данных."""
-
     return PasswordService()
 
 
@@ -108,8 +138,6 @@ def employee_factory(
     employees_uow_factory: Callable[[], EmployeesUOW],
     password_service: PasswordService,
 ) -> Callable[..., Coroutine[Any, Any, EmployeeTestData]]:
-    """Создаёт сотрудника через EmployeesUOW и фиксирует его в PostgreSQL."""
-
     async def factory(
         *,
         username: str | None = None,
@@ -125,21 +153,14 @@ def employee_factory(
             role=role,
             commission_percent=commission_percent,
         )
-
         if not is_active:
-            employee.update(
-                actor_id=uuid7(),
-                is_active=False,
-            )
+            employee.update(actor_id=uuid7(), is_active=False)
 
         async with employees_uow_factory() as uow:
             await uow.employees.add(employee)
             await uow.commit(events=employee.pull_events())
 
-        return EmployeeTestData(
-            employee=employee,
-            password=password,
-        )
+        return EmployeeTestData(employee=employee, password=password)
 
     return factory
 
@@ -148,8 +169,6 @@ def employee_factory(
 def car_factory(
     cars_uow_factory: Callable[[], CarsUOW],
 ) -> Callable[..., Coroutine[Any, Any, CarTestData]]:
-    """Создаёт автомобиль через CarsUOW и фиксирует его в PostgreSQL."""
-
     async def factory(
         *,
         model: str = "Tesla Model 3",
@@ -163,20 +182,47 @@ def car_factory(
             number=number or unique_car_number(),
             current_mileage=current_mileage,
         )
-
         if not is_active:
-            car.update(
-                actor_id=uuid7(),
-                is_active=False,
-            )
+            car.update(actor_id=uuid7(), is_active=False)
 
         async with cars_uow_factory() as uow:
             await uow.cars.add(car)
             await uow.commit(events=car.pull_events())
 
-        return CarTestData(
-            car=car,
+        return CarTestData(car=car)
+
+    return factory
+
+
+@pytest.fixture
+def client_factory(
+    clients_uow_factory: Callable[[], ClientsUOW],
+) -> Callable[..., Coroutine[Any, Any, ClientTestData]]:
+    async def factory(
+        *,
+        name: str = "Тестовый клиент",
+        phone: str | None = None,
+        address: str = "Тестовый адрес",
+        sleeping_threshold_days: int = 30,
+        is_active: bool = True,
+    ) -> ClientTestData:
+        from uuid import uuid4
+
+        client = Client.create(
+            actor_id=uuid7(),
+            name=name,
+            phone=phone or uuid4().hex,
+            address=address,
+            sleeping_threshold_days=sleeping_threshold_days,
         )
+        if not is_active:
+            client.update(actor_id=uuid7(), is_active=False)
+
+        async with clients_uow_factory() as uow:
+            await uow.clients.add(client)
+            await uow.commit(events=client.pull_events())
+
+        return ClientTestData(client=client)
 
     return factory
 

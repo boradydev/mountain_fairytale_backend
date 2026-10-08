@@ -4,7 +4,9 @@ from uuid import UUID
 
 from pydantic import Field
 
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
+from src.feat.clients.domain.client_entities import Client
 
 
 class ClientResp(BaseSchema):
@@ -12,8 +14,8 @@ class ClientResp(BaseSchema):
     name: str
     phone: str
     address: str
-    last_delivery_date: datetime
-    last_delivery_quantity: int
+    last_delivery_date: datetime | None
+    last_delivery_quantity: int | None
     cooldown_until: datetime | None
     sleeping_threshold_days: int
     sales_representative_id: UUID | None
@@ -35,3 +37,16 @@ class CreateClientReq(BaseSchema):
     sleeping_threshold_days: Annotated[int, Field(ge=0, le=3650)]
     sales_representative_id: UUID | None = None
     default_payment_method_id: UUID | None = None
+
+
+class UpdateClientReq(BasePatchSchema):
+    __entity__ = Client
+
+    name: Annotated[str | None, Field(default=None, min_length=1, max_length=120)]
+    phone: Annotated[str | None, Field(default=None, min_length=1, max_length=32)]
+    address: Annotated[str | None, Field(default=None, min_length=1, max_length=500)]
+    cooldown_until: datetime | None = None
+    sleeping_threshold_days: Annotated[int | None, Field(default=None, ge=0, le=3650)]
+    sales_representative_id: UUID | None = None
+    default_payment_method_id: UUID | None = None
+    is_active: bool | None = None

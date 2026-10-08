@@ -2,16 +2,17 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.api.api_abcs import ITokenService
 from src.common.app.abcs.password_service_abcs import IPasswordService
+from src.common.infra.services.token.settings import JwtSettings
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
+from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
 from src.feat.pay_methods.infra.pay_method_factories import PaymentMethodsUseCaseFactory
 from src.feat.products.infra.product_factories import ProductsUseCaseFactory
 from src.feat.sales_rep.infra.sales_rep_factories import SalesRepresentativesUseCaseFactory
-from src.common.infra.services.token.settings import JwtSettings
-from src.common.api.api_abcs import ITokenService
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,7 @@ class AppContext:
     employees_use_cases: EmployeesUseCaseFactory
     auth_use_cases: AuthUseCaseFactory
     cars_use_cases: CarsUseCaseFactory
+    clients_use_cases: ClientsUseCaseFactory
     drivers_use_cases: DriversUseCaseFactory
     payment_methods_use_cases: PaymentMethodsUseCaseFactory
     products_use_cases: ProductsUseCaseFactory

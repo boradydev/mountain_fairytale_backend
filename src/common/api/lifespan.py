@@ -6,16 +6,17 @@ from fastapi import FastAPI
 from src.common.infra.bootstrap.admins.ensure_admin import ensure_admin
 from src.common.infra.db.postgres.database import Postgres
 from src.common.infra.factories.app_context import AppContext
+from src.common.infra.services.password_service import PasswordService
+from src.common.infra.services.token.jwt_service import JwtTokenService
+from src.common.infra.services.token.settings import JwtSettings
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
+from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
 from src.feat.pay_methods.infra.pay_method_factories import PaymentMethodsUseCaseFactory
 from src.feat.products.infra.product_factories import ProductsUseCaseFactory
 from src.feat.sales_rep.infra.sales_rep_factories import SalesRepresentativesUseCaseFactory
-from src.common.infra.services.password_service import PasswordService
-from src.common.infra.services.token.jwt_service import JwtTokenService
-from src.common.infra.services.token.settings import JwtSettings
 
 
 logger = logging.getLogger(__name__)
@@ -27,39 +28,26 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Fastapi application...")
 
     postgres = Postgres()
-
     token_settings = JwtSettings()
     token_service = JwtTokenService(settings=token_settings)
-
     passwd_service = PasswordService()
 
     employees_use_cases = EmployeesUseCaseFactory(
         session_factory=postgres.session_factory,
         password_service=passwd_service,
     )
-
     auth_use_cases = AuthUseCaseFactory(
         session_factory=postgres.session_factory,
         password_service=passwd_service,
         token_service=token_service,
     )
-
-    cars_use_cases = CarsUseCaseFactory(
-        session_factory=postgres.session_factory,
-    )
-
-    drivers_use_cases = DriversUseCaseFactory(
-        session_factory=postgres.session_factory,
-    )
-
+    cars_use_cases = CarsUseCaseFactory(session_factory=postgres.session_factory)
+    clients_use_cases = ClientsUseCaseFactory(session_factory=postgres.session_factory)
+    drivers_use_cases = DriversUseCaseFactory(session_factory=postgres.session_factory)
     payment_methods_use_cases = PaymentMethodsUseCaseFactory(
         session_factory=postgres.session_factory,
     )
-
-    products_use_cases = ProductsUseCaseFactory(
-        session_factory=postgres.session_factory,
-    )
-
+    products_use_cases = ProductsUseCaseFactory(session_factory=postgres.session_factory)
     sales_representatives_use_cases = SalesRepresentativesUseCaseFactory(
         session_factory=postgres.session_factory,
     )
@@ -71,6 +59,7 @@ async def lifespan(app: FastAPI):
         employees_use_cases=employees_use_cases,
         auth_use_cases=auth_use_cases,
         cars_use_cases=cars_use_cases,
+        clients_use_cases=clients_use_cases,
         drivers_use_cases=drivers_use_cases,
         payment_methods_use_cases=payment_methods_use_cases,
         products_use_cases=products_use_cases,
