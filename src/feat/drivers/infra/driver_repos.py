@@ -1,11 +1,14 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.stmt_alchemy_debug import stmt_debug
 from src.feat.drivers.domain.abcs.driver_repo_abcs import IDriversRepository
 from src.feat.drivers.domain.driver_entities import Driver
 
+logger = logging.getLogger(__name__)
 
 class DriversRepository(IDriversRepository):
     _FUZZY_THRESHOLD = 0.35
@@ -65,5 +68,6 @@ class DriversRepository(IDriversRepository):
             )
             .limit(1)
         )
+        logger.debug(stmt_debug(stmt))
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()

@@ -76,6 +76,7 @@ sqlalchemy = { version = "^2.0.46", extras = ["asyncio"] }
 pyjwt = "2.13.0"
 inflection = "^0.5.1"
 pwdlib = { version = "^0.3.0", extras = ["argon2"] }
+sqlparse = "^0.6.0"
 
 
 [build-system]
@@ -87,8 +88,6 @@ dev = [
     "pytest (>=9.1.1,<10.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
     "pytest-asyncio (>=1.4.0,<2.0.0)",
-    "hypothesis (>=6.151.9,<7.0.0)",
-    "faker (>=40.40.0,<41.0.0)",
     "ftl-extract (>=0.12.1,<0.13.0)",
     "pytest-timeout (>=2.4.0,<3.0.0)",
 ]
