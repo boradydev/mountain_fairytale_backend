@@ -261,7 +261,7 @@ async def update_driver(
         UpdateDriverDTO(
             actor_id=UUID(access_token_payload.employee_id),
             driver_id=driver_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 
@@ -299,7 +299,7 @@ async def update_driver(
     Критические сценарии для API-тестов:
         1. Поиск по имени с точным совпадением -> возвращается водитель.
         2. Поиск по имени с частичным совпадением выше порога (0.35) -> возвращается водитель.
-        3. Поиск по имени, не достигающему порога -> data == null.
+        3. Поиск по имени, не достигающего порога -> data == null.
         4. Поиск деактивированного водителя -> возвращается водитель.
         5. При нескольких кандидатах с одинаковым similarity возвращается самый новый.
     """,

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
+from src.feat.drivers.api.driver_schemas import UpdateDriverReq
 from src.feat.drivers.app.abcs.driver_uow_abcs import IDriversUOW
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.drivers.domain.driver_excs import DriverNotFoundException
@@ -11,7 +11,7 @@ from src.feat.drivers.domain.driver_excs import DriverNotFoundException
 class UpdateDriverDTO:
     actor_id: UUID
     driver_id: UUID
-    payload: dict[str, Any]
+    payload: UpdateDriverReq
 
 
 class UpdateDriverUseCase:
@@ -35,7 +35,7 @@ class UpdateDriverUseCase:
 
             driver.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.drivers.update(driver)

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.drivers.domain.driver_entities import Driver
 
@@ -24,10 +24,8 @@ class CreateDriverReq(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=120)]
 
 
-class UpdateDriverReq(create_patch_schema_for_domain(
-    Driver, 
-    exclude_fields={"driver_id", "created_at"}
-)):
-    """
-    PATCH schema for Driver.
-    """
+class UpdateDriverReq(BasePatchSchema):
+    __entity__ = Driver
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    is_active: bool | None = None
