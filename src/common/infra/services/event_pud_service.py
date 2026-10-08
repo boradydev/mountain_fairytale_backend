@@ -11,7 +11,7 @@ from src.core.uuid7 import uuid7
 from src.common.app.abcs.event_pub_service_abcs import IEventPublisher
 from src.common.domain.event_record import EventRecord
 from src.common.domain.events import BaseDomainEvent
-from src.common.infra.db.postgres.repos.events.repo import EventsRepository
+from src.common.infra.db.postgres.repos.events.event_repos import EventsRepository
 
 
 logger = logging.getLogger(__name__)

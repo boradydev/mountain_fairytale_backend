@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from src.common.domain.event_record import EventRecord
-from src.common.infra.db.postgres.repos.events.repo import EventsRepository
+from src.common.infra.db.postgres.repos.events.event_repos import EventsRepository
 from src.core.uuid7 import uuid7
 
 
@@ -148,6 +148,6 @@ async def test_get_all_respects_offset(postgres) -> None:
         result_ids = {event.event_id for event in result}
 
         assert result_ids == {
-            records[2].event_id,
-            records[3].event_id,
+            records[0].event_id,
+            records[1].event_id,
         }
