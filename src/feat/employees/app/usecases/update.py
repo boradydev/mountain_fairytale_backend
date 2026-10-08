@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from src.feat.employees.api.employee_schemas import UpdateEmployeeReq
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
@@ -10,7 +11,7 @@ from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
 class UpdateEmployeeDTO:
     actor_id: UUID
     employee_id: UUID
-    payload: dict
+    payload: UpdateEmployeeReq
 
 
 class UpdateEmployeeUseCase:
@@ -36,7 +37,7 @@ class UpdateEmployeeUseCase:
 
             employee.update(
                 actor_id=dto.actor_id,
-                **dto.payload,
+                **dto.payload.changes(),
             )
 
             await uow.employees.update(employee)

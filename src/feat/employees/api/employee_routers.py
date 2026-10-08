@@ -290,7 +290,7 @@ async def update_employee(
         UpdateEmployeeDTO(
             actor_id=UUID(access_token_payload.employee_id),
             employee_id=employee_id,
-            payload=body.model_dump(exclude_unset=True),
+            payload=body,
         ),
     )
 

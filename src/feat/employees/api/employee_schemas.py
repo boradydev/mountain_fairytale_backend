@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.common.api.patch_schema import create_patch_schema_for_domain
+from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
 from src.feat.employees.domain.employee_entities import Employee
 
@@ -26,12 +26,11 @@ class CreateEmployeeReq(BaseSchema):
     password: Annotated[str, Field(min_length=0, max_length=50)]
 
 
-class UpdateEmployeeReq(create_patch_schema_for_domain(Employee)):
-    """
-    PATCH schema for Employee.
-    Allowed fields: username, is_active.
-    All fields are optional, but non-nullable.
-    """
+class UpdateEmployeeReq(BasePatchSchema):
+    __entity__ = Employee
+
+    username: str | None = Field(default=None, min_length=1, max_length=50)
+    is_active: bool | None = None
 
 
 class ChangeEmployeePasswordReq(BaseSchema):
