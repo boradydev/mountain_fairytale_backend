@@ -21,18 +21,9 @@ class Client(BaseEntity):
     name: Mapped[str] = mapped_column(Text)
     phone: Mapped[str] = mapped_column(Text)
     address: Mapped[str] = mapped_column(Text)
-    last_delivery_date: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
-    last_delivery_quantity: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-    )
-    cooldown_until: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
+    last_delivery_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_delivery_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sleeping_threshold_days: Mapped[int] = mapped_column(Integer)
     sales_representative_id: Mapped[UUID | None] = mapped_column(
         ForeignKey(
