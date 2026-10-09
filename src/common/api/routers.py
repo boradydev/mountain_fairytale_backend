@@ -4,6 +4,10 @@ from src.common.api.deps import verify_access_token, verify_admin_access
 from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
 from src.feat.clients.api.client_routers import clients_router
+from src.feat.delivery_document.api.delivery_document_routers import (
+    delivery_route_sheets_router,
+    pickup_sheets_router,
+)
 from src.feat.drivers.api.driver_routers import drivers_router
 from src.feat.employees.api.employee_routers import employees_router
 from src.feat.me.me_routers import me_router
@@ -23,6 +27,8 @@ protected = APIRouter(
 protected.include_router(me_router)
 protected.include_router(cars_router)
 protected.include_router(clients_router)
+protected.include_router(delivery_route_sheets_router)
+protected.include_router(pickup_sheets_router)
 protected.include_router(drivers_router)
 protected.include_router(payment_methods_router)
 protected.include_router(products_router)

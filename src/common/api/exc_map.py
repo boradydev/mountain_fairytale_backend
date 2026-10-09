@@ -36,6 +36,16 @@ from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
+from src.feat.delivery_document.domain.delivery_document_excs import (
+    DeliveryDocumentEditLockNotFoundException,
+    DeliveryDocumentEditLockNotOwnedException,
+    DeliveryDocumentLockedException,
+    DeliveryDocumentNotFoundException,
+    DeliveryDocumentPointClientAlreadyExistsException,
+    DeliveryDocumentPointProductAlreadyExistsException,
+    DeliveryDocumentRelatedEntityNotFoundException,
+    DeliveryDocumentUpdateException,
+)
 from src.feat.drivers.domain.driver_excs import (
     DriverDomainUpdateException,
     DriverNotFoundException,
@@ -86,6 +96,32 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         ClientDomainUpdateException: Resp(status_code=422, detail="Client domain update error"),
         ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),
         ClientRelatedEntityNotFoundException: Resp(status_code=422, detail="Client related entity not found"),
+        DeliveryDocumentNotFoundException: Resp(status_code=404, detail="Delivery document not found"),
+        DeliveryDocumentUpdateException: Resp(status_code=422, detail="Delivery document update error"),
+        DeliveryDocumentRelatedEntityNotFoundException: Resp(
+            status_code=422,
+            detail="Delivery document related entity not found",
+        ),
+        DeliveryDocumentPointClientAlreadyExistsException: Resp(
+            status_code=422,
+            detail="Client already exists in delivery document",
+        ),
+        DeliveryDocumentPointProductAlreadyExistsException: Resp(
+            status_code=422,
+            detail="Product already exists in delivery document point",
+        ),
+        DeliveryDocumentLockedException: Resp(
+            status_code=423,
+            detail="Delivery document is locked by another employee",
+        ),
+        DeliveryDocumentEditLockNotFoundException: Resp(
+            status_code=409,
+            detail="Delivery document edit lock not found or expired",
+        ),
+        DeliveryDocumentEditLockNotOwnedException: Resp(
+            status_code=403,
+            detail="Delivery document edit lock is not owned by the current employee",
+        ),
         DriverNotFoundException: Resp(status_code=404, detail="Driver not found"),
         DriverDomainUpdateException: Resp(status_code=422, detail="Driver domain update error"),
         PaymentMethodNotFoundException: Resp(status_code=404, detail="Payment method not found"),
