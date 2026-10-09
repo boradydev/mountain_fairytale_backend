@@ -8,6 +8,9 @@ from src.common.infra.services.token.settings import JwtSettings
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.delivery_document.infra.delivery_document_factories import (
+    DeliveryDocumentsUseCaseFactory,
+)
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
 from src.feat.pay_methods.infra.pay_method_factories import PaymentMethodsUseCaseFactory
@@ -25,6 +28,7 @@ class AppContext:
     auth_use_cases: AuthUseCaseFactory
     cars_use_cases: CarsUseCaseFactory
     clients_use_cases: ClientsUseCaseFactory
+    delivery_documents_use_cases: DeliveryDocumentsUseCaseFactory
     drivers_use_cases: DriversUseCaseFactory
     payment_methods_use_cases: PaymentMethodsUseCaseFactory
     products_use_cases: ProductsUseCaseFactory

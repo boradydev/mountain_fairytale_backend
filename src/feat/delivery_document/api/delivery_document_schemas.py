@@ -30,12 +30,11 @@ class CreateDeliveryDocumentPointReq(BaseSchema):
         product_ids = [item.product_id for item in self.items]
         if len(product_ids) != len(set(product_ids)):
             raise ValueError("A product can appear only once in a point.")
-
         return self
 
 
 class UpdateDeliveryDocumentPointReq(BaseSchema):
-    delivery_document_point_id: UUID | None = None
+    point_id: UUID | None = None
     client_id: UUID
     items: Annotated[list[UpdateDeliveryDocumentItemReq], Field(min_length=1)]
 
@@ -44,7 +43,6 @@ class UpdateDeliveryDocumentPointReq(BaseSchema):
         product_ids = [item.product_id for item in self.items]
         if len(product_ids) != len(set(product_ids)):
             raise ValueError("A product can appear only once in a point.")
-
         return self
 
 
@@ -57,15 +55,17 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
     points: Annotated[list[CreateDeliveryDocumentPointReq], Field(min_length=1)]
 
     @model_validator(mode="after")
-    def validate_mileage(self) -> "CreateDeliveryRouteSheetReq":
+    def validate_request(self) -> "CreateDeliveryRouteSheetReq":
         if self.end_mileage is not None and self.end_mileage <= self.start_mileage:
             raise ValueError("End mileage must be greater than start mileage.")
-
-        self._validate_unique_clients()
+        self._validate_unique_clients(self.points)
         return self
 
-    def _validate_unique_clients(self) -> None:
-        client_ids = [point.client_id for point in self.points]
+    @staticmethod
+    def _validate_unique_clients(
+        points: list[CreateDeliveryDocumentPointReq],
+    ) -> None:
+        client_ids = [point.client_id for point in points]
         if len(client_ids) != len(set(client_ids)):
             raise ValueError("A client can appear only once in a document.")
 
@@ -79,7 +79,6 @@ class CreatePickupSheetReq(BaseSchema):
         client_ids = [point.client_id for point in self.points]
         if len(client_ids) != len(set(client_ids)):
             raise ValueError("A client can appear only once in a document.")
-
         return self
 
 
@@ -91,6 +90,13 @@ class UpdateDeliveryRouteSheetReq(BaseSchema):
     end_mileage: Mileage | None = None
     points: Annotated[list[UpdateDeliveryDocumentPointReq], Field(min_length=1)] | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def validate_not_empty(cls, value: object) -> object:
+        if isinstance(value, dict) and not value:
+            raise ValueError("Request body cannot be empty.")
+        return value
+
     @model_validator(mode="after")
     def validate_patch(self) -> "UpdateDeliveryRouteSheetReq":
         non_nullable_fields = (
@@ -101,34 +107,30 @@ class UpdateDeliveryRouteSheetReq(BaseSchema):
             "points",
         )
         for field_name in non_nullable_fields:
-            if field_name in self.model_fields_set and getattr(self, field_name) is None:
+            if (
+                field_name in self.model_fields_set
+                and getattr(self, field_name) is None
+            ):
                 raise ValueError(f"Field '{field_name}' cannot be null.")
 
         if (
-            "start_mileage" in self.model_fields_set
-            and "end_mileage" in self.model_fields_set
-            and self.start_mileage is not None
+            self.start_mileage is not None
             and self.end_mileage is not None
             and self.end_mileage <= self.start_mileage
         ):
             raise ValueError("End mileage must be greater than start mileage.")
 
-        self._validate_points()
+        if self.points is not None:
+            self._validate_points(self.points)
         return self
 
-    def _validate_points(self) -> None:
-        if self.points is None:
-            return
-
-        client_ids = [point.client_id for point in self.points]
+    @staticmethod
+    def _validate_points(points: list[UpdateDeliveryDocumentPointReq]) -> None:
+        client_ids = [point.client_id for point in points]
         if len(client_ids) != len(set(client_ids)):
             raise ValueError("A client can appear only once in a document.")
 
-        point_ids = [
-            point.delivery_document_point_id
-            for point in self.points
-            if point.delivery_document_point_id is not None
-        ]
+        point_ids = [point.point_id for point in points if point.point_id is not None]
         if len(point_ids) != len(set(point_ids)):
             raise ValueError("A point ID can appear only once in a document.")
 
@@ -137,30 +139,25 @@ class UpdatePickupSheetReq(BaseSchema):
     planned_date: date | None = None
     points: Annotated[list[UpdateDeliveryDocumentPointReq], Field(min_length=1)] | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def validate_not_empty(cls, value: object) -> object:
+        if isinstance(value, dict) and not value:
+            raise ValueError("Request body cannot be empty.")
+        return value
+
     @model_validator(mode="after")
     def validate_patch(self) -> "UpdatePickupSheetReq":
         for field_name in ("planned_date", "points"):
-            if field_name in self.model_fields_set and getattr(self, field_name) is None:
+            if (
+                field_name in self.model_fields_set
+                and getattr(self, field_name) is None
+            ):
                 raise ValueError(f"Field '{field_name}' cannot be null.")
 
-        self._validate_points()
+        if self.points is not None:
+            UpdateDeliveryRouteSheetReq._validate_points(self.points)
         return self
-
-    def _validate_points(self) -> None:
-        if self.points is None:
-            return
-
-        client_ids = [point.client_id for point in self.points]
-        if len(client_ids) != len(set(client_ids)):
-            raise ValueError("A client can appear only once in a document.")
-
-        point_ids = [
-            point.delivery_document_point_id
-            for point in self.points
-            if point.delivery_document_point_id is not None
-        ]
-        if len(point_ids) != len(set(point_ids)):
-            raise ValueError("A point ID can appear only once in a document.")
 
 
 class DeliveryDocumentItemResp(BaseSchema):
@@ -171,7 +168,7 @@ class DeliveryDocumentItemResp(BaseSchema):
 
 
 class DeliveryDocumentPointResp(BaseSchema):
-    delivery_document_point_id: UUID
+    point_id: UUID
     client_id: UUID
     client_name: str
     phone: str

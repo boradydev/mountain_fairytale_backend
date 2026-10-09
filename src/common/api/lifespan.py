@@ -12,6 +12,9 @@ from src.common.infra.services.token.settings import JwtSettings
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.delivery_document.infra.delivery_document_factories import (
+    DeliveryDocumentsUseCaseFactory,
+)
 from src.feat.drivers.infra.driver_factories import DriversUseCaseFactory
 from src.feat.employees.infra.employee_factories import EmployeesUseCaseFactory
 from src.feat.pay_methods.infra.pay_method_factories import PaymentMethodsUseCaseFactory
@@ -43,6 +46,9 @@ async def lifespan(app: FastAPI):
     )
     cars_use_cases = CarsUseCaseFactory(session_factory=postgres.session_factory)
     clients_use_cases = ClientsUseCaseFactory(session_factory=postgres.session_factory)
+    delivery_documents_use_cases = DeliveryDocumentsUseCaseFactory(
+        session_factory=postgres.session_factory,
+    )
     drivers_use_cases = DriversUseCaseFactory(session_factory=postgres.session_factory)
     payment_methods_use_cases = PaymentMethodsUseCaseFactory(
         session_factory=postgres.session_factory,
@@ -60,6 +66,7 @@ async def lifespan(app: FastAPI):
         auth_use_cases=auth_use_cases,
         cars_use_cases=cars_use_cases,
         clients_use_cases=clients_use_cases,
+        delivery_documents_use_cases=delivery_documents_use_cases,
         drivers_use_cases=drivers_use_cases,
         payment_methods_use_cases=payment_methods_use_cases,
         products_use_cases=products_use_cases,
