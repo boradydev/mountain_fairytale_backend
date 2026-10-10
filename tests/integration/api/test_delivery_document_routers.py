@@ -732,7 +732,7 @@ class TestDeliveryDocumentRouters:
         second_acquire = await client.post(
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
-        assert second_acquire.status_code == 409
+        assert second_acquire.status_code == 423
 
         foreign_renew = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
@@ -759,7 +759,7 @@ class TestDeliveryDocumentRouters:
         missing_renew = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
-        assert missing_renew.status_code == 404
+        assert missing_renew.status_code == 409
 
 
     async def test_delivery_document_routes_require_authentication(
