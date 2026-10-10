@@ -37,7 +37,7 @@ class CreatePointReq(BaseSchema):
 
 
 class UpdatePointReq(BaseSchema):
-    point_id: UUID | None = None
+    point_id: UUID
     client_id: UUID
     position: fields.Position
     items: Annotated[list[UpdateItemReq], Field(min_length=1)]
