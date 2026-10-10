@@ -163,26 +163,49 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             raise DeliveryDocumentUpdateException(field="driver_id", message="A driver is required for delivery.")
         if car_id is None:
             raise DeliveryDocumentUpdateException(field="car_id", message="A car is required for delivery.")
-        driver = await self._session.get(Driver, driver_id)
+        with self._session.no_autoflush:
+            driver = await self._session.get(Driver, driver_id)
+            car = await self._session.get(Car, car_id)
+
         if driver is None or not getattr(driver, "is_active", True):
             raise DeliveryDocumentRelatedEntityNotFoundException(field="driver_id", entity_id=driver_id)
-        car = await self._session.get(Car, car_id)
         if car is None or not getattr(car, "is_active", True):
             raise DeliveryDocumentRelatedEntityNotFoundException(field="car_id", entity_id=car_id)
 
     async def validate_references(self, document: DeliveryDocument) -> None:
         client_ids = {point.client_id for point in document.points}
         product_ids = {item.product_id for point in document.points for item in point.items}
-        if client_ids:
-            found = set((await self._session.execute(select(Client.client_id).where(Client.client_id.in_(client_ids)))).scalars())
-            missing = client_ids - found
-            if missing:
-                raise DeliveryDocumentRelatedEntityNotFoundException(field="client_id", entity_id=next(iter(missing)))
-        if product_ids:
-            found_products = set((await self._session.execute(select(Product.product_id).where(Product.product_id.in_(product_ids)))).scalars())
-            missing_products = product_ids - found_products
-            if missing_products:
-                raise DeliveryDocumentRelatedEntityNotFoundException(field="product_id", entity_id=next(iter(missing_products)))
+
+        with self._session.no_autoflush:
+            found_clients = set(
+                (
+                    await self._session.execute(
+                        select(Client.client_id).where(Client.client_id.in_(client_ids)),
+                    )
+                ).scalars(),
+            ) if client_ids else set()
+
+            found_products = set(
+                (
+                    await self._session.execute(
+                        select(Product.product_id).where(Product.product_id.in_(product_ids)),
+                    )
+                ).scalars(),
+            ) if product_ids else set()
+
+        missing_clients = client_ids - found_clients
+        if missing_clients:
+            raise DeliveryDocumentRelatedEntityNotFoundException(
+                field="client_id",
+                entity_id=next(iter(missing_clients)),
+            )
+
+        missing_products = product_ids - found_products
+        if missing_products:
+            raise DeliveryDocumentRelatedEntityNotFoundException(
+                field="product_id",
+                entity_id=next(iter(missing_products)),
+            )
 
     async def _translate_integrity_error(self, exc: IntegrityError, document: DeliveryDocument) -> None:
         original = str(exc.orig)
