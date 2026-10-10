@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta
-from typing import Any, Literal, Protocol, Self
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 from sqlalchemy import (
@@ -17,9 +20,6 @@ from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
-from src.feat.drivers.domain.driver_entities import Driver
-from src.feat.employees.domain.employee_entities import Employee
-from src.feat.products.domain.product_entities import Product
 from src.feat.delivery_document.domain.delivery_document_events import (
     CancelDeliveryDocumentEvent,
     CreateDeliveryDocumentEvent,
@@ -29,31 +29,26 @@ from src.feat.delivery_document.domain.delivery_document_events import (
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentUpdateException,
 )
+from src.feat.drivers.domain.driver_entities import Driver
+from src.feat.employees.domain.employee_entities import Employee
+from src.feat.products.domain.product_entities import Product
+
+if TYPE_CHECKING:
+    from src.feat.delivery_document.api.delivery_document_schemas import (
+        CreateDeliveryRouteSheetReq,
+        CreateItemReq,
+        CreatePickupSheetReq,
+        CreatePointReq,
+        UpdateDeliveryRouteSheetReq,
+        UpdateItemReq,
+        UpdatePickupSheetReq,
+        UpdatePointReq,
+    )
 
 
-DOCUMENT_TYPE = Literal["delivery", "pickup"]
-
-
-class CreateItemData(Protocol):
-    product_id: UUID
-    quantity: int
-    price: float
-
-
-class CreatePointData(Protocol):
-    client_id: UUID
-    items: list[CreateItemData]
-
-
-class UpdateItemData(Protocol):
-    product_id: UUID
-    quantity: int
-
-
-class UpdatePointData(Protocol):
-    point_id: UUID | None
-    client_id: UUID
-    items: list[UpdateItemData]
+class DocumentType(str, Enum):
+    DELIVERY = "delivery"
+    PICKUP = "pickup"
 
 
 class Item(BaseEntity):
@@ -85,19 +80,21 @@ class Item(BaseEntity):
     def create(
         cls,
         *,
-        product_id: UUID,
-        quantity: int,
-        price: float,
+        request: CreateItemReq,
     ) -> Self:
         return cls(
-            product_id=product_id,
-            quantity=quantity,
-            price=price,
+            product_id=request.product_id,
+            quantity=request.quantity,
+            price=request.price,
         )
 
-    def update(self, **payload: Any) -> None:
+    def update(
+        self,
+        *,
+        request: UpdateItemReq,
+    ) -> None:
         self._apply_update_changes(
-            payload=payload,
+            payload={"quantity": request.quantity},
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
@@ -162,55 +159,66 @@ class Point(BaseEntity):
     def create(
         cls,
         *,
-        client_id: UUID,
-        position: int,
-        items: list[CreateItemData],
+        request: CreatePointReq,
     ) -> Self:
+        from src.feat.delivery_document.api.delivery_document_schemas import (
+            CreateItemReq,
+        )
+
         return cls(
             point_id=uuid7(),
-            client_id=client_id,
-            position=position,
+            client_id=request.client_id,
+            position=request.position,
             items=[
                 Item.create(
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    price=item.price,
+                    request=CreateItemReq(
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        price=item.price,
+                    ),
                 )
-                for item in items
+                for item in request.items
             ],
         )
 
     def update(
         self,
         *,
-        client_id: UUID,
-        position: int,
-        items: list[UpdateItemData],
+        request: UpdatePointReq,
     ) -> None:
-        if self.client_id != client_id:
+        from src.feat.delivery_document.api.delivery_document_schemas import (
+            UpdateItemReq,
+        )
+
+        if self.client_id != request.client_id:
             raise DeliveryDocumentUpdateException(
                 field="client_id",
                 message="The client of an existing point cannot be changed.",
             )
 
         self._apply_update_changes(
-            payload={"position": position},
+            payload=request.changes,
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
         existing_items = {item.product_id: item for item in self.items}
         updated_items: list[Item] = []
 
-        for requested_item in items:
+        for requested_item in request.items:
             item = existing_items.get(requested_item.product_id)
             if item is None:
-                item = Item.create(
+                item = Item(
                     product_id=requested_item.product_id,
                     quantity=requested_item.quantity,
                     price=0,
                 )
             else:
-                item.update(quantity=requested_item.quantity)
+                item.update(
+                    request=UpdateItemReq(
+                        product_id=requested_item.product_id,
+                        quantity=requested_item.quantity,
+                    ),
+                )
             updated_items.append(item)
 
         self.items = updated_items
@@ -318,20 +326,28 @@ class DeliveryDocument(BaseEntity):
         cls,
         *,
         actor_id: UUID,
-        document_type: DOCUMENT_TYPE,
-        planned_date: date,
-        points: list[CreatePointData],
-        driver_id: UUID | None = None,
-        car_id: UUID | None = None,
-        start_mileage: float | None = None,
-        end_mileage: float | None = None,
+        request: CreateDeliveryRouteSheetReq | CreatePickupSheetReq,
     ) -> Self:
         created_at = datetime.now()
+
+        if isinstance(request, CreateDeliveryRouteSheetReq):
+            document_type = DocumentType.DELIVERY
+            driver_id = request.driver_id
+            car_id = request.car_id
+            start_mileage = request.start_mileage
+            end_mileage = request.end_mileage
+        else:
+            document_type = DocumentType.PICKUP
+            driver_id = None
+            car_id = None
+            start_mileage = None
+            end_mileage = None
+
         document = cls(
             delivery_document_id=uuid7(),
             document_type=document_type,
             created_at=created_at,
-            planned_date=planned_date,
+            planned_date=request.planned_date,
             is_active=True,
             driver_id=driver_id,
             car_id=car_id,
@@ -339,11 +355,10 @@ class DeliveryDocument(BaseEntity):
             end_mileage=end_mileage,
             points=[
                 Point.create(
-                    client_id=point.client_id,
+                    request=point,
                     position=position,
-                    items=point.items,
                 )
-                for position, point in enumerate(points)
+                for point in request.points
             ],
             edit_lock=EditLock.create(
                 employee_id=actor_id,
@@ -364,15 +379,33 @@ class DeliveryDocument(BaseEntity):
         self,
         *,
         actor_id: UUID,
-        points: list[UpdatePointData] | None = None,
-        **payload: Any,
+        request: UpdateDeliveryRouteSheetReq | UpdatePickupSheetReq,
     ) -> None:
+        from src.feat.delivery_document.api.delivery_document_schemas import (
+            UpdateDeliveryRouteSheetReq,
+        )
+
+        payload: dict[str, Any] = {}
+
+        if "planned_date" in request.model_fields_set:
+            payload["planned_date"] = request.planned_date
+
+        if isinstance(request, UpdateDeliveryRouteSheetReq):
+            if "driver_id" in request.model_fields_set:
+                payload["driver_id"] = request.driver_id
+            if "car_id" in request.model_fields_set:
+                payload["car_id"] = request.car_id
+            if "start_mileage" in request.model_fields_set:
+                payload["start_mileage"] = request.start_mileage
+            if "end_mileage" in request.model_fields_set:
+                payload["end_mileage"] = request.end_mileage
+
         changes = self._apply_update_changes(
             payload=payload,
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
-        if points is not None:
+        if "points" in request.model_fields_set and request.points is not None:
             old_points = self._points_snapshot(self.points)
             existing_points = {
                 point.point_id: point
@@ -380,16 +413,23 @@ class DeliveryDocument(BaseEntity):
             }
             updated_points: list[Point] = []
 
-            for position, requested_point in enumerate(points):
+            for position, requested_point in enumerate(request.points):
                 if requested_point.point_id is None:
-                    point = Point.create(
+                    from src.feat.delivery_document.api.delivery_document_schemas import (
+                        CreateItemReq,
+                    )
+
+                    point = Point(
+                        point_id=uuid7(),
                         client_id=requested_point.client_id,
                         position=position,
                         items=[
                             Item.create(
-                                product_id=item.product_id,
-                                quantity=item.quantity,
-                                price=0,
+                                request=CreateItemReq(
+                                    product_id=item.product_id,
+                                    quantity=item.quantity,
+                                    price=0,
+                                ),
                             )
                             for item in requested_point.items
                         ],
@@ -402,9 +442,8 @@ class DeliveryDocument(BaseEntity):
                             message="The point does not belong to this document.",
                         )
                     point.update(
-                        client_id=requested_point.client_id,
+                        request=requested_point,
                         position=position,
-                        items=requested_point.items,
                     )
 
                 updated_points.append(point)

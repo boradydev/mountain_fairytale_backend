@@ -6,7 +6,7 @@ from pydantic import Field, model_validator
 
 from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
-from src.common.api.types import Mileage, Price, Quantity
+from src.common.api import fields
 from src.feat.delivery_document.domain.delivery_document_entities import (
     DeliveryDocument,
 )
@@ -14,17 +14,18 @@ from src.feat.delivery_document.domain.delivery_document_entities import (
 
 class CreateItemReq(BaseSchema):
     product_id: UUID
-    quantity: Quantity
-    price: Price
+    quantity: fields.Quantity
+    price: fields.Price
 
 
 class UpdateItemReq(BaseSchema):
     product_id: UUID
-    quantity: Quantity
+    quantity: fields.Quantity
 
 
 class CreatePointReq(BaseSchema):
     client_id: UUID
+    position: int
     items: Annotated[list[CreateItemReq], Field(min_length=1)]
 
     @model_validator(mode="after")
@@ -38,6 +39,7 @@ class CreatePointReq(BaseSchema):
 class UpdatePointReq(BaseSchema):
     point_id: UUID | None = None
     client_id: UUID
+    position: fields.Position
     items: Annotated[list[UpdateItemReq], Field(min_length=1)]
 
     @model_validator(mode="after")
@@ -52,8 +54,8 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
     planned_date: date
     driver_id: UUID
     car_id: UUID
-    start_mileage: Mileage
-    end_mileage: Mileage | None = None
+    start_mileage: fields.Mileage
+    end_mileage: fields.Mileage | None = None
     points: Annotated[list[CreatePointReq], Field(min_length=1)]
 
     @model_validator(mode="after")
@@ -91,8 +93,8 @@ class UpdateDeliveryRouteSheetReq(BasePatchSchema):
     planned_date: date | None = None
     driver_id: UUID | None = None
     car_id: UUID | None = None
-    start_mileage: Mileage | None = None
-    end_mileage: Mileage | None = None
+    start_mileage: fields.Mileage | None = None
+    end_mileage: fields.Mileage | None = None
     points: Annotated[list[UpdatePointReq], Field(min_length=1)] | None = None
 
     @model_validator(mode="after")
