@@ -21,6 +21,8 @@ def prepare_api_database() -> Generator[None]:
     # Берем имя из POSTGRES_API_TEST_DB или задаем дефолт
     api_db_name = os.environ.get("POSTGRES_API_TEST_DB", "mountain_fairytale_api_test")
 
+    os.environ["POSTGRES_DB"] = api_db_name # подмена названия базы в окружении
+
     bootstrap_test_database(test_db_name=api_db_name, alembic_config_path=ALEMBIC_CONFIG, project_dir=PROJECT_DIR)
     yield
 
