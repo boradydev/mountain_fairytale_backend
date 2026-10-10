@@ -9,6 +9,8 @@ AI Note:
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
+
 from types import MappingProxyType
 
 from src.common.api.api_excs import (
@@ -16,7 +18,6 @@ from src.common.api.api_excs import (
     RefreshTokenNotFoundException,
     UnauthorizedException,
 )
-from src.common.api.types import Resp
 from src.common.infra.services.token.excs import InvalidRefreshTokenException
 from src.core.excs import BaseAppException
 from src.feat.auth.domain.auth_excs import (
@@ -72,6 +73,12 @@ from src.feat.sales_rep.domain.sales_rep_excs import (
     SalesRepresentativeNotFoundException,
     SalesRepresentativePhoneAlreadyExistsException,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class Resp:
+    status_code: int
+    detail: str
 
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(

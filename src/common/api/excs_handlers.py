@@ -7,8 +7,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from src.core.excs import BaseAppException
-from src.common.api.exc_map import APP_EXCEPTION_MAP
-from src.common.api.types import Resp
+from src.common.api.exc_map import APP_EXCEPTION_MAP, Resp
 
 
 def get_business_exception_handler(
