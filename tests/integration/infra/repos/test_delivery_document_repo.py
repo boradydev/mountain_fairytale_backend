@@ -1,24 +1,34 @@
 from collections.abc import AsyncGenerator
-from datetime import date
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain.car_entities import Car
 from src.feat.cars.infra.car_repos import CarsRepository
 from src.feat.clients.domain.client_entities import Client
 from src.feat.clients.infra.client_repos import ClientsRepository
+from src.feat.delivery_document.api.delivery_document_schemas import (
+    UpdateDeliveryRouteSheetReq,
+    UpdatePickupSheetReq,
+)
 from src.feat.delivery_document.domain.delivery_document_entities import (
     DeliveryDocument,
     DocumentType,
+    EditLock,
 )
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentEditLockNotFoundException,
     DeliveryDocumentEditLockNotOwnedException,
     DeliveryDocumentLockedException,
+    DeliveryDocumentPointClientAlreadyExistsException,
+    DeliveryDocumentPointProductAlreadyExistsException,
     DeliveryDocumentRelatedEntityNotFoundException,
+    DeliveryDocumentUpdateException,
 )
 from src.feat.delivery_document.infra.delivery_document_repos import (
     DeliveryDocumentsRepository,
@@ -227,6 +237,9 @@ async def test_get_all_filters_by_type_cancelled_status_and_paginates(postgres) 
             product=pickup_product,
         )
 
+        active_delivery.created_at = datetime(2025, 3, 15, 12, 0, 0)
+        cancelled_delivery.created_at = active_delivery.created_at + timedelta(hours=1)
+
         await repository.add(active_delivery)
         await repository.add(cancelled_delivery)
         await repository.add(active_pickup)
@@ -268,19 +281,21 @@ async def test_get_all_filters_by_type_cancelled_status_and_paginates(postgres) 
             active_delivery.delivery_document_id,
         ]
         assert all_delivery_total == 2
-        assert {document.delivery_document_id for document in all_deliveries} == {
-            active_delivery.delivery_document_id,
+        assert [document.delivery_document_id for document in all_deliveries] == [
             cancelled_delivery.delivery_document_id,
-        }
+            active_delivery.delivery_document_id,
+        ]
         assert pickup_total == 1
         assert [document.delivery_document_id for document in pickups] == [
             active_pickup.delivery_document_id,
         ]
         assert first_page_total == second_page_total == 2
-        assert len(first_page) == len(second_page) == 1
-        assert first_page[0].delivery_document_id != second_page[0].delivery_document_id
-        assert first_page[0].delivery_document_id == all_deliveries[0].delivery_document_id
-        assert second_page[0].delivery_document_id == all_deliveries[1].delivery_document_id
+        assert [document.delivery_document_id for document in first_page] == [
+            cancelled_delivery.delivery_document_id,
+        ]
+        assert [document.delivery_document_id for document in second_page] == [
+            active_delivery.delivery_document_id,
+        ]
 
 
 @pytest.mark.integration
@@ -377,11 +392,21 @@ async def test_edit_lock_acquire_renew_release_and_ownership(postgres) -> None:
         await repository.add(document)
         await session.commit()
 
+        before = datetime.now()
         owner_name = await repository.acquire_edit_lock(
             delivery_document_id=document.delivery_document_id,
             employee_id=owner.employee_id,
         )
+        after = datetime.now()
         assert owner_name == owner.username
+
+        lock_expiration = await session.execute(
+            select(EditLock.expires_at).where(
+                EditLock.delivery_document_id == document.delivery_document_id,
+            ),
+        )
+        expires_at = lock_expiration.scalar_one()
+        assert before + EditLock.TTL <= expires_at <= after + EditLock.TTL
 
         repeated_owner_name = await repository.acquire_edit_lock(
             delivery_document_id=document.delivery_document_id,
@@ -423,6 +448,68 @@ async def test_edit_lock_acquire_renew_release_and_ownership(postgres) -> None:
                 delivery_document_id=document.delivery_document_id,
                 employee_id=owner.employee_id,
             )
+
+
+@pytest.mark.integration
+async def test_acquire_edit_lock_replaces_expired_lock(postgres) -> None:
+    async with postgres.session_factory() as session:
+        clients, product, driver, car = await _create_related_entities(
+            session,
+            delivery=True,
+        )
+        document = await _create_document(
+            session,
+            document_type=DocumentType.DELIVERY,
+            clients=clients,
+            product=product,
+            driver=driver,
+            car=car,
+        )
+        owner = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("expired_lock_owner"),
+            password_hash="test-password-hash",
+            role="employee",
+            commission_percent=0.0,
+        )
+        next_owner = Employee.create(
+            actor_id=uuid7(),
+            username=unique_username("expired_lock_next_owner"),
+            password_hash="test-password-hash",
+            role="employee",
+            commission_percent=0.0,
+        )
+        repository = DeliveryDocumentsRepository(session=session)
+
+        await EmployeesRepository(session=session).add(owner)
+        await EmployeesRepository(session=session).add(next_owner)
+        await repository.add(document)
+        await session.commit()
+
+        session.add(
+            EditLock.create(
+                delivery_document_id=document.delivery_document_id,
+                employee_id=owner.employee_id,
+                expires_at=datetime.now() - EditLock.TTL - timedelta(seconds=1),
+            ),
+        )
+        await session.commit()
+
+        owner_name = await repository.acquire_edit_lock(
+            delivery_document_id=document.delivery_document_id,
+            employee_id=next_owner.employee_id,
+        )
+
+        assert owner_name == next_owner.username
+
+        lock_result = await session.execute(
+            select(EditLock.employee_id, EditLock.expires_at).where(
+                EditLock.delivery_document_id == document.delivery_document_id,
+            ),
+        )
+        saved_employee_id, saved_expires_at = lock_result.one()
+        assert saved_employee_id == next_owner.employee_id
+        assert saved_expires_at > datetime.now()
 
 
 @pytest.mark.integration
@@ -471,54 +558,50 @@ async def test_validate_references_rejects_missing_entities(
 
 
 @pytest.mark.integration
-async def test_validate_references_rejects_missing_transport_entities(postgres) -> None:
-    """Проверяет, что при неверных ссылках на водителя или автомобиль выбрасывается исключение."""
+@pytest.mark.parametrize("missing_field", ["driver_id", "car_id"])
+async def test_validate_active_assignments_rejects_missing_transport_entities(
+    postgres,
+    missing_field: str,
+) -> None:
     async with postgres.session_factory() as session:
-        clients, product, _, _ = await _create_related_entities(session, delivery=False)
+        _, _, driver, car = await _create_related_entities(session, delivery=True)
+        assert driver is not None
+        assert car is not None
+
+        driver_id = uuid7() if missing_field == "driver_id" else driver.driver_id
+        car_id = uuid7() if missing_field == "car_id" else car.car_id
         repository = DeliveryDocumentsRepository(session=session)
 
-        # Случай 1: Несуществующий driver_id
-        document_wrong_driver = DeliveryDocument.create(
-            actor_id=uuid7(),
-            document_type=DocumentType.DELIVERY,
-            planned_date=date(2025, 3, 15),
-            points=[_make_point(clients[0].client_id, product.product_id, quantity=1, price=10.0)],
-            driver_id=uuid7(),  # рандомный UUID
-            car_id=uuid7(),
-            start_mileage=10.0,
-        )
         with pytest.raises(DeliveryDocumentRelatedEntityNotFoundException) as exc_info:
-            await repository.validate_references(document_wrong_driver)
-        assert exc_info.value.field in ("driver_id", "car_id")
+            await repository.validate_active_assignments(
+                document_type=DocumentType.DELIVERY,
+                planned_date=date(2025, 3, 15),
+                driver_id=driver_id,
+                car_id=car_id,
+            )
+
+        assert exc_info.value.field == missing_field
 
 
 @pytest.mark.integration
-async def test_pickup_sheet_forces_null_transport_fields(postgres) -> None:
-    """Проверяет, что для Листа самовывоза (PICKUP) транспортные поля сбрасываются в NULL (Раздел 3 контракта)."""
+async def test_pickup_sheet_persists_null_transport_fields(postgres) -> None:
     async with postgres.session_factory() as session:
         clients, product, _, _ = await _create_related_entities(session, delivery=False)
         repository = DeliveryDocumentsRepository(session=session)
-
-        # Создаем документ PICKUP
-        document = DeliveryDocument.create(
-            actor_id=uuid7(),
+        document = await _create_document(
+            session,
             document_type=DocumentType.PICKUP,
-            planned_date=date(2025, 3, 15),
-            points=[_make_point(clients[0].client_id, product.product_id, quantity=1, price=10.0)],
+            clients=clients,
+            product=product,
         )
-
-        # Насильно выставим поля на уровне сущности (если это позволяет доменная модель),
-        # чтобы проверить, что инфраструктурный слой/БД сохранит строго NULL.
-        document.driver_id = uuid7()
-        document.car_id = uuid7()
-        document.start_mileage = 100.0
-        document.end_mileage = 200.0
 
         await repository.add(document)
         await session.commit()
 
-        # Читаем из базы и проверяем принудительный сброс в NULL
-        saved = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.PICKUP)
+        saved = await repository.get_by_id(
+            document.delivery_document_id,
+            document_type=DocumentType.PICKUP,
+        )
         assert saved is not None
         assert saved.driver_id is None
         assert saved.car_id is None
@@ -527,48 +610,99 @@ async def test_pickup_sheet_forces_null_transport_fields(postgres) -> None:
 
 
 @pytest.mark.integration
-async def test_delivery_mileage_validation_on_update(postgres) -> None:
-    """Проверяет правила изменения пробега доставки (Раздел 3.1 контракта)."""
+@pytest.mark.parametrize("invalid_end_mileage", [50.0, 100.0])
+async def test_delivery_mileage_validation_on_update(
+    postgres,
+    invalid_end_mileage: float,
+) -> None:
     async with postgres.session_factory() as session:
         clients, product, driver, car = await _create_related_entities(session, delivery=True)
         repository = DeliveryDocumentsRepository(session=session)
 
-        document = await _create_document(session, document_type=DocumentType.DELIVERY, clients=clients,
-                                          product=product, driver=driver, car=car)
+        document = await _create_document(
+            session,
+            document_type=DocumentType.DELIVERY,
+            clients=clients,
+            product=product,
+            driver=driver,
+            car=car,
+        )
         await repository.add(document)
         await session.commit()
 
-        # 1. Конечный пробег может оставаться пустым (None) - Успех
-        document.end_mileage = None
+        document.update(
+            actor_id=uuid7(),
+            request=UpdateDeliveryRouteSheetReq(end_mileage=None),
+        )
         await repository.update(document)
         await session.commit()
 
-        # 2. Конечный пробег строго больше начального (200.0 > 100.0) - Успех
-        document.end_mileage = 200.0
+        document.update(
+            actor_id=uuid7(),
+            request=UpdateDeliveryRouteSheetReq(end_mileage=200.0),
+        )
         await repository.update(document)
         await session.commit()
 
-        # Читаем для подтверждения корректности
-        updated = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        updated = await repository.get_by_id(
+            document.delivery_document_id,
+            document_type=DocumentType.DELIVERY,
+        )
+        assert updated is not None
         assert updated.end_mileage == 200.0
 
-        # 3. Если конечный пробег меньше или равен начальному - должна падать ошибка
-        # (в зависимости от реализации: либо доменная бизнес-ошибка, либо CheckConstraint базы данных)
-        document.end_mileage = 50.0  # Меньше начального (100.0)
+        with pytest.raises(DeliveryDocumentUpdateException) as exc_info:
+            document.update(
+                actor_id=uuid7(),
+                request=UpdateDeliveryRouteSheetReq(end_mileage=invalid_end_mileage),
+            )
 
-        with pytest.raises(Exception):
-            await repository.update(document)
-            await session.commit()
+        assert exc_info.value.field == "end_mileage"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("invalid_end_mileage", [50.0, 100.0])
+async def test_delivery_mileage_validation_on_create(
+    postgres,
+    invalid_end_mileage: float,
+) -> None:
+    async with postgres.session_factory() as session:
+        clients, product, driver, car = await _create_related_entities(session, delivery=True)
+        assert driver is not None
+        assert car is not None
+
+        with pytest.raises(DeliveryDocumentUpdateException) as exc_info:
+            DeliveryDocument.create(
+                actor_id=uuid7(),
+                document_type=DocumentType.DELIVERY,
+                planned_date=date(2025, 3, 15),
+                points=[
+                    _make_point(
+                        clients[0].client_id,
+                        product.product_id,
+                        quantity=1,
+                        price=10.0,
+                    ),
+                ],
+                driver_id=driver.driver_id,
+                car_id=car.car_id,
+                start_mileage=100.0,
+                end_mileage=invalid_end_mileage,
+            )
+
+        assert exc_info.value.field == "end_mileage"
 
 
 @pytest.mark.integration
 async def test_duplicate_client_in_same_document_is_forbidden(postgres) -> None:
-    """Проверяет, что один клиент может присутствовать в документе не более одного раза (Раздел 4 контракта)."""
     async with postgres.session_factory() as session:
-        clients, product, driver, car = await _create_related_entities(session, delivery=True, client_count=1)
+        clients, product, driver, car = await _create_related_entities(
+            session,
+            delivery=True,
+            client_count=1,
+        )
         repository = DeliveryDocumentsRepository(session=session)
 
-        # Пытаемся передать массив из двух точек, ссылающихся на одного и того же клиента
         points = [
             _make_point(clients[0].client_id, product.product_id, quantity=2, price=10.0),
             _make_point(clients[0].client_id, product.product_id, quantity=5, price=15.0),
@@ -584,34 +718,77 @@ async def test_duplicate_client_in_same_document_is_forbidden(postgres) -> None:
             start_mileage=100.0,
         )
 
-        # Ожидаем ошибку при записи в БД (например, IntegrityError из-за уникального индекса)
-        with pytest.raises(Exception):
+        with pytest.raises(DeliveryDocumentPointClientAlreadyExistsException) as exc_info:
             await repository.add(document)
-            await session.commit()
+
+        assert isinstance(exc_info.value.__cause__, IntegrityError)
+
+
+@pytest.mark.integration
+async def test_duplicate_product_in_same_point_is_forbidden(postgres) -> None:
+    async with postgres.session_factory() as session:
+        clients, product, _, _ = await _create_related_entities(
+            session,
+            delivery=False,
+        )
+        duplicate_item = SimpleNamespace(
+            product_id=product.product_id,
+            quantity=1,
+            price=10.0,
+        )
+        document = DeliveryDocument.create(
+            actor_id=uuid7(),
+            document_type=DocumentType.PICKUP,
+            planned_date=date(2025, 3, 15),
+            points=[
+                SimpleNamespace(
+                    client_id=clients[0].client_id,
+                    items=[duplicate_item, duplicate_item],
+                ),
+            ],
+        )
+
+        with pytest.raises(DeliveryDocumentPointProductAlreadyExistsException) as exc_info:
+            await DeliveryDocumentsRepository(session=session).add(document)
+
+        assert isinstance(exc_info.value.__cause__, IntegrityError)
 
 
 @pytest.mark.integration
 async def test_cascade_delete_points_and_items(postgres) -> None:
-    """Проверяет, что при физическом очищении коллекции точек (пустой PATCH) данные удаляются каскадно (Раздел 2 и 9.1)."""
+    """Проверяет разрешённую контрактом очистку точек через PATCH."""
     async with postgres.session_factory() as session:
         clients, product, driver, car = await _create_related_entities(session, delivery=True, client_count=2)
         repository = DeliveryDocumentsRepository(session=session)
 
-        document = await _create_document(session, document_type=DocumentType.DELIVERY, clients=clients,
-                                          product=product, driver=driver, car=car)
+        document = await _create_document(
+            session,
+            document_type=DocumentType.DELIVERY,
+            clients=clients,
+            product=product,
+            driver=driver,
+            car=car,
+        )
         await repository.add(document)
         await session.commit()
 
-        # Изначально у документа 2 точки
-        initial_check = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        initial_check = await repository.get_by_id(
+            document.delivery_document_id,
+            document_type=DocumentType.DELIVERY,
+        )
+        assert initial_check is not None
         assert len(initial_check.points) == 2
 
-        # Имитируем очистку точек через PATCH (передача пустого списка разрешена контрактом)
-        document.points = []
+        document.update(
+            actor_id=uuid7(),
+            request=UpdatePickupSheetReq(points=[]),
+        )
         await repository.update(document)
         await session.commit()
 
-        # Проверяем, что документ остался, но точек у него нет
-        updated = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        updated = await repository.get_by_id(
+            document.delivery_document_id,
+            document_type=DocumentType.DELIVERY,
+        )
         assert updated is not None
         assert len(updated.points) == 0
