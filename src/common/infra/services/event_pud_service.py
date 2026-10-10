@@ -1,7 +1,7 @@
 # src/infra/services/event_publisher/password_service.py
 import logging
 from dataclasses import fields, is_dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -91,6 +91,9 @@ class EventPublisher(IEventPublisher):
             return str(value)
 
         if isinstance(value, datetime):
+            return value.isoformat()
+
+        if isinstance(value, date):
             return value.isoformat()
 
         if is_dataclass(value):
