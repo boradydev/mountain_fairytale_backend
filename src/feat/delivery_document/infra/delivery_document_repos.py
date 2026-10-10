@@ -112,7 +112,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     async def acquire_edit_lock(self, *, delivery_document_id: UUID, employee_id: UUID) -> str:
         result = await self._session.execute(
             select(EditLock).where(EditLock.delivery_document_id == delivery_document_id)
-            .options(joinedload(EditLock.employee)).with_for_update(),
+            .options(joinedload(EditLock.employee)).with_for_update(of=EditLock),
         )
         lock = result.unique().scalar_one_or_none()
         now = datetime.now()
@@ -145,7 +145,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
 
     async def release_edit_lock(self, *, delivery_document_id: UUID, employee_id: UUID) -> None:
         result = await self._session.execute(
-            select(EditLock).where(EditLock.delivery_document_id == delivery_document_id).with_for_update(),
+            select(EditLock).where(EditLock.delivery_document_id == delivery_document_id).with_for_update(of=EditLock),
         )
         lock = result.scalar_one_or_none()
         if lock is None or lock.expires_at <= datetime.now():
