@@ -279,6 +279,8 @@ async def test_get_all_filters_by_type_cancelled_status_and_paginates(postgres) 
         assert first_page_total == second_page_total == 2
         assert len(first_page) == len(second_page) == 1
         assert first_page[0].delivery_document_id != second_page[0].delivery_document_id
+        assert first_page[0].delivery_document_id == all_deliveries[0].delivery_document_id
+        assert second_page[0].delivery_document_id == all_deliveries[1].delivery_document_id
 
 
 @pytest.mark.integration
@@ -466,3 +468,150 @@ async def test_validate_references_rejects_missing_entities(
             await repository.validate_references(document)
 
         assert exc_info.value.field == expected_field
+
+
+@pytest.mark.integration
+async def test_validate_references_rejects_missing_transport_entities(postgres) -> None:
+    """Проверяет, что при неверных ссылках на водителя или автомобиль выбрасывается исключение."""
+    async with postgres.session_factory() as session:
+        clients, product, _, _ = await _create_related_entities(session, delivery=False)
+        repository = DeliveryDocumentsRepository(session=session)
+
+        # Случай 1: Несуществующий driver_id
+        document_wrong_driver = DeliveryDocument.create(
+            actor_id=uuid7(),
+            document_type=DocumentType.DELIVERY,
+            planned_date=date(2025, 3, 15),
+            points=[_make_point(clients[0].client_id, product.product_id, quantity=1, price=10.0)],
+            driver_id=uuid7(),  # рандомный UUID
+            car_id=uuid7(),
+            start_mileage=10.0,
+        )
+        with pytest.raises(DeliveryDocumentRelatedEntityNotFoundException) as exc_info:
+            await repository.validate_references(document_wrong_driver)
+        assert exc_info.value.field in ("driver_id", "car_id")
+
+
+@pytest.mark.integration
+async def test_pickup_sheet_forces_null_transport_fields(postgres) -> None:
+    """Проверяет, что для Листа самовывоза (PICKUP) транспортные поля сбрасываются в NULL (Раздел 3 контракта)."""
+    async with postgres.session_factory() as session:
+        clients, product, _, _ = await _create_related_entities(session, delivery=False)
+        repository = DeliveryDocumentsRepository(session=session)
+
+        # Создаем документ PICKUP
+        document = DeliveryDocument.create(
+            actor_id=uuid7(),
+            document_type=DocumentType.PICKUP,
+            planned_date=date(2025, 3, 15),
+            points=[_make_point(clients[0].client_id, product.product_id, quantity=1, price=10.0)],
+        )
+
+        # Насильно выставим поля на уровне сущности (если это позволяет доменная модель),
+        # чтобы проверить, что инфраструктурный слой/БД сохранит строго NULL.
+        document.driver_id = uuid7()
+        document.car_id = uuid7()
+        document.start_mileage = 100.0
+        document.end_mileage = 200.0
+
+        await repository.add(document)
+        await session.commit()
+
+        # Читаем из базы и проверяем принудительный сброс в NULL
+        saved = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.PICKUP)
+        assert saved is not None
+        assert saved.driver_id is None
+        assert saved.car_id is None
+        assert saved.start_mileage is None
+        assert saved.end_mileage is None
+
+
+@pytest.mark.integration
+async def test_delivery_mileage_validation_on_update(postgres) -> None:
+    """Проверяет правила изменения пробега доставки (Раздел 3.1 контракта)."""
+    async with postgres.session_factory() as session:
+        clients, product, driver, car = await _create_related_entities(session, delivery=True)
+        repository = DeliveryDocumentsRepository(session=session)
+
+        document = await _create_document(session, document_type=DocumentType.DELIVERY, clients=clients,
+                                          product=product, driver=driver, car=car)
+        await repository.add(document)
+        await session.commit()
+
+        # 1. Конечный пробег может оставаться пустым (None) - Успех
+        document.end_mileage = None
+        await repository.update(document)
+        await session.commit()
+
+        # 2. Конечный пробег строго больше начального (200.0 > 100.0) - Успех
+        document.end_mileage = 200.0
+        await repository.update(document)
+        await session.commit()
+
+        # Читаем для подтверждения корректности
+        updated = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        assert updated.end_mileage == 200.0
+
+        # 3. Если конечный пробег меньше или равен начальному - должна падать ошибка
+        # (в зависимости от реализации: либо доменная бизнес-ошибка, либо CheckConstraint базы данных)
+        document.end_mileage = 50.0  # Меньше начального (100.0)
+
+        with pytest.raises(Exception):
+            await repository.update(document)
+            await session.commit()
+
+
+@pytest.mark.integration
+async def test_duplicate_client_in_same_document_is_forbidden(postgres) -> None:
+    """Проверяет, что один клиент может присутствовать в документе не более одного раза (Раздел 4 контракта)."""
+    async with postgres.session_factory() as session:
+        clients, product, driver, car = await _create_related_entities(session, delivery=True, client_count=1)
+        repository = DeliveryDocumentsRepository(session=session)
+
+        # Пытаемся передать массив из двух точек, ссылающихся на одного и того же клиента
+        points = [
+            _make_point(clients[0].client_id, product.product_id, quantity=2, price=10.0),
+            _make_point(clients[0].client_id, product.product_id, quantity=5, price=15.0),
+        ]
+
+        document = DeliveryDocument.create(
+            actor_id=uuid7(),
+            document_type=DocumentType.DELIVERY,
+            planned_date=date(2025, 3, 15),
+            points=points,
+            driver_id=driver.driver_id,
+            car_id=car.car_id,
+            start_mileage=100.0,
+        )
+
+        # Ожидаем ошибку при записи в БД (например, IntegrityError из-за уникального индекса)
+        with pytest.raises(Exception):
+            await repository.add(document)
+            await session.commit()
+
+
+@pytest.mark.integration
+async def test_cascade_delete_points_and_items(postgres) -> None:
+    """Проверяет, что при физическом очищении коллекции точек (пустой PATCH) данные удаляются каскадно (Раздел 2 и 9.1)."""
+    async with postgres.session_factory() as session:
+        clients, product, driver, car = await _create_related_entities(session, delivery=True, client_count=2)
+        repository = DeliveryDocumentsRepository(session=session)
+
+        document = await _create_document(session, document_type=DocumentType.DELIVERY, clients=clients,
+                                          product=product, driver=driver, car=car)
+        await repository.add(document)
+        await session.commit()
+
+        # Изначально у документа 2 точки
+        initial_check = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        assert len(initial_check.points) == 2
+
+        # Имитируем очистку точек через PATCH (передача пустого списка разрешена контрактом)
+        document.points = []
+        await repository.update(document)
+        await session.commit()
+
+        # Проверяем, что документ остался, но точек у него нет
+        updated = await repository.get_by_id(document.delivery_document_id, document_type=DocumentType.DELIVERY)
+        assert updated is not None
+        assert len(updated.points) == 0
