@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from src.common.api import fields
 from src.common.api.patch_schema import BasePatchSchema
@@ -65,6 +65,8 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
 
 
 class CreatePickupSheetReq(BaseSchema):
+    model_config = ConfigDict(extra="forbid")
+
     planned_date: date
     points: Annotated[list[CreatePointReq], Field(min_length=1)]
 
@@ -97,6 +99,8 @@ class UpdateDeliveryRouteSheetReq(BasePatchSchema):
 
 
 class UpdatePickupSheetReq(BasePatchSchema):
+    model_config = ConfigDict(extra="forbid")
+
     __entity__ = DeliveryDocument
     __composition_fields__ = {"points"}
 
