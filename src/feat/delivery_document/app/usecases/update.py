@@ -5,7 +5,9 @@ from typing import Any
 from src.feat.delivery_document.app.abcs.delivery_document_uow_abcs import IDeliveryDocumentsUOW
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument
 from src.feat.delivery_document.domain.delivery_document_excs import (
-    DeliveryDocumentLockedException, DeliveryDocumentNotFoundException,
+    DeliveryDocumentEditLockNotFoundException,
+    DeliveryDocumentLockedException,
+    DeliveryDocumentNotFoundException,
 )
 
 
@@ -33,7 +35,11 @@ class UpdateDeliveryDocumentUseCase:
                 from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDocumentUpdateException
                 raise DeliveryDocumentUpdateException(field="is_active", message="Restore the document before editing it.")
             lock = await repo.get_edit_lock(dto.delivery_document_id)
-            if lock is not None and lock.employee_id != dto.actor_id:
+            if lock is None:
+                raise DeliveryDocumentEditLockNotFoundException(
+                    delivery_document_id=dto.delivery_document_id,
+                )
+            if lock.employee_id != dto.actor_id:
                 raise DeliveryDocumentLockedException(
                     delivery_document_id=dto.delivery_document_id, owner_name=lock.owner_name,
                 )

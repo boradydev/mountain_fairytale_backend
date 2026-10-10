@@ -483,6 +483,11 @@ class TestDeliveryDocumentRouters:
         first_point_id = created["points"][0]["pointId"]
         second_point_id = created["points"][1]["pointId"]
 
+        lock_response = await client.post(
+            f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
+        )
+        assert lock_response.status_code == 200
+
         field_only_patch = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": date(2025, 3, 16).isoformat()},
