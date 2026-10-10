@@ -17,14 +17,11 @@ class BasePatchSchema(BaseSchema):
     - отсутствие поля означает «не изменять»;
     - пустой объект запрещён;
     - `null` разрешён только для nullable-полей сущности;
-    - поля должны существовать в SQLAlchemy-сущности или быть
-      объявлены композиционными полями;
-    - поля должны входить в `_ALLOWED_UPDATE_FIELDS` сущности
-      или быть объявлены композиционными полями.
+    - поля должны существовать в SQLAlchemy-сущности;
+    - поля должны входить в `_ALLOWED_UPDATE_FIELDS`.
     """
 
     __entity__: ClassVar[type[Any] | None] = None
-    __composition_fields__: ClassVar[set[str]] = set()
 
     @model_validator(mode="before")
     @classmethod
@@ -81,7 +78,6 @@ class BasePatchSchema(BaseSchema):
             "_ALLOWED_UPDATE_FIELDS",
             set(),
         )
-        composition_fields = cls.__composition_fields__
 
         entity_fields = {
             column.key
@@ -90,7 +86,7 @@ class BasePatchSchema(BaseSchema):
 
         schema_fields = set(cls.model_fields)
 
-        unknown_fields = schema_fields - entity_fields - composition_fields
+        unknown_fields = schema_fields - entity_fields
 
         if unknown_fields:
             fields = ", ".join(sorted(unknown_fields))
@@ -99,7 +95,7 @@ class BasePatchSchema(BaseSchema):
                 f"in {entity.__name__}: {fields}",
             )
 
-        forbidden_fields = schema_fields - allowed_fields - composition_fields
+        forbidden_fields = schema_fields - allowed_fields
 
         if forbidden_fields:
             fields = ", ".join(sorted(forbidden_fields))
