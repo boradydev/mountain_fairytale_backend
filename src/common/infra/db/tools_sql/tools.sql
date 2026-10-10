@@ -5,7 +5,7 @@ WHERE datname = 'mountain_fairytale_test';
 
 
 -- ПЕРЕСОЗДАНИЕ БАЗЫ ДАННЫХ С ИСПРАВЛЕННОЙ ЛОКАЛЬЮ (WINDOWS ОПТИМИЗАЦИЯ)
-CREATE DATABASE mountain_fairytale
+CREATE DATABASE mountain_fairytale_repo_test
     WITH
     TEMPLATE = template0
     ENCODING = 'UTF8'
