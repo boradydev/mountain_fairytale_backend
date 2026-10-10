@@ -771,3 +771,132 @@ class TestDeliveryDocumentRouters:
 
         assert delivery_response.status_code == 401
         assert pickup_response.status_code == 401
+
+    async def test_modify_cancelled_document_is_forbidden(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        client_factory,
+        car_factory,
+    ) -> None:
+        """PATCH отмененного документа запрещен до его восстановления (Раздел 2.2 и 9.1)."""
+        await self.login(client, active_employee)
+        delivery_client = await client_factory(phone=unique_phone())
+        car = await car_factory()
+        driver = await self.create_driver(client, f"Водитель отмены {uuid7()}")
+        product = await self.create_product(client, unique_product_name("cancelled_patch"))
+
+        # 1. Создаем документ
+        create_response = await client.post(
+            f"{DELIVERY_BASE_PATH}/create",
+            json=self.delivery_payload(driver["driverId"], str(car.car_id), [
+                self.point_payload(str(delivery_client.client_id), product["productId"])
+            ]),
+        )
+        document_id = create_response.json()["data"]["deliveryDocumentId"]
+
+        # 2. Отменяем документ
+        await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/cancel")
+
+        # 3. Пытаемся отредактировать отмененный документ
+        bad_patch = await client.patch(
+            f"{DELIVERY_BASE_PATH}/{document_id}",
+            json={"plannedDate": date(2025, 3, 16).isoformat()},
+        )
+        assert bad_patch.status_code == 422  # Или 409 в зависимости от реализации хэндлера
+
+    async def test_edit_locked_document_by_other_fails(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        employee_factory,
+        client_factory,
+        car_factory,
+    ) -> None:
+        """Действующая блокировка другого сотрудника запрещает редактирование и отмену (Раздел 10)."""
+        await self.login(client, active_employee)
+        delivery_client = await client_factory(phone=unique_phone())
+        car = await car_factory()
+        driver = await self.create_driver(client, f"Водитель лока {uuid7()}")
+        product = await self.create_product(client, unique_product_name("lock_protection"))
+
+        create_response = await client.post(
+            f"{DELIVERY_BASE_PATH}/create",
+            json=self.delivery_payload(driver["driverId"], str(car.car_id), [
+                self.point_payload(str(delivery_client.client_id), product["productId"])
+            ]),
+        )
+        document_id = create_response.json()["data"]["deliveryDocumentId"]
+
+        # 1. Первый сотрудник захватывает блокировку
+        await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock")
+
+        # 2. Авторизуется второй сотрудник
+        other_employee = await employee_factory()
+        await self.login(client, other_employee)
+
+        # 3. ВТОРОЙ пытается сделать PATCH заблокированного документа
+        bad_patch = await client.patch(
+            f"{DELIVERY_BASE_PATH}/{document_id}",
+            json={"plannedDate": date(2025, 3, 16).isoformat()},
+        )
+        assert bad_patch.status_code == 423  # Ожидаем Locked (или 409 Conflict)
+
+        # 4. ВТОРОЙ пытается отменить заблокированный документ
+        bad_cancel = await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/cancel")
+        assert bad_cancel.status_code == 423
+
+    async def test_business_rules_validation_errors(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        client_factory,
+        car_factory,
+    ) -> None:
+        """Проверка специфичных бизнес-ограничений на количества, цены и типы документов (Разделы 3 и 5)."""
+        await self.login(client, active_employee)
+        test_client = await client_factory(phone=unique_phone())
+        product = await self.create_product(client, unique_product_name("biz_val"))
+        car = await car_factory()
+        driver = await self.create_driver(client, f"Водитель вал {uuid7()}")
+
+        # 1. Ошибка: Повторное добавление одного товара в одну точку (Раздел 5)
+        duplicate_products_payload = {
+            "clientId": str(test_client.client_id),
+            "items": [
+                {"productId": product["productId"], "quantity": 2, "price": 100.0},
+                {"productId": product["productId"], "quantity": 3, "price": 100.0}
+            ]
+        }
+        dup_resp = await client.post(
+            f"{PICKUP_BASE_PATH}/create",
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [duplicate_products_payload]}
+        )
+        assert dup_resp.status_code == 422
+
+        # 2. Ошибка: Неположительное количество товара (Раздел 5)
+        bad_quantity_payload = self.point_payload(str(test_client.client_id), product["productId"], quantity=0)
+        q_resp = await client.post(
+            f"{PICKUP_BASE_PATH}/create",
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_quantity_payload]}
+        )
+        assert q_resp.status_code == 422
+
+        # 3. Ошибка: Отрицательная цена товара (Раздел 5)
+        bad_price_payload = self.point_payload(str(test_client.client_id), product["productId"], price=-10.5)
+        p_resp = await client.post(
+            f"{PICKUP_BASE_PATH}/create",
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_price_payload]}
+        )
+        assert p_resp.status_code == 422
+
+        # 4. Ошибка: Передача полей доставки (водитель/машина) в самовывоз (Раздел 3)
+        pickup_with_delivery_fields = {
+            "plannedDate": date(2025, 3, 15).isoformat(),
+            "driverId": driver["driverId"],
+            "carId": str(car.car_id),
+            "startMileage": 10.0,
+            "points": [self.point_payload(str(test_client.client_id), product["productId"])]
+        }
+        pickup_err_resp = await client.post(f"{PICKUP_BASE_PATH}/create", json=pickup_with_delivery_fields)
+        assert pickup_err_resp.status_code == 422
