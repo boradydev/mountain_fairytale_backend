@@ -19,7 +19,7 @@ from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
-from src.feat.delivery_document.api.delivery_document_schemas import CreatePointReq
+from src.feat.delivery_document.api.delivery_document_schemas import CreatePointReq, CreateItemReq
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.products.domain.product_entities import Product
@@ -43,6 +43,11 @@ class Item(BaseEntity):
     price: Mapped[float] = mapped_column(Float)
     product: Mapped[Product] = relationship(lazy="joined")
 
+    _ALLOWED_UPDATE_FIELDS = {
+        "quantity",
+        "price",
+    }
+
     @property
     def product_name(self) -> str:
         return self.product.name
@@ -61,6 +66,8 @@ class Item(BaseEntity):
             price=price,
         )
 
+    def update(self) -> None:
+        pass
 
 
 class Point(BaseEntity):
@@ -77,6 +84,10 @@ class Point(BaseEntity):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    _ALLOWED_UPDATE_FIELDS = {
+        "position",
+    }
 
     @property
     def client_name(self) -> str:
@@ -112,15 +123,21 @@ class Point(BaseEntity):
         *,
         client_id: UUID,
         position: int,
-        items: list[Item],
-        point_id: UUID | None = None,
+        items: list[CreateItemReq],
     ) -> Self:
         return cls(
-            point_id=point_id or uuid7(),
+            point_id=uuid7(),
             client_id=client_id,
             position=position,
-            items=items,
+            items=[Item.create(
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.price,
+            ) for item in items]
         )
+
+    def update(self) -> None:
+        pass
 
 
 class DeliveryDocument(BaseEntity):

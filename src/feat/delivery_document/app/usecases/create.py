@@ -3,7 +3,7 @@ from datetime import date
 from uuid import UUID
 
 from src.feat.delivery_document.api.delivery_document_schemas import (
-    CreateDeliveryDocumentPointReq,
+    CreatePointReq,
 )
 from src.feat.delivery_document.app.abcs.delivery_document_uow_abcs import (
     IDeliveryDocumentsUOW,
@@ -18,7 +18,7 @@ from src.feat.delivery_document.domain.delivery_document_entities import (
 class CreateDeliveryDocumentDTO:
     actor_id: UUID
     planned_date: date
-    points: list[CreateDeliveryDocumentPointReq]
+    points: list[CreatePointReq]
     document_type: str
     driver_id: UUID | None = None
     car_id: UUID | None = None

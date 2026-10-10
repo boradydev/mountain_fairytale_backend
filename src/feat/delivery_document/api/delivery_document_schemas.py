@@ -4,13 +4,14 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from src.common.api.schemas import BaseSchema
-from src.common.api.types import Quantity, Mileage
+from src.common.api.schemas import BaseSchema, BaseSchemaOrigin
+from src.common.api.types import Quantity, Mileage, Price
 
 
 class CreateItemReq(BaseSchema):
     product_id: UUID
     quantity: Quantity
+    price: Price
 
 
 class UpdateItemReq(BaseSchema):

@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+from typing import Annotated
 
+from pydantic import Field
 
-@dataclass(frozen=True, slots=True)
-class Resp:
-    status_code: int
-    detail: str
+Quantity = Annotated[int, Field(gt=0)]
+Price = Annotated[float, Field(ge=0)]
+Mileage = Annotated[float, Field(ge=0)]

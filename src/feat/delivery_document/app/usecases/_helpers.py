@@ -2,13 +2,13 @@ from typing import Any
 from uuid import UUID
 
 from src.feat.delivery_document.api.delivery_document_schemas import (
-    CreateDeliveryDocumentPointReq,
-    UpdateDeliveryDocumentPointReq,
+    CreatePointReq,
+    UpdatePointReq,
 )
 from src.feat.delivery_document.domain.delivery_document_entities import (
     DeliveryDocument,
-    DeliveryDocumentItem,
-    DeliveryDocumentPoint,
+    Item,
+    Point,
 )
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentUpdateException,
@@ -16,14 +16,14 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
 
 
 def create_points(
-    points: list[CreateDeliveryDocumentPointReq],
-) -> list[DeliveryDocumentPoint]:
+    points: list[CreatePointReq],
+) -> list[Point]:
     return [
-        DeliveryDocumentPoint.create(
+        Point.create(
             client_id=point.client_id,
             position=position,
             items=[
-                DeliveryDocumentItem.create(
+                Item.create(
                     product_id=item.product_id,
                     quantity=item.quantity,
                 )
@@ -37,19 +37,19 @@ def create_points(
 def update_points(
     *,
     document: DeliveryDocument,
-    requested_points: list[UpdateDeliveryDocumentPointReq],
+    requested_points: list[UpdatePointReq],
 ) -> dict[str, Any] | None:
     existing_points = {point.point_id: point for point in document.points}
     old_snapshot = DeliveryDocument._points_snapshot(document.points)
-    updated_points: list[DeliveryDocumentPoint] = []
+    updated_points: list[Point] = []
 
     for position, requested_point in enumerate(requested_points):
         if requested_point.point_id is None:
-            point = DeliveryDocumentPoint.create(
+            point = Point.create(
                 client_id=requested_point.client_id,
                 position=position,
                 items=[
-                    DeliveryDocumentItem.create(
+                    Item.create(
                         product_id=item.product_id,
                         quantity=item.quantity,
                     )
@@ -75,12 +75,12 @@ def update_points(
         point.position = position
 
         existing_items = {item.product_id: item for item in point.items}
-        updated_items: list[DeliveryDocumentItem] = []
+        updated_items: list[Item] = []
 
         for requested_item in requested_point.items:
             item = existing_items.get(requested_item.product_id)
             if item is None:
-                item = DeliveryDocumentItem.create(
+                item = Item.create(
                     product_id=requested_item.product_id,
                     quantity=requested_item.quantity,
                 )

@@ -13,9 +13,9 @@ from src.feat.delivery_document.domain.abcs.delivery_document_repo_abcs import (
 )
 from src.feat.delivery_document.domain.delivery_document_entities import (
     DeliveryDocument,
-    DeliveryDocumentEditLock,
-    DeliveryDocumentItem,
-    DeliveryDocumentPoint,
+    EditLock,
+    Item,
+    Point,
 )
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentEditLockNotFoundException,
@@ -94,14 +94,14 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     async def get_edit_lock(
         self,
         delivery_document_id: UUID,
-    ) -> DeliveryDocumentEditLock | None:
+    ) -> EditLock | None:
         stmt = (
-            select(DeliveryDocumentEditLock)
+            select(EditLock)
             .where(
-                DeliveryDocumentEditLock.delivery_document_id
+                EditLock.delivery_document_id
                 == delivery_document_id,
             )
-            .options(joinedload(DeliveryDocumentEditLock.employee))
+            .options(joinedload(EditLock.employee))
         )
         return (await self._session.execute(stmt)).unique().scalar_one_or_none()
 
@@ -134,7 +134,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             )
 
         if lock is None:
-            lock = DeliveryDocumentEditLock(
+            lock = EditLock(
                 delivery_document_id=delivery_document_id,
                 employee_id=employee_id,
                 expires_at=now + self._EDIT_LOCK_TTL,
@@ -256,8 +256,8 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
 
         if not is_new:
             existing_point_result = await self._session.execute(
-                select(DeliveryDocumentPoint.point_id).where(
-                    DeliveryDocumentPoint.delivery_document_id
+                select(Point.point_id).where(
+                    Point.delivery_document_id
                     == document.delivery_document_id,
                 ),
             )
@@ -266,10 +266,10 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             if existing_point_ids:
                 existing_item_result = await self._session.execute(
                     select(
-                        DeliveryDocumentItem.point_id,
-                        DeliveryDocumentItem.product_id,
+                        Item.point_id,
+                        Item.product_id,
                     ).where(
-                        DeliveryDocumentItem.point_id.in_(existing_point_ids),
+                        Item.point_id.in_(existing_point_ids),
                     ),
                 )
                 existing_item_keys = set(existing_item_result.tuples().all())
@@ -364,14 +364,14 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     async def _get_lock_for_update(
         self,
         delivery_document_id: UUID,
-    ) -> DeliveryDocumentEditLock | None:
+    ) -> EditLock | None:
         stmt = (
-            select(DeliveryDocumentEditLock)
+            select(EditLock)
             .where(
-                DeliveryDocumentEditLock.delivery_document_id
+                EditLock.delivery_document_id
                 == delivery_document_id,
             )
-            .options(joinedload(DeliveryDocumentEditLock.employee))
+            .options(joinedload(EditLock.employee))
             .with_for_update()
         )
         return (await self._session.execute(stmt)).unique().scalar_one_or_none()
@@ -382,12 +382,12 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             joinedload(DeliveryDocument.driver),
             joinedload(DeliveryDocument.car),
             selectinload(DeliveryDocument.points)
-            .joinedload(DeliveryDocumentPoint.client)
+            .joinedload(Point.client)
             .joinedload(Client.sales_representative),
             selectinload(DeliveryDocument.points)
-            .joinedload(DeliveryDocumentPoint.client)
+            .joinedload(Point.client)
             .joinedload(Client.default_payment_method),
             selectinload(DeliveryDocument.points)
-            .selectinload(DeliveryDocumentPoint.items)
-            .joinedload(DeliveryDocumentItem.product),
+            .selectinload(Point.items)
+            .joinedload(Item.product),
         )

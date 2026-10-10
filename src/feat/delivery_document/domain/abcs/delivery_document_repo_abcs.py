@@ -4,7 +4,7 @@ from uuid import UUID
 
 from src.feat.delivery_document.domain.delivery_document_entities import (
     DeliveryDocument,
-    DeliveryDocumentEditLock,
+    EditLock,
 )
 
 
@@ -41,7 +41,7 @@ class IDeliveryDocumentsRepository(ABC):
     async def get_edit_lock(
         self,
         delivery_document_id: UUID,
-    ) -> DeliveryDocumentEditLock | None:
+    ) -> EditLock | None:
         """Возвращает текущую блокировку редактирования документа."""
 
     @abstractmethod
