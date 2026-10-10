@@ -99,6 +99,18 @@ class TestClientRouters:
         active_employee: EmployeeTestData,
     ) -> None:
         await self.login(client, active_employee)
+
+        initial_active_response = await client.get(BASE_PATH)
+        assert initial_active_response.status_code == 200
+        initial_active_total = initial_active_response.json()["total"]
+
+        initial_all_response = await client.get(
+            BASE_PATH,
+            params={"include_deactivated": True, "offset": 0, "limit": 1},
+        )
+        assert initial_all_response.status_code == 200
+        initial_all_total = initial_all_response.json()["total"]
+
         created = []
         for index in range(3):
             response = await client.post(
@@ -120,7 +132,7 @@ class TestClientRouters:
         )
         assert active_page.status_code == 200
         active_data = active_page.json()
-        assert active_data["total"] == 2
+        assert active_data["total"] == initial_active_total + 2
         assert active_data["limit"] == 1
         assert len(active_data["data"]["clients"]) == 1
 
@@ -130,8 +142,8 @@ class TestClientRouters:
         )
         assert all_clients.status_code == 200
         all_data = all_clients.json()
-        assert all_data["total"] == 3
-        assert len(all_data["data"]["clients"]) == 3
+        assert all_data["total"] == initial_all_total + 3
+        assert len(all_data["data"]["clients"]) == min(initial_all_total + 3, 10)
 
         inactive_get = await client.get(f"{BASE_PATH}/{inactive['clientId']}")
         assert inactive_get.status_code == 200
