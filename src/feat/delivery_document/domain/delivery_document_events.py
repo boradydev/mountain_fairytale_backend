@@ -29,3 +29,46 @@ class CancelDeliveryDocumentEvent(BaseDomainEvent):
 class RestoreDeliveryDocumentEvent(BaseDomainEvent):
     actor_id: UUID
     delivery_document_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreatePointEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    delivery_document_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdatePointEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    changes: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeletePointEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    delivery_document_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreateItemEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    product_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateItemEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    product_id: UUID
+    changes: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeleteItemEvent(BaseDomainEvent):
+    actor_id: UUID
+    point_id: UUID
+    product_id: UUID

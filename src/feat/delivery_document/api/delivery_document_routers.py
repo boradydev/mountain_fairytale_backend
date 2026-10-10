@@ -1,3 +1,4 @@
+from types import NoneType
 from typing import Annotated
 from uuid import UUID
 
@@ -36,7 +37,7 @@ from src.feat.delivery_document.app.usecases.update import (
 )
 from src.feat.delivery_document.domain import delivery_document_excs
 from src.feat.delivery_document.domain.delivery_document_entities import (
-    DeliveryDocument,
+    DocumentType,
 )
 
 
@@ -63,18 +64,6 @@ _DOCUMENT_EXCEPTIONS = (
 )
 
 
-def _actor_id(access_token_payload: object) -> UUID:
-    return UUID(access_token_payload.employee_id)  # type: ignore[attr-defined]
-
-
-def _route_sheet_response(document: DeliveryDocument) -> DeliveryRouteSheetResp:
-    return DeliveryRouteSheetResp.model_validate(document)
-
-
-def _pickup_sheet_response(document: DeliveryDocument) -> PickupSheetResp:
-    return PickupSheetResp.model_validate(document)
-
-
 @delivery_route_sheets_router.get(
     "",
     status_code=status.HTTP_200_OK,
@@ -90,7 +79,7 @@ async def get_delivery_route_sheets(
 ) -> StdResponse[DeliveryRouteSheetsResp]:
     documents, total = await ctx.delivery_documents_use_cases.get_delivery_documents().execute(
         GetDeliveryDocumentsDTO(
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            document_type=DocumentType.DELIVERY,
             include_cancelled=include_cancelled,
             offset=offset,
             limit=limit,
@@ -98,9 +87,7 @@ async def get_delivery_route_sheets(
     )
     return StdResponse(
         data=DeliveryRouteSheetsResp(
-            delivery_route_sheets=[
-                _route_sheet_response(document) for document in documents
-            ],
+            delivery_route_sheets=[DeliveryRouteSheetResp.model_validate(document) for document in documents],
         ),
         offset=offset,
         limit=limit,
@@ -125,10 +112,10 @@ async def get_delivery_route_sheet(
     document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
         GetDeliveryDocumentDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            document_type=DocumentType.DELIVERY,
         ),
     )
-    return StdResponse(data=_route_sheet_response(document))
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.post(
@@ -150,8 +137,8 @@ async def create_delivery_route_sheet(
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.create_delivery_document().execute(
         CreateDeliveryDocumentDTO(
-            actor_id=_actor_id(access_token_payload),
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            actor_id=UUID(access_token_payload.employee_id),
+            document_type=DocumentType.DELIVERY,
             planned_date=body.planned_date,
             driver_id=body.driver_id,
             car_id=body.car_id,
@@ -160,7 +147,7 @@ async def create_delivery_route_sheet(
             points=body.points,
         ),
     )
-    return StdResponse(data=_route_sheet_response(document))
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.patch(
@@ -180,13 +167,13 @@ async def update_delivery_route_sheet(
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.update_delivery_document().execute(
         UpdateDeliveryDocumentDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            document_type=DocumentType.DELIVERY,
             payload=body,
         ),
     )
-    return StdResponse(data=_route_sheet_response(document))
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.post(
@@ -208,12 +195,12 @@ async def cancel_delivery_route_sheet(
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.cancel_delivery_document().execute(
         ChangeDeliveryDocumentStatusDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            document_type=DocumentType.DELIVERY,
         ),
     )
-    return StdResponse(data=_route_sheet_response(document))
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.post(
@@ -234,12 +221,12 @@ async def restore_delivery_route_sheet(
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.restore_delivery_document().execute(
         ChangeDeliveryDocumentStatusDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
+            document_type=DocumentType.DELIVERY,
         ),
     )
-    return StdResponse(data=_route_sheet_response(document))
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.post(
@@ -260,8 +247,8 @@ async def acquire_delivery_route_sheet_edit_lock(
     owner_name = await ctx.delivery_documents_use_cases.acquire_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.DELIVERY,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=DeliveryDocumentEditLockResp(owner_name=owner_name))
@@ -286,8 +273,8 @@ async def renew_delivery_route_sheet_edit_lock(
     owner_name = await ctx.delivery_documents_use_cases.renew_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.DELIVERY,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=DeliveryDocumentEditLockResp(owner_name=owner_name))
@@ -296,7 +283,7 @@ async def renew_delivery_route_sheet_edit_lock(
 @delivery_route_sheets_router.delete(
     "/{delivery_document_id:uuid}/edit-lock",
     status_code=status.HTTP_200_OK,
-    response_model=StdResponse[None],
+    response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
         delivery_document_excs.DeliveryDocumentNotFoundException,
@@ -308,12 +295,12 @@ async def release_delivery_route_sheet_edit_lock(
     delivery_document_id: Annotated[UUID, Path()],
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
-) -> StdResponse[None]:
+) -> StdResponse[NoneType]:
     await ctx.delivery_documents_use_cases.release_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.DELIVERY,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=None)
@@ -334,7 +321,7 @@ async def get_pickup_sheets(
 ) -> StdResponse[PickupSheetsResp]:
     documents, total = await ctx.delivery_documents_use_cases.get_delivery_documents().execute(
         GetDeliveryDocumentsDTO(
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            document_type=DocumentType.PICKUP,
             include_cancelled=include_cancelled,
             offset=offset,
             limit=limit,
@@ -342,7 +329,7 @@ async def get_pickup_sheets(
     )
     return StdResponse(
         data=PickupSheetsResp(
-            pickup_sheets=[_pickup_sheet_response(document) for document in documents],
+            pickup_sheets=[PickupSheetResp.model_validate(document) for document in documents],
         ),
         offset=offset,
         limit=limit,
@@ -367,10 +354,10 @@ async def get_pickup_sheet(
     document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
         GetDeliveryDocumentDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            document_type=DocumentType.PICKUP,
         ),
     )
-    return StdResponse(data=_pickup_sheet_response(document))
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @pickup_sheets_router.post(
@@ -392,13 +379,13 @@ async def create_pickup_sheet(
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.create_delivery_document().execute(
         CreateDeliveryDocumentDTO(
-            actor_id=_actor_id(access_token_payload),
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            actor_id=UUID(access_token_payload.employee_id),
+            document_type=DocumentType.PICKUP,
             planned_date=body.planned_date,
             points=body.points,
         ),
     )
-    return StdResponse(data=_pickup_sheet_response(document))
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @pickup_sheets_router.patch(
@@ -418,13 +405,13 @@ async def update_pickup_sheet(
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.update_delivery_document().execute(
         UpdateDeliveryDocumentDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            document_type=DocumentType.PICKUP,
             payload=body,
         ),
     )
-    return StdResponse(data=_pickup_sheet_response(document))
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @pickup_sheets_router.post(
@@ -446,12 +433,12 @@ async def cancel_pickup_sheet(
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.cancel_delivery_document().execute(
         ChangeDeliveryDocumentStatusDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            document_type=DocumentType.PICKUP,
         ),
     )
-    return StdResponse(data=_pickup_sheet_response(document))
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @pickup_sheets_router.post(
@@ -472,12 +459,12 @@ async def restore_pickup_sheet(
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.restore_delivery_document().execute(
         ChangeDeliveryDocumentStatusDTO(
-            actor_id=_actor_id(access_token_payload),
+            actor_id=UUID(access_token_payload.employee_id),
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
+            document_type=DocumentType.PICKUP,
         ),
     )
-    return StdResponse(data=_pickup_sheet_response(document))
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @pickup_sheets_router.post(
@@ -498,8 +485,8 @@ async def acquire_pickup_sheet_edit_lock(
     owner_name = await ctx.delivery_documents_use_cases.acquire_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.PICKUP,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=DeliveryDocumentEditLockResp(owner_name=owner_name))
@@ -524,8 +511,8 @@ async def renew_pickup_sheet_edit_lock(
     owner_name = await ctx.delivery_documents_use_cases.renew_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.PICKUP,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=DeliveryDocumentEditLockResp(owner_name=owner_name))
@@ -534,7 +521,7 @@ async def renew_pickup_sheet_edit_lock(
 @pickup_sheets_router.delete(
     "/{delivery_document_id:uuid}/edit-lock",
     status_code=status.HTTP_200_OK,
-    response_model=StdResponse[None],
+    response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
         delivery_document_excs.DeliveryDocumentNotFoundException,
@@ -546,12 +533,12 @@ async def release_pickup_sheet_edit_lock(
     delivery_document_id: Annotated[UUID, Path()],
     ctx: Context,
     access_token_payload: AccessTokenPayloadDep,
-) -> StdResponse[None]:
+) -> StdResponse[NoneType]:
     await ctx.delivery_documents_use_cases.release_edit_lock().execute(
         DeliveryDocumentEditLockDTO(
             delivery_document_id=delivery_document_id,
-            document_type=DeliveryDocument.TYPE_PICKUP_SHEET,
-            employee_id=_actor_id(access_token_payload),
+            document_type=DocumentType.PICKUP,
+            employee_id=UUID(access_token_payload.employee_id),
         ),
     )
     return StdResponse(data=None)

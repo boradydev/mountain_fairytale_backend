@@ -4,12 +4,10 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from src.common.api import fields
 from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
-from src.common.api import fields
-from src.feat.delivery_document.domain.delivery_document_entities import (
-    DeliveryDocument,
-)
+from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument
 
 
 class CreateItemReq(BaseSchema):
@@ -21,31 +19,31 @@ class CreateItemReq(BaseSchema):
 class UpdateItemReq(BaseSchema):
     product_id: UUID
     quantity: fields.Quantity
+    price: fields.Price
 
 
 class CreatePointReq(BaseSchema):
     client_id: UUID
-    position: int
     items: Annotated[list[CreateItemReq], Field(min_length=1)]
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        product_ids = [item.product_id for item in self.items]
-        if len(product_ids) != len(set(product_ids)):
+        ids = [item.product_id for item in self.items]
+        if len(ids) != len(set(ids)):
             raise ValueError("A product can appear only once in a point.")
         return self
 
 
 class UpdatePointReq(BaseSchema):
-    point_id: UUID
+    # Omitted/null point_id means that this is a new point.
+    point_id: UUID | None = None
     client_id: UUID
-    position: fields.Position
     items: Annotated[list[UpdateItemReq], Field(min_length=1)]
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        product_ids = [item.product_id for item in self.items]
-        if len(product_ids) != len(set(product_ids)):
+        ids = [item.product_id for item in self.items]
+        if len(ids) != len(set(ids)):
             raise ValueError("A product can appear only once in a point.")
         return self
 
@@ -62,16 +60,8 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
     def validate_request(self) -> Self:
         if self.end_mileage is not None and self.end_mileage <= self.start_mileage:
             raise ValueError("End mileage must be greater than start mileage.")
-        self._validate_unique_clients(self.points)
+        _validate_unique_clients(self.points)
         return self
-
-    @staticmethod
-    def _validate_unique_clients(
-        points: list[CreatePointReq],
-    ) -> None:
-        client_ids = [point.client_id for point in points]
-        if len(client_ids) != len(set(client_ids)):
-            raise ValueError("A client can appear only once in a document.")
 
 
 class CreatePickupSheetReq(BaseSchema):
@@ -80,9 +70,7 @@ class CreatePickupSheetReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_unique_clients(self) -> Self:
-        client_ids = [point.client_id for point in self.points]
-        if len(client_ids) != len(set(client_ids)):
-            raise ValueError("A client can appear only once in a document.")
+        _validate_unique_clients(self.points)
         return self
 
 
@@ -95,44 +83,17 @@ class UpdateDeliveryRouteSheetReq(BasePatchSchema):
     car_id: UUID | None = None
     start_mileage: fields.Mileage | None = None
     end_mileage: fields.Mileage | None = None
-    points: Annotated[list[UpdatePointReq], Field(min_length=1)] | None = None
+    points: list[UpdatePointReq] | None = None
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
-        non_nullable_fields = (
-            "planned_date",
-            "driver_id",
-            "car_id",
-            "start_mileage",
-            "points",
-        )
-        for field_name in non_nullable_fields:
-            if (
-                field_name in self.model_fields_set
-                and getattr(self, field_name) is None
-            ):
-                raise ValueError(f"Field '{field_name}' cannot be null.")
-
-        if (
-            self.start_mileage is not None
-            and self.end_mileage is not None
-            and self.end_mileage <= self.start_mileage
-        ):
-            raise ValueError("End mileage must be greater than start mileage.")
-
+        for name in ("planned_date", "driver_id", "car_id", "start_mileage", "points"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"Field '{name}' cannot be null.")
+        _validate_mileage(self.start_mileage, self.end_mileage)
         if self.points is not None:
-            self._validate_points(self.points)
+            _validate_patch_points(self.points)
         return self
-
-    @staticmethod
-    def _validate_points(points: list[UpdatePointReq]) -> None:
-        client_ids = [point.client_id for point in points]
-        if len(client_ids) != len(set(client_ids)):
-            raise ValueError("A client can appear only once in a document.")
-
-        point_ids = [point.point_id for point in points if point.point_id is not None]
-        if len(point_ids) != len(set(point_ids)):
-            raise ValueError("A point ID can appear only once in a document.")
 
 
 class UpdatePickupSheetReq(BasePatchSchema):
@@ -140,20 +101,34 @@ class UpdatePickupSheetReq(BasePatchSchema):
     __composition_fields__ = {"points"}
 
     planned_date: date | None = None
-    points: Annotated[list[UpdatePointReq], Field(min_length=1)] | None = None
+    points: list[UpdatePointReq] | None = None
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
-        for field_name in ("planned_date", "points"):
-            if (
-                field_name in self.model_fields_set
-                and getattr(self, field_name) is None
-            ):
-                raise ValueError(f"Field '{field_name}' cannot be null.")
-
+        for name in ("planned_date", "points"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"Field '{name}' cannot be null.")
         if self.points is not None:
-            UpdateDeliveryRouteSheetReq._validate_points(self.points)
+            _validate_patch_points(self.points)
         return self
+
+
+def _validate_mileage(start: float | None, end: float | None) -> None:
+    if start is not None and end is not None and end <= start:
+        raise ValueError("End mileage must be greater than start mileage.")
+
+
+def _validate_unique_clients(points: list[CreatePointReq]) -> None:
+    client_ids = [point.client_id for point in points]
+    if len(client_ids) != len(set(client_ids)):
+        raise ValueError("A client can appear only once in a document.")
+
+
+def _validate_patch_points(points: list[UpdatePointReq]) -> None:
+    _validate_unique_clients(points)  # type: ignore[arg-type]
+    point_ids = [point.point_id for point in points if point.point_id is not None]
+    if len(point_ids) != len(set(point_ids)):
+        raise ValueError("A point ID can appear only once in a document.")
 
 
 class ItemResp(BaseSchema):
@@ -173,6 +148,7 @@ class PointResp(BaseSchema):
     default_payment_method_name: str | None
     sales_representative_id: UUID | None
     sales_representative_name: str | None
+    position: int
     items: list[ItemResp]
 
 
@@ -207,4 +183,4 @@ class PickupSheetsResp(BaseSchema):
 
 
 class DeliveryDocumentEditLockResp(BaseSchema):
-    owner_name: str
+    owner_name: str | None
