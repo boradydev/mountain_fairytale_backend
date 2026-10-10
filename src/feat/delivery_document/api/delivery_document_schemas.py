@@ -4,8 +4,12 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from src.common.api.schemas import BaseSchema, BaseSchemaOrigin
-from src.common.api.types import Quantity, Mileage, Price
+from src.common.api.patch_schema import BasePatchSchema
+from src.common.api.schemas import BaseSchema
+from src.common.api.types import Mileage, Price, Quantity
+from src.feat.delivery_document.domain.delivery_document_entities import (
+    DeliveryDocument,
+)
 
 
 class CreateItemReq(BaseSchema):
@@ -80,20 +84,16 @@ class CreatePickupSheetReq(BaseSchema):
         return self
 
 
-class UpdateDeliveryRouteSheetReq(BaseSchema):
+class UpdateDeliveryRouteSheetReq(BasePatchSchema):
+    __entity__ = DeliveryDocument
+    __composition_fields__ = {"points"}
+
     planned_date: date | None = None
     driver_id: UUID | None = None
     car_id: UUID | None = None
     start_mileage: Mileage | None = None
     end_mileage: Mileage | None = None
     points: Annotated[list[UpdatePointReq], Field(min_length=1)] | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_not_empty(cls, value: object) -> object:
-        if isinstance(value, dict) and not value:
-            raise ValueError("Request body cannot be empty.")
-        return value
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
@@ -133,16 +133,12 @@ class UpdateDeliveryRouteSheetReq(BaseSchema):
             raise ValueError("A point ID can appear only once in a document.")
 
 
-class UpdatePickupSheetReq(BaseSchema):
+class UpdatePickupSheetReq(BasePatchSchema):
+    __entity__ = DeliveryDocument
+    __composition_fields__ = {"points"}
+
     planned_date: date | None = None
     points: Annotated[list[UpdatePointReq], Field(min_length=1)] | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_not_empty(cls, value: object) -> object:
-        if isinstance(value, dict) and not value:
-            raise ValueError("Request body cannot be empty.")
-        return value
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
