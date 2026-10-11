@@ -37,7 +37,9 @@ class RefreshUseCase:
             )
 
             if employee is None:
-                raise auth_excs.AuthEmployeeNotFoundException
+                raise auth_excs.AuthEmployeeNotFoundException(
+                    employee_id=employee_id,
+                )
 
             if not employee.is_active:
                 raise auth_excs.AuthEmployeeDeactivateException(
