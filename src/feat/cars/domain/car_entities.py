@@ -2,17 +2,19 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain import car_events
 from src.feat.cars.domain.car_excs import CarDomainUpdateException
-from src.common.domain.entities import BaseEntity
+from src.feat.cars.domain.car_number import CAR_NUMBER_PATTERN, normalize_car_number
 
 
 class Car(BaseEntity):
     __tablename__ = "cars"
+    __table_args__ = (CheckConstraint(f"number ~ '{CAR_NUMBER_PATTERN}'", name="cars_number_format_check"),)
 
     car_id: Mapped[UUID] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(Text, index=True)
@@ -27,7 +29,6 @@ class Car(BaseEntity):
     current_mileage: Mapped[float] = mapped_column(Float, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime)
-
 
     _ALLOWED_UPDATE_FIELDS = {
         "model",
@@ -48,7 +49,7 @@ class Car(BaseEntity):
         car = cls(
             car_id=uuid7(),
             model=model,
-            number=number,
+            number=normalize_car_number(number),
             current_mileage=current_mileage,
             is_active=True,
             created_at=datetime.now(),
@@ -88,13 +89,13 @@ class Car(BaseEntity):
         )
 
     def _validate_update(self, payload: dict[str, Any]) -> None:
+        if "number" in payload:
+            payload["number"] = normalize_car_number(payload["number"])
+
         new_mileage = payload.get("current_mileage")
 
         if new_mileage is not None and new_mileage < self.current_mileage:
             raise CarDomainUpdateException(
                 field="current_mileage",
-                message=(
-                    f"New mileage ({new_mileage}) cannot be less "
-                    f"than current mileage ({self.current_mileage})."
-                ),
+                message=(f"New mileage ({new_mileage}) cannot be less than current mileage ({self.current_mileage})."),
             )

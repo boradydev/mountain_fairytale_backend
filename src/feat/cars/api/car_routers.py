@@ -23,6 +23,7 @@ from src.feat.cars.app.usecases.get import GetCarDTO
 from src.feat.cars.app.usecases.get_all import GetCarsDTO
 from src.feat.cars.app.usecases.update import UpdateCarDTO
 from src.feat.cars.domain import car_excs
+from src.feat.cars.domain.car_number import CarNumber
 
 
 """
@@ -128,14 +129,15 @@ async def get_cars(
         UnauthorizedException,
     ),
     description="""
-    Проверка существования автомобиля с указанным государственным номером.
+    Проверка существования автомобиля с нормализованным государственным номером.
 
     Предусловие:
         Запрос выполняется от имени авторизованного пользователя.
 
     Входные данные:
         Query parameter:
-            number: государственный номер автомобиля.
+            number: государственный номер автомобиля. Пробелы и латинские
+                визуальные двойники кириллических букв нормализуются.
 
     Результат:
         Если автомобиль с таким номером существует:
@@ -147,7 +149,7 @@ async def get_cars(
     Важные требования:
         1. Endpoint не должен возвращать 404, если автомобиль не найден.
         2. Отсутствие автомобиля является нормальным результатом проверки.
-        3. Поиск выполняется по полному значению number.
+        3. Поиск выполняется по нормализованному значению number.
         4. Поиск должен находить как активные, так и деактивированные автомобили.
 
     Критические сценарии для API-тестов:
@@ -158,7 +160,7 @@ async def get_cars(
     """,
 )
 async def check_duplicate(
-    number: Annotated[str, Query(min_length=1, max_length=30)],
+    number: Annotated[CarNumber, Query()],
     ctx: Context,
 ) -> StdResponse[CarResp | None]:
     car = await ctx.cars_use_cases.check_duplicate().execute(

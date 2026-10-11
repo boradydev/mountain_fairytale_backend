@@ -27,6 +27,7 @@ from src.feat.auth.domain.auth_excs import (
 )
 from src.feat.cars.domain.car_excs import (
     CarAlreadyActivateException,
+    CarDomainUpdateException,
     CarNotFoundException,
     CarNumberAlreadyExistsException,
 )
@@ -91,6 +92,7 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         CarNotFoundException: Resp(status_code=404, detail="Car not found"),
         CarNumberAlreadyExistsException: Resp(status_code=409, detail="Car number already exists"),
         CarAlreadyActivateException: Resp(status_code=409, detail="Car is already active"),
+        CarDomainUpdateException: Resp(status_code=422, detail="Car domain update error"),
         RefreshTokenNotFoundException: Resp(status_code=401, detail="Refresh token not found"),
         EmployeeDeactivateException: Resp(status_code=403, detail="Employee account is deactivated"),
         AuthEmployeeNotFoundByUsernameException: Resp(status_code=401, detail="Invalid credentials"),

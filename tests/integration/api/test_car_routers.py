@@ -1,8 +1,8 @@
 from httpx import AsyncClient
-from src.core.uuid7 import uuid7
 
-from tests.integration.conftest import EmployeeTestData
+from src.core.uuid7 import uuid7
 from tests.helpers import unique_car_number
+from tests.integration.conftest import EmployeeTestData
 
 
 BASE_PATH = "/protected/cars"
@@ -35,7 +35,7 @@ class TestCarRouters:
         response = await client.get(f"{BASE_PATH}?include_deactivated=false")
         assert response.status_code == 200
         data = response.json()["data"]["cars"]
-        
+
         # Проверяем, что активный автомобиль в списке, а деактивированный — нет
         car_ids = [car["carId"] for car in data]
         assert str(active_car.car_id) in car_ids
@@ -55,7 +55,7 @@ class TestCarRouters:
         response = await client.get(f"{BASE_PATH}?include_deactivated=true")
         assert response.status_code == 200
         data = response.json()["data"]["cars"]
-        
+
         car_ids = [car["carId"] for car in data]
         assert str(active_car.car_id) in car_ids
         assert str(inactive_car.car_id) in car_ids
@@ -80,9 +80,7 @@ class TestCarRouters:
     ) -> None:
         await self.login(client, active_employee)
 
-        response = await client.get(
-            f"{BASE_PATH}/check-duplicate", params={"number": "NONEXISTENT"}
-        )
+        response = await client.get(f"{BASE_PATH}/check-duplicate", params={"number": unique_car_number()})
         assert response.status_code == 200
         assert response.json()["data"] is None
 
@@ -93,11 +91,7 @@ class TestCarRouters:
     ) -> None:
         await self.login(client, active_employee)
 
-        payload = {
-            "model": "Toyota Camry", 
-            "number": unique_car_number(), 
-            "currentMileage": 100.0
-        }
+        payload = {"model": "Toyota Camry", "number": unique_car_number(), "currentMileage": 100.0}
         response = await client.post(f"{BASE_PATH}/create", json=payload)
 
         assert response.status_code == 201
@@ -109,6 +103,48 @@ class TestCarRouters:
         get_resp = await client.get(f"{BASE_PATH}/{data['carId']}")
         assert get_resp.status_code == 200
         assert get_resp.json()["data"]["number"] == payload["number"]
+
+    async def test_create_car_normalizes_registration_number(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, active_employee)
+
+        response = await client.post(
+            f"{BASE_PATH}/create",
+            json={"model": "Газель", "number": "a 123kx 126"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["data"]["number"] == "А123КХ126"
+
+        duplicate = await client.get(
+            f"{BASE_PATH}/check-duplicate",
+            params={"number": "А 123 КХ 126"},
+        )
+        assert duplicate.status_code == 200
+        assert duplicate.json()["data"]["carId"] == response.json()["data"]["carId"]
+
+        conflict = await client.post(
+            f"{BASE_PATH}/create",
+            json={"model": "Дубликат", "number": "A123KX126"},
+        )
+        assert conflict.status_code == 409
+
+    async def test_create_car_rejects_invalid_registration_number(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, active_employee)
+
+        response = await client.post(
+            f"{BASE_PATH}/create",
+            json={"model": "Газель", "number": "А12ББ"},
+        )
+
+        assert response.status_code == 422
 
     async def test_create_car_duplicate_number(
         self,
@@ -130,14 +166,14 @@ class TestCarRouters:
         car_factory,
     ) -> None:
         await self.login(client, active_employee)
-        
+
         # Создаем деактивированный автомобиль с определенным номером
         car = await car_factory(is_active=False)
 
         # Пытаемся создать новый активный автомобиль с тем же номером
         payload = {"model": "Tesla", "number": car.number}
         response = await client.post(f"{BASE_PATH}/create", json=payload)
-        
+
         # Ожидаем 409 Conflict, так как номер должен быть уникальным во всей системе
         assert response.status_code == 409
 
@@ -164,7 +200,7 @@ class TestCarRouters:
         car_factory,
     ) -> None:
         await self.login(client, active_employee)
-        
+
         # Создаем два автомобиля
         car1 = await car_factory()
         car2 = await car_factory()
@@ -172,7 +208,7 @@ class TestCarRouters:
         # Пытаемся изменить номер первого автомобиля на номер второго
         payload = {"number": car2.number}
         response = await client.patch(f"{BASE_PATH}/{car1.car_id}", json=payload)
-        
+
         assert response.status_code == 409
 
     async def test_update_car_not_found(
@@ -183,6 +219,23 @@ class TestCarRouters:
         await self.login(client, active_employee)
         response = await client.patch(f"{BASE_PATH}/{uuid7()}", json={"model": "Any"})
         assert response.status_code == 404
+
+    async def test_update_car_decreasing_mileage_is_unprocessable(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        car_factory,
+    ) -> None:
+        await self.login(client, active_employee)
+        car = await car_factory(current_mileage=100)
+
+        response = await client.patch(
+            f"{BASE_PATH}/{car.car_id}",
+            json={"currentMileage": 99},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "Car domain update error"
 
     async def test_unauthorized_access(
         self,
