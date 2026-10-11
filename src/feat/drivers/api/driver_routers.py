@@ -24,45 +24,8 @@ from src.feat.drivers.app.usecases.get_all import GetDriversDTO
 from src.feat.drivers.app.usecases.update import UpdateDriverDTO
 from src.feat.drivers.domain import driver_excs
 
-"""
-API CONTRACT — DRIVERS
-
-Этот модуль является источником требований к HTTP API водителей.
-
-Назначение:
-    Управление данными водителей.
-
-Основные правила:
-    1. Все эндпоинты защищены и доступны любому авторизованному пользователю.
-    2. Водитель не удаляется физически.
-    3. Деактивация и повторная активация выполняются через PATCH с полем `isActive`.
-    4. Создаваемые записи по умолчанию активны.
-    5. ID водителя является UUID.
-    6. JSON использует camelCase через BaseSchema.
-    7. Ответы обёрнуты в StdResponse.
-    8. По умолчанию список содержит только активные записи; `includeDeactivated=true` включает всех.
-
-Особенности данных:
-    - name: 1–120 символов.
-    - Уникальность имени (name) НЕ обеспечивается ни на уровне домена, ни на уровне БД.
-    - Совпадающие или похожие ФИО допустимы.
-
-Авторизация:
-    Токен доступа (access token) может быть передан двумя способами:
-    1. Через Cookies: кука `access-token`.
-    2. Через Headers (для Flutter): заголовок `Authorization: Bearer <token>`.
-
-AI TESTING RULES:
-    1. Тестировать HTTP API через публичные endpoints этого router.
-    2. Не использовать use cases для определения ожидаемого поведения API.
-    3. Не анализировать repositories/services для определения требований.
-    4. Ожидаемое поведение определять только из: router, schemas, domain/API exceptions.
-    5. Изменение состояния выполнять через реальные HTTP-запросы API.
-    6. Проверять HTTP status code и тело ответа.
-    7. Проверять фактическое изменение состояния после POST/PUT/PATCH через GET.
-    8. Проверять, что деактивированные записи и их данные сохраняются.
-    9. Не использовать реализацию use case/repository как источник ожидаемого поведения.
-"""
+# Cross-client contract: docs/contracts/drivers.md.
+# Endpoint descriptions below also document the API in OpenAPI.
 
 
 drivers_router = APIRouter(
@@ -289,7 +252,8 @@ async def update_driver(
         2. Поиск осуществляется среди всех записей (и активных, и деактивированных).
         3. Выбор лучшего кандидата:
             - Сначала по убыванию similarity score.
-            - При равном score — по убыванию даты создания (created_at DESC).
+            - При равном score — по возрастанию разницы длины имени кандидата и запроса.
+            - При равном score и разнице длины — по убыванию даты создания (created_at DESC).
             - При равной дате — по убыванию driver_id DESC.
 
     Результат:
