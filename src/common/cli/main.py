@@ -4,46 +4,36 @@ import getpass
 
 import dotenv
 
+from src.common.domain.const import SYSTEM_ACTOR_ID
+from src.common.infra.db.postgres.database import Postgres
+from src.common.infra.services.password_service import PasswordService
 from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
     ChangeEmployeePasswordUseCase,
 )
-from src.common.domain.const import SYSTEM_ACTOR_ID
-from src.common.infra.bootstrap.admins.settings import AdminSettings
-from src.common.infra.db.postgres.database import Postgres
 from src.feat.employees.infra.employee_uow import EmployeesUOW
-from src.common.infra.services.event_pud_service import EventPublisher
-from src.common.infra.services.password_service import PasswordService
 
 
 async def change_admin_password() -> None:
-    settings = AdminSettings()
-
     postgres = Postgres()
-    event_publisher = EventPublisher(
-        session_factory=postgres.session_factory,
-    )
     password_service = PasswordService()
 
     uow = EmployeesUOW(
         session_factory=postgres.session_factory,
-        event_publisher=event_publisher,
     )
 
     try:
         async with uow as _uow:
-            admin = await _uow.employees.get_by_username(
-                settings.ADMIN_USERNAME,
-            )
+            admin = await _uow.employees.get_admin()
 
             if admin is None:
                 raise RuntimeError(
-                    f"Администратор '{settings.ADMIN_USERNAME}' не найден.",
+                    "Bootstrap-администратор не найден.",
                 )
 
             if admin.role != "admin":
                 raise RuntimeError(
-                    f"Пользователь '{settings.ADMIN_USERNAME}' не является администратором.",
+                    "Учётная запись не является администратором.",
                 )
 
             password = getpass.getpass("Новый пароль: ")
@@ -54,25 +44,23 @@ async def change_admin_password() -> None:
             if password != password_confirmation:
                 raise RuntimeError("Пароли не совпадают.")
 
-            use_case = ChangeEmployeePasswordUseCase(
-                uow=_uow,
-                password_service=password_service,
-            )
+            admin_id = admin.employee_id
+            admin_username = admin.username
 
-            await use_case.execute(
-                ChangeEmployeePasswordDTO(
-                    actor_id=SYSTEM_ACTOR_ID,
-                    employee_id=admin.employee_id,
-                    password=password,
-                ),
-            )
+        use_case = ChangeEmployeePasswordUseCase(uow=uow, password_service=password_service)
+        await use_case.execute(
+            ChangeEmployeePasswordDTO(
+                actor_id=SYSTEM_ACTOR_ID,
+                employee_id=admin_id,
+                password=password,
+            ),
+        )
 
     finally:
-        await event_publisher.wait_pending()
         await postgres.dispose()
 
     print(
-        f"Пароль администратора '{settings.ADMIN_USERNAME}' успешно изменён.",
+        f"Пароль администратора '{admin_username}' успешно изменён.",
     )
 
 

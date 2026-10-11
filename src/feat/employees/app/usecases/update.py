@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from src.common.api.api_excs import ForbiddenException
 from src.feat.employees.api.employee_schemas import UpdateEmployeeReq
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
 from src.feat.employees.domain.employee_entities import Employee
@@ -34,6 +35,9 @@ class UpdateEmployeeUseCase:
                 raise EmployeeNotFoundException(
                     employee_id=dto.employee_id,
                 )
+
+            if employee.role == "admin" and dto.payload.changes().get("is_active") is False:
+                raise ForbiddenException
 
             employee.update(
                 actor_id=dto.actor_id,

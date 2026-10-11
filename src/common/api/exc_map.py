@@ -10,7 +10,6 @@ AI Note:
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-
 from types import MappingProxyType
 
 from src.common.api.api_excs import (
@@ -18,7 +17,7 @@ from src.common.api.api_excs import (
     RefreshTokenNotFoundException,
     UnauthorizedException,
 )
-from src.common.infra.services.token.excs import InvalidRefreshTokenException
+from src.common.infra.services.token.excs import InvalidAccessTokenException, InvalidRefreshTokenException
 from src.core.excs import BaseAppException
 from src.feat.auth.domain.auth_excs import (
     AuthEmployeeDeactivateException,
@@ -85,6 +84,7 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
     {
         InvalidCredentialsException: Resp(status_code=401, detail="Invalid credentials"),
         UnauthorizedException: Resp(status_code=401, detail="Unauthorized"),
+        InvalidAccessTokenException: Resp(status_code=401, detail="Unauthorized"),
         ForbiddenException: Resp(status_code=403, detail="Forbidden"),
         EmployeeNotFoundByUsernameException: Resp(status_code=404, detail="Employee not found"),
         EmployeeNotFoundException: Resp(status_code=404, detail="Employee not found"),

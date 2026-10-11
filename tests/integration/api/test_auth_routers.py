@@ -1,6 +1,6 @@
 from httpx import AsyncClient
-from src.core.uuid7 import uuid7
 
+from src.core.uuid7 import uuid7
 from tests.integration.conftest import EmployeeTestData
 
 
@@ -8,7 +8,8 @@ BASE_PATH = "/public/auth"
 
 
 class TestAuthFlow:
-    """Интеграционные тесты API авторизации.
+    """
+    Интеграционные тесты API авторизации.
 
     Используется реальный PostgreSQL, реальный UOW, реальные сервисы паролей
     и JWT. HTTP-запросы выполняются асинхронным httpx.AsyncClient.
@@ -83,7 +84,7 @@ class TestAuthFlow:
     ) -> None:
         response = await self.login(client, inactive_employee)
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     async def test_login_validation_error_too_long(
         self,

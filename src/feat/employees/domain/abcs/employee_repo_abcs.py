@@ -6,6 +6,14 @@ from src.feat.employees.domain.employee_entities import Employee
 
 class IEmployeesRepository(ABC):
     @abstractmethod
+    async def get_admin(self) -> Employee | None:
+        """Возвращает bootstrap-администратора независимо от username."""
+
+    @abstractmethod
+    async def get_active_usernames(self) -> list[str]:
+        """Возвращает username в порядке created_at ASC, employee_id ASC."""
+
+    @abstractmethod
     async def add(self, employee: Employee) -> None:
         """Добавляет нового сотрудника."""
 

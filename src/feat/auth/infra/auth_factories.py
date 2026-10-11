@@ -1,10 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.api.api_abcs import ITokenService
+from src.common.app.abcs.password_service_abcs import IPasswordService
+from src.feat.auth.app.usecases.get_users import GetAuthUsersUseCase
 from src.feat.auth.app.usecases.login import LoginUseCase
 from src.feat.auth.app.usecases.refresh import RefreshUseCase
-from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.employees.infra.employee_uow import EmployeesUOW
-from src.common.api.api_abcs import ITokenService
 
 
 class AuthUseCaseFactory:
@@ -24,6 +25,9 @@ class AuthUseCaseFactory:
             password_service=self._password_service,
             token_service=self._token_service,
         )
+
+    def get_users(self) -> GetAuthUsersUseCase:
+        return GetAuthUsersUseCase(uow=self._create_uow())
 
     def refresh(self) -> RefreshUseCase:
         return RefreshUseCase(

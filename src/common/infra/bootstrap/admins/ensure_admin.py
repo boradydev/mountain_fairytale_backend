@@ -10,13 +10,13 @@ async def ensure_admin(
     uow: IEmployeesUOW,
     password_service: IPasswordService,
 ) -> None:
-    settings = AdminSettings()
-
     async with uow as current_uow:
-        admin = await current_uow.employees.get_by_username(settings.ADMIN_USERNAME)
+        admin = await current_uow.employees.get_admin()
 
     if admin is not None:
         return
+
+    settings = AdminSettings()
 
     dto = CreateEmployeeDTO(
         actor_id=SYSTEM_ACTOR_ID,

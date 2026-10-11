@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from src.feat.auth.app.auth_dtos import AuthTokensDTO
+from src.common.api.api_abcs import ITokenService
 from src.common.app.abcs.password_service_abcs import IPasswordService
+from src.feat.auth.app.auth_dtos import AuthTokensDTO
 from src.feat.auth.domain import auth_excs
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
-from src.common.api.api_abcs import ITokenService
 from src.feat.employees.domain.employee_events import EmployeeLoginEvent
 
 
@@ -35,14 +35,10 @@ class LoginUseCase:
             )
 
             if employee is None:
-                raise auth_excs.AuthEmployeeNotFoundByUsernameException(
-                    username=dto.username,
-                )
+                raise auth_excs.InvalidCredentialsException
 
             if not employee.is_active:
-                raise auth_excs.AuthEmployeeDeactivateException(
-                    employee_id=employee.employee_id,
-                )
+                raise auth_excs.InvalidCredentialsException
 
             is_valid = self._password_service.verify_password(
                 plain_password=dto.password,

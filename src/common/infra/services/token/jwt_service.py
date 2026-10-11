@@ -3,13 +3,14 @@ from typing import Any
 
 import jwt
 from jwt import InvalidTokenError
+from pydantic import ValidationError
 
+from src.common.api.api_abcs import ITokenService
 from src.common.infra.services.token.excs import (
     InvalidAccessTokenException,
     InvalidRefreshTokenException,
 )
 from src.common.infra.services.token.settings import JwtSettings
-from src.common.api.api_abcs import ITokenService
 from src.feat.auth.api.auth_schemas import AccessTokenPyload, RefreshTokenPyload
 
 
@@ -42,10 +43,9 @@ class JwtTokenService(ITokenService):
     ) -> AccessTokenPyload:
         try:
             payload = self._decode(access_token)
-        except InvalidTokenError as exc:
+            return AccessTokenPyload.model_validate(payload)
+        except (InvalidTokenError, ValidationError) as exc:
             raise InvalidAccessTokenException from exc
-
-        return AccessTokenPyload.model_validate(payload)
 
     def create_refresh_token(
         self,
@@ -67,10 +67,9 @@ class JwtTokenService(ITokenService):
     ) -> RefreshTokenPyload:
         try:
             payload = self._decode(refresh_token)
-        except InvalidTokenError as exc:
+            return RefreshTokenPyload.model_validate(payload)
+        except (InvalidTokenError, ValidationError) as exc:
             raise InvalidRefreshTokenException from exc
-
-        return RefreshTokenPyload.model_validate(payload)
 
     def _get_access_token_expiration(self) -> datetime:
         return datetime.now(UTC) + timedelta(
@@ -107,6 +106,7 @@ class JwtTokenService(ITokenService):
             token,
             self._settings.JWT_SECRET_KEY,
             algorithms=[self._settings.JWT_ALGORITHM],
+            options={"require": ["exp", "employee_id", "token_type"]},
         )
 
         return payload

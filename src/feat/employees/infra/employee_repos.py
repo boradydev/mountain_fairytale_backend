@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,23 @@ from src.feat.employees.domain.employee_excs import EmployeeUsernameAlreadyExist
 
 
 class EmployeesRepository(IEmployeesRepository):
+    async def get_admin(self) -> Employee | None:
+        result = await self._session.execute(
+            select(Employee)
+            .where(Employee.role == "admin")
+            .order_by(Employee.created_at.asc(), Employee.employee_id.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_active_usernames(self) -> list[str]:
+        result = await self._session.execute(
+            select(Employee.username)
+            .where(Employee.is_active.is_(True))
+            .order_by(Employee.created_at.asc(), Employee.employee_id.asc())
+        )
+        return list(result.scalars().all())
+
     def __init__(
         self,
         session: AsyncSession,

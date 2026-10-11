@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
@@ -27,6 +27,13 @@ class CreateEmployeeReq(BaseSchema):
     password: Annotated[str, Field(min_length=0, max_length=50)]
     commission_percent: Annotated[float, Field(ge=0, le=100)]
 
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Username cannot be blank.")
+        return value
+
 
 class UpdateEmployeeReq(BasePatchSchema):
     __entity__ = Employee
@@ -34,6 +41,13 @@ class UpdateEmployeeReq(BasePatchSchema):
     username: str | None = Field(default=None, min_length=1, max_length=50)
     commission_percent: float | None = Field(default=None, ge=0, le=100)
     is_active: bool | None = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str | None) -> str:
+        if value is None or not value.strip():
+            raise ValueError("Username cannot be blank or null.")
+        return value
 
 
 class ChangeEmployeePasswordReq(BaseSchema):

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, status
 
-from src.common.api.api_excs import UnauthorizedException
+from src.common.api.api_excs import ForbiddenException, UnauthorizedException
 from src.common.api.deps import (
     AccessTokenPayloadDep,
     Context,
@@ -26,6 +26,7 @@ from src.feat.employees.app.usecases.get import GetEmployeeDTO
 from src.feat.employees.app.usecases.get_all import GetEmployeesDTO
 from src.feat.employees.app.usecases.update import UpdateEmployeeDTO
 from src.feat.employees.domain import employee_excs
+
 
 """
 API CONTRACT — EMPLOYEES
@@ -251,6 +252,7 @@ async def create_employee(
         UnauthorizedException,
         employee_excs.EmployeeNotFoundException,
         employee_excs.EmployeeDomainUpdateException,
+        ForbiddenException,
         employee_excs.EmployeeUsernameAlreadyExistsException,
     ),
     description="""
@@ -283,6 +285,7 @@ async def create_employee(
         2. Деактивация и повторная активация сотрудника происходят через изменение поля is_active.
         3. Сотрудник сохраняет свой employeeId.
         4. commissionPercent можно изменять на значение от 0 до 100 включительно.
+        5. Деактивация bootstrap-администратора запрещена (403).
 
     Критические сценарии для API-тестов:
         1. Изменение username.

@@ -1,14 +1,15 @@
 from fastapi import APIRouter, status
 
-from src.common.api.deps import AuthTokenManagerDep
-from src.feat.auth.api.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
 from src.common.api.api_excs import RefreshTokenNotFoundException
-from src.common.api.deps import Context
+from src.common.api.deps import AuthTokenManagerDep, Context
 from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
+from src.common.infra.services.token.excs import InvalidRefreshTokenException
+from src.feat.auth.api.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
 from src.feat.auth.app.usecases.login import LoginDTO
 from src.feat.auth.app.usecases.refresh import RefreshDTO
 from src.feat.auth.domain import auth_excs
+
 
 """
 API CONTRACT — AUTHENTICATION
@@ -22,6 +23,7 @@ API CONTRACT — AUTHENTICATION
 Endpoints:
     POST /public/auth/login
     POST /public/auth/refresh
+    GET /public/auth/users — только активные username, без авторизации.
 
 Основные правила безопасности:
 
@@ -33,9 +35,8 @@ Endpoints:
        в зависимости от предусмотренного endpoint поведения.
     6. При успешной авторизации и обновлении токенов app cookies
        устанавливаются или обновляются.
-    7. Необходимо исключить User Enumeration:
-       API не должен раскрывать, существует ли пользователь с указанным
-       username.
+    7. Список активных username публичен. Ошибки входа одинаковы для
+       отсутствующего, деактивированного сотрудника и неверного пароля.
     8. Деактивированный сотрудник не может авторизоваться или обновить токены.
     9. Пароль никогда не возвращается API.
     10. JWT-токены не должны содержать пароль или password hash.
@@ -72,14 +73,22 @@ auth_router = APIRouter(
 )
 
 
+@auth_router.get(
+    "/users",
+    response_model=StdResponse[list[str]],
+    description="Все активные username, включая администратора, без пагинации. "
+    "Порядок: created_at ASC, employee_id ASC. Пустой список: data=[].",
+)
+async def get_users(ctx: Context) -> StdResponse[list[str]]:
+    return StdResponse(data=await ctx.auth_use_cases.get_users().execute())
+
+
 @auth_router.post(
     "/login",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[AuthTokensResp],
     responses=map_exceptions_to_responses(
         auth_excs.InvalidCredentialsException,
-        auth_excs.AuthEmployeeNotFoundByUsernameException,
-        auth_excs.AuthEmployeeDeactivateException,
     ),
     description="""
     Предусловие: Пользователь существует и активен.
@@ -124,6 +133,7 @@ async def login(
     response_model=StdResponse[AuthTokensResp],
     responses=map_exceptions_to_responses(
         RefreshTokenNotFoundException,
+        InvalidRefreshTokenException,
         auth_excs.AuthEmployeeNotFoundException,
         auth_excs.AuthEmployeeDeactivateException,
     ),

@@ -10,13 +10,16 @@ from src.common.api.deps import (
 )
 from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
+from src.common.infra.services.token.excs import InvalidAccessTokenException
+from src.common.infra.services.token.settings import JwtSettings
+from src.common.infra.web.fastapi.auth_token_manager import AuthTokenManager
 from src.feat.employees.api.employee_schemas import ChangeEmployeePasswordReq
 from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
+from src.feat.employees.app.usecases.get import GetEmployeeDTO
 from src.feat.employees.domain.employee_excs import EmployeeNotFoundException
-from src.common.infra.services.token.settings import JwtSettings
-from src.common.infra.web.fastapi.auth_token_manager import AuthTokenManager
+from src.feat.me.me_schemas import CurrentEmployeeResp
 
 
 """
@@ -64,12 +67,35 @@ me_router = APIRouter(
 )
 
 
+@me_router.get(
+    "",
+    response_model=StdResponse[CurrentEmployeeResp],
+    responses=map_exceptions_to_responses(
+        UnauthorizedException,
+        InvalidAccessTokenException,
+        EmployeeNotFoundException,
+    ),
+    description="Текущий сотрудник из проверенного access token. "
+    "Возвращает актуальные employeeId, username, role. "
+    "Деактивация не отзывает действующий access token.",
+)
+async def get_me(
+    ctx: Context,
+    access_token_payload: AccessTokenPayloadDep,
+) -> StdResponse[CurrentEmployeeResp]:
+    employee = await ctx.employees_use_cases.get_employee().execute(
+        GetEmployeeDTO(employee_id=UUID(access_token_payload.employee_id)),
+    )
+    return StdResponse(data=CurrentEmployeeResp.model_validate(employee))
+
+
 @me_router.post(
     "/logout",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
+        InvalidAccessTokenException,
     ),
     description="""
     Выход текущего пользователя из системы.
@@ -124,6 +150,7 @@ async def logout(
     response_model=StdResponse[NoneType],
     responses=map_exceptions_to_responses(
         UnauthorizedException,
+        InvalidAccessTokenException,
         EmployeeNotFoundException,
     ),
     description="""

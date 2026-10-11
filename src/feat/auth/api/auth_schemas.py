@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from src.common.api.schemas import BaseSchema
 
@@ -20,14 +21,21 @@ class AuthTokensResp(BaseSchema):
     refresh_token: str
 
 
-class AccessTokenPyload(BaseSchema):
+class EmployeeTokenPayload(BaseSchema):
     employee_id: str
+
+    @field_validator("employee_id")
+    @classmethod
+    def validate_employee_id(cls, value: str) -> str:
+        return str(UUID(value))
+
+
+class AccessTokenPyload(EmployeeTokenPayload):
     role: str
     token_type: Literal["access"]
     exp: datetime
 
 
-class RefreshTokenPyload(BaseSchema):
-    employee_id: str
+class RefreshTokenPyload(EmployeeTokenPayload):
     token_type: Literal["refresh"]
     exp: datetime
