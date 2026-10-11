@@ -5,7 +5,7 @@ from src.common.api.deps import AuthTokenManagerDep, Context
 from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
 from src.common.infra.services.token.excs import InvalidRefreshTokenException
-from src.feat.auth.api.auth_schemas import AuthTokensResp, CredsReq, RefreshTokenReq
+from src.feat.auth.api.auth_schemas import AuthTokensResp, AuthUsersResp, CredsReq, RefreshTokenReq
 from src.feat.auth.app.usecases.login import LoginDTO
 from src.feat.auth.app.usecases.refresh import RefreshDTO
 from src.feat.auth.domain import auth_excs
@@ -75,12 +75,13 @@ auth_router = APIRouter(
 
 @auth_router.get(
     "/users",
-    response_model=StdResponse[list[str]],
+    response_model=StdResponse[AuthUsersResp],
     description="Все активные username, включая администратора, без пагинации. "
-    "Порядок: created_at ASC, employee_id ASC. Пустой список: data=[].",
+    "Порядок: created_at ASC, employee_id ASC. Ответ: data.usernames; пустой список: usernames=[].",
 )
-async def get_users(ctx: Context) -> StdResponse[list[str]]:
-    return StdResponse(data=await ctx.auth_use_cases.get_users().execute())
+async def get_users(ctx: Context) -> StdResponse[AuthUsersResp]:
+    usernames = await ctx.auth_use_cases.get_users().execute()
+    return StdResponse(data=AuthUsersResp(usernames=usernames))
 
 
 @auth_router.post(

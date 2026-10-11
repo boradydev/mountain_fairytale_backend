@@ -30,10 +30,11 @@ async def test_users_public_active_only(client, active_employee, inactive_employ
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"offset", "limit", "total", "message", "data"}
-    assert all(isinstance(username, str) for username in body["data"])
-    assert active_employee.username in body["data"]
-    assert admin_employee.username in body["data"]
-    assert inactive_employee.username not in body["data"]
+    assert set(body["data"]) == {"usernames"}
+    assert all(isinstance(username, str) for username in body["data"]["usernames"])
+    assert active_employee.username in body["data"]["usernames"]
+    assert admin_employee.username in body["data"]["usernames"]
+    assert inactive_employee.username not in body["data"]["usernames"]
     assert body["offset"] is None
     assert body["limit"] is None
     assert body["total"] is None
@@ -53,7 +54,7 @@ async def test_users_order_and_rename(client, employee_factory, employees_uow_fa
     expected = [employee.username for employee in sorted((first, second), key=lambda item: item.employee_id)]
     response = await client.get("/public/auth/users")
     assert response.status_code == 200
-    assert [name for name in response.json()["data"] if name in expected] == expected
+    assert [name for name in response.json()["data"]["usernames"] if name in expected] == expected
     tokens = await login(client, admin_employee)
     renamed = f"renamed_{uuid7()}"
     response = await client.patch(
@@ -64,7 +65,7 @@ async def test_users_order_and_rename(client, employee_factory, employees_uow_fa
     assert response.status_code == 200
     response = await client.get("/public/auth/users")
     expected = [renamed if name == first.username else name for name in expected]
-    assert [name for name in response.json()["data"] if name in expected] == expected
+    assert [name for name in response.json()["data"]["usernames"] if name in expected] == expected
 
 
 async def test_users_empty_list(client, postgres):
@@ -82,7 +83,7 @@ async def test_users_empty_list(client, postgres):
     try:
         response = await client.get("/public/auth/users")
         assert response.status_code == 200
-        assert response.json()["data"] == []
+        assert response.json()["data"] == {"usernames": []}
     finally:
         async with postgres.session_factory() as session:
             await session.execute(update(Employee).where(Employee.employee_id.in_(active_ids)).values(is_active=True))
@@ -212,7 +213,7 @@ async def test_month_old_refresh_restores_session(client, active_employee):
 async def test_deactivation_after_dropdown_blocks_login_refresh_only(client, active_employee, admin_employee):
     tokens = await login(client, active_employee)
     response = await client.get("/public/auth/users")
-    assert active_employee.username in response.json()["data"]
+    assert active_employee.username in response.json()["data"]["usernames"]
     admin_tokens = await login(client, admin_employee)
     response = await client.patch(
         f"/admin/employees/{active_employee.employee_id}",
@@ -229,7 +230,7 @@ async def test_deactivation_after_dropdown_blocks_login_refresh_only(client, act
     response = await client.get("/protected/me", headers=bearer(tokens["accessToken"]))
     assert response.status_code == 200
     response = await client.get("/public/auth/users")
-    assert active_employee.username not in response.json()["data"]
+    assert active_employee.username not in response.json()["data"]["usernames"]
 
 
 async def test_password_change_uses_actor_and_preserves_tokens(client, active_employee, employee_factory):

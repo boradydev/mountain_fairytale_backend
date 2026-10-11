@@ -21,6 +21,10 @@ class AuthTokensResp(BaseSchema):
     refresh_token: str
 
 
+class AuthUsersResp(BaseSchema):
+    usernames: list[str]
+
+
 class EmployeeTokenPayload(BaseSchema):
     employee_id: str
 

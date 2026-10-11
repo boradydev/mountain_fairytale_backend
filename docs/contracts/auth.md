@@ -105,7 +105,7 @@ Flutter ссылается на этот файл; независимую коп
 
 | Действие | Метод и путь | Запрос | Успешный ответ |
 | --- | --- | --- | --- |
-| Список для входа — добавить | GET /public/auth/users | Без токенов и тела | 200, data: список username |
+| Список для входа — добавить | GET /public/auth/users | Без токенов и тела | 200, data.usernames: список username |
 | Вход | POST /public/auth/login | username, password | 200, токены внутри data |
 | Обновление | POST /public/auth/refresh | refreshToken | 200, токены внутри data |
 | Выход | POST /protected/me/logout | Bearer access token, тело не требуется | 200, data: null |
@@ -163,14 +163,14 @@ Endpoint: GET /public/auth/users. Доступен без авторизации
 
 1. Возвращает всех активных сотрудников, включая bootstrap-администратора.
 2. Деактивированные сотрудники исключаются сервером.
-3. Возвращает только имена пользователей: data — массив строк username.
+3. Возвращает только имена пользователей: data — объект с полем usernames (массив строк username).
    Идентификаторы, роли, даты создания, пароли и password hash не возвращаются.
 4. Сортировка на сервере: created_at ASC — самые старые сотрудники сверху.
    При одинаковом created_at используется employee_id ASC для стабильного порядка.
 5. Переименование не меняет место сотрудника в порядке по дате добавления.
 6. Возвращается полный список без пагинации; при отсутствии активных сотрудников
-   HTTP 200 и data: [], а не null.
-7. Flutter сохраняет порядок массива и использует выбранный username для login.
+   HTTP 200 и data: {"usernames": []}, а не null.
+7. Flutter сохраняет порядок массива data.usernames и использует выбранный username для login.
 8. Наличие username в списке не заменяет проверку активности и пароля при login.
 
 Пример успешного ответа:
@@ -181,11 +181,11 @@ Endpoint: GET /public/auth/users. Доступен без авторизации
   "limit": null,
   "total": null,
   "message": null,
-  "data": ["admin", "manager", "dispatcher"]
+  "data": {"usernames": ["admin", "manager", "dispatcher"]}
 }
 ```
 
-HTTP-модель: StdResponse[list[str]]. Имена в примере расположены по дате
+HTTP-модель: StdResponse[AuthUsersResp] (usernames: list[str]). Имена в примере расположены по дате
 добавления сотрудников, а не по алфавиту.
 
 ## 3. Правила клиента
@@ -255,7 +255,7 @@ access и refresh tokens продолжают действовать до сво
 | Пути Flutter | /auth/login, /auth/refresh, /auth/logout | Согласовать полные пути с backend и настройкой base URL |
 | Ответ с токенами | Flutter читает корень и snake_case | Читать data.accessToken и data.refreshToken |
 | Logout Flutter | Передаёт refresh token через transport | Передавать Bearer access token на /protected/me/logout |
-| Dropdown пользователей | Flutter вызывает /auth/users | Добавить GET /public/auth/users: data со строками username, created_at ASC |
+| Dropdown пользователей | Flutter вызывает /auth/users | Добавить GET /public/auth/users: data.usernames со строками username, created_at ASC |
 | Регистрация | Flutter вызывает /auth/register | Убрать публичную регистрацию и кнопку; сотрудников создаёт администратор |
 | Сбой refresh | Flutter ловит любую ошибку и удаляет токены | Разделить отказ в авторизации и временный сбой |
 | Изменение состояния | ApiClient вызывает refresh через сервис | Проверить уведомление AuthProvider об окончании сессии |
@@ -324,8 +324,8 @@ protected сейчас использует verify_access_token, который 
 
 - GET /public/auth/users работает без токенов, возвращает только активные username.
 - Список отсортирован по created_at ASC; при равных датах — по employee_id ASC.
-- Ответ списка содержит data со строками и не раскрывает другие поля сотрудника.
-- Пустой список возвращается как HTTP 200 с data: [].
+- Ответ списка содержит data.usernames со строками и не раскрывает другие поля сотрудника.
+- Пустой список возвращается как HTTP 200 с data: {"usernames": []}.
 
 - Пустой username и username из одних пробелов отклоняются при создании и изменении.
 - GET /protected/me возвращает employeeId, username и role текущего сотрудника.
