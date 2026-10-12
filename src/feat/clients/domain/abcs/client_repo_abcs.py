@@ -24,6 +24,7 @@ class IClientsRepository(ABC):
         include_deactivated: bool,
         offset: int,
         limit: int,
+        search: str | None = None,
     ) -> tuple[list[Client], int]:
         """Возвращает страницу клиентов и общее количество подходящих записей."""
 

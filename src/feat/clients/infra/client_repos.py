@@ -1,7 +1,8 @@
+import re
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -75,10 +76,22 @@ class ClientsRepository(IClientsRepository):
         include_deactivated: bool,
         offset: int,
         limit: int,
+        search: str | None = None,
     ) -> tuple[list[Client], int]:
         filters = []
         if not include_deactivated:
             filters.append(Client.is_active.is_(True))
+
+        term = (search or "").strip()
+        if term:
+            matches = [
+                Client.name.icontains(term, autoescape=True),
+                Client.address.icontains(term, autoescape=True),
+            ]
+            digits = re.sub(r"[^0-9]", "", term)
+            if digits:
+                matches.append(func.regexp_replace(Client.phone, "[^0-9]", "", "g").contains(digits))
+            filters.append(or_(*matches))
 
         count_stmt = select(func.count()).select_from(Client).where(*filters)
         total = int((await self._session.execute(count_stmt)).scalar_one())

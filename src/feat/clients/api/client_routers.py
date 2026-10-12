@@ -1,5 +1,5 @@
 """
-API CONTRACT — CLIENTS
+API CONTRACT — CLIENTS.
 
 Назначение:
     Управление клиентами через HTTP API.
@@ -96,6 +96,7 @@ clients_router = APIRouter(
             по умолчанию false.
         offset: число записей, которые нужно пропустить; значение не меньше 0.
         limit: максимальное число записей; значение не меньше 1.
+        search: до 500 символов; поиск по имени, адресу и цифрам телефона.
 
     Действие:
         Вернуть клиентов с сортировкой created_at DESC, затем client_id DESC.
@@ -103,7 +104,7 @@ clients_router = APIRouter(
     Результат:
         data.clients содержит страницу клиентов.
         offset, limit и total находятся на верхнем уровне StdResponse.
-        total — количество записей, соответствующих include_deactivated,
+        total — количество записей, соответствующих include_deactivated и search,
         до применения offset и limit.
 
     Критические сценарии для API-тестов:
@@ -116,16 +117,18 @@ clients_router = APIRouter(
 )
 async def get_clients(
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1)] = 100,
+    search: Annotated[str | None, Query(max_length=500)] = None,
 ) -> StdResponse[ClientsResp]:
     clients, total = await ctx.clients_use_cases.get_clients().execute(
         GetClientsDTO(
             include_deactivated=include_deactivated,
             offset=offset,
             limit=limit,
+            search=search,
         ),
     )
     return StdResponse(
@@ -139,7 +142,63 @@ async def get_clients(
 
 
 @clients_router.get(
-    "/{client_id:uuid}",
+    "/check-duplicate",
+    status_code=status.HTTP_200_OK,
+    response_model=StdResponse[ClientResp | None],
+    responses=map_exceptions_to_responses(UnauthorizedException),
+    description="""
+    Проверка наличия клиента, похожего на переданные данные.
+
+    Предусловие:
+        Запрос выполняется от имени любого аутентифицированного пользователя.
+
+    Query-параметры:
+        Обязательны все три параметра: name, phone и address.
+        name: от 1 до 120 символов.
+        phone: от 1 до 32 символов.
+        address: от 1 до 500 символов.
+        Отсутствующий или невалидный параметр приводит к HTTP 422.
+
+    Действие:
+        Поиск выполняется среди активных и деактивированных клиентов.
+        Кандидат считается совпадением, если проходит порог similarity
+        минимум по двум из трёх полей.
+
+    Результат:
+        Если совпадение найдено, data содержит ClientResp.
+        Если совпадение не найдено, data равен null. Отсутствие совпадения
+        не является ошибкой и не приводит к HTTP 404.
+
+    Критические сценарии для API-тестов:
+        1. Точное совпадение возвращает клиента.
+        2. Отсутствие совпадений возвращает HTTP 200 и data == null.
+        3. Проверка находит клиента, даже если он деактивирован.
+        4. Запрос без каждого из обязательных параметров приводит к HTTP 422.
+        5. Пустое или слишком длинное значение параметра приводит к HTTP 422.
+        6. Совпадение только по одному полю не должно считаться дубликатом.
+    """,
+)
+async def check_duplicate_client(
+    ctx: Context,
+    _access_token_payload: AccessTokenPayloadDep,
+    name: Annotated[str, Query(min_length=1, max_length=120)],
+    phone: Annotated[str, Query(min_length=1, max_length=32)],
+    address: Annotated[str, Query(min_length=1, max_length=500)],
+) -> StdResponse[ClientResp | None]:
+    client = await ctx.clients_use_cases.check_duplicate().execute(
+        CheckClientDuplicateDTO(
+            name=name,
+            phone=phone,
+            address=address,
+        ),
+    )
+    return StdResponse(
+        data=ClientResp.model_validate(client) if client is not None else None,
+    )
+
+
+@clients_router.get(
+    "/{client_id}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[ClientResp],
     responses=map_exceptions_to_responses(
@@ -166,7 +225,7 @@ async def get_clients(
 async def get_client(
     client_id: Annotated[UUID, Path()],
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ClientResp]:
     client = await ctx.clients_use_cases.get_client().execute(
         GetClientDTO(client_id=client_id),
@@ -241,7 +300,7 @@ async def create_client(
 
 
 @clients_router.patch(
-    "/{client_id:uuid}",
+    "/{client_id}",
     status_code=status.HTTP_200_OK,
     response_model=StdResponse[ClientResp],
     responses=map_exceptions_to_responses(
@@ -303,59 +362,3 @@ async def update_client(
         ),
     )
     return StdResponse(data=ClientResp.model_validate(client))
-
-
-@clients_router.get(
-    "/check-duplicate",
-    status_code=status.HTTP_200_OK,
-    response_model=StdResponse[ClientResp | None],
-    responses=map_exceptions_to_responses(UnauthorizedException),
-    description="""
-    Проверка наличия клиента, похожего на переданные данные.
-
-    Предусловие:
-        Запрос выполняется от имени любого аутентифицированного пользователя.
-
-    Query-параметры:
-        Обязательны все три параметра: name, phone и address.
-        name: от 1 до 120 символов.
-        phone: от 1 до 32 символов.
-        address: от 1 до 500 символов.
-        Отсутствующий или невалидный параметр приводит к HTTP 422.
-
-    Действие:
-        Поиск выполняется среди активных и деактивированных клиентов.
-        Кандидат считается совпадением, если проходит порог similarity
-        минимум по двум из трёх полей.
-
-    Результат:
-        Если совпадение найдено, data содержит ClientResp.
-        Если совпадение не найдено, data равен null. Отсутствие совпадения
-        не является ошибкой и не приводит к HTTP 404.
-
-    Критические сценарии для API-тестов:
-        1. Точное совпадение возвращает клиента.
-        2. Отсутствие совпадений возвращает HTTP 200 и data == null.
-        3. Проверка находит клиента, даже если он деактивирован.
-        4. Запрос без каждого из обязательных параметров приводит к HTTP 422.
-        5. Пустое или слишком длинное значение параметра приводит к HTTP 422.
-        6. Совпадение только по одному полю не должно считаться дубликатом.
-    """,
-)
-async def check_duplicate_client(
-    ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
-    name: Annotated[str, Query(min_length=1, max_length=120)],
-    phone: Annotated[str, Query(min_length=1, max_length=32)],
-    address: Annotated[str, Query(min_length=1, max_length=500)],
-) -> StdResponse[ClientResp | None]:
-    client = await ctx.clients_use_cases.check_duplicate().execute(
-        CheckClientDuplicateDTO(
-            name=name,
-            phone=phone,
-            address=address,
-        ),
-    )
-    return StdResponse(
-        data=ClientResp.model_validate(client) if client is not None else None,
-    )

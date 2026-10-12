@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+import pytest
 from httpx import AsyncClient
 
 from src.core.uuid7 import uuid7
@@ -89,9 +90,7 @@ class TestClientRouters:
         assert reactivate.status_code == 200
         assert reactivate.json()["data"]["isActive"] is True
 
-        assert (
-            await client.patch(f"{BASE_PATH}/{first['clientId']}", json={})
-        ).status_code == 422
+        assert (await client.patch(f"{BASE_PATH}/{first['clientId']}", json={})).status_code == 422
 
     async def test_list_pagination_and_deactivated_record(
         self,
@@ -112,7 +111,7 @@ class TestClientRouters:
         initial_all_total = initial_all_response.json()["total"]
 
         created = []
-        for index in range(3):
+        for _index in range(3):
             response = await client.post(
                 f"{BASE_PATH}/create",
                 json=self.payload(name=f"Pagination client {uuid7()}"),
@@ -226,3 +225,209 @@ class TestClientRouters:
     async def test_unauthorized_access(self, client: AsyncClient) -> None:
         response = await client.get(BASE_PATH)
         assert response.status_code == 401
+
+    async def test_search_filters_before_pagination_and_normalizes_phone(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, active_employee)
+        marker = uuid4().hex
+        rows = []
+        for index in range(3):
+            response = await client.post(
+                f"{BASE_PATH}/create",
+                json=self.payload(
+                    name=f"Магазин {marker} {index}",
+                    address=f"Москва, улица {marker}, {index}",
+                    phone=f"+7 (912) 345-67-{index:02d}",
+                ),
+            )
+            assert response.status_code == 201
+            rows.append(response.json()["data"])
+        for query in (f"  {marker.upper()}  ", f"МАГАЗИН {marker}", f"УЛИЦА {marker}"):
+            page = await client.get(BASE_PATH, params={"search": query, "offset": 1, "limit": 1})
+            assert page.status_code == 200
+            body = page.json()
+            assert body["total"] == 3
+            assert body["offset"] == 1
+            assert body["limit"] == 1
+            assert [row["clientId"] for row in body["data"]["clients"]] == [rows[1]["clientId"]]
+        phone = await client.get(BASE_PATH, params={"search": "912 345-67-01"})
+        assert phone.status_code == 200
+        assert phone.json()["total"] == 1
+        assert phone.json()["data"]["clients"][0]["clientId"] == rows[1]["clientId"]
+        deactivated = await client.patch(f"{BASE_PATH}/{rows[1]['clientId']}", json={"isActive": False})
+        assert deactivated.status_code == 200
+        for include, total in ((False, 2), (True, 3)):
+            response = await client.get(BASE_PATH, params={"search": marker, "include_deactivated": include})
+            assert response.status_code == 200
+            assert response.json()["total"] == total
+        for query in (uuid4().hex, "%", "_"):
+            response = await client.get(BASE_PATH, params={"search": query})
+            assert response.status_code == 200
+            assert response.json()["total"] == 0
+            assert response.json()["data"]["clients"] == []
+        blank = await client.get(BASE_PATH, params={"search": "   "})
+        unfiltered = await client.get(BASE_PATH)
+        assert blank.json() == unfiltered.json()
+
+    @pytest.mark.parametrize("params", [{"offset": -1}, {"limit": 0}, {"search": "x" * 501}])
+    async def test_list_validation(self, client: AsyncClient, active_employee: EmployeeTestData, params: dict) -> None:
+        await self.login(client, active_employee)
+        assert (await client.get(BASE_PATH, params=params)).status_code == 422
+
+    async def test_invalid_uuid_and_unknown_client(
+        self, client: AsyncClient, active_employee: EmployeeTestData
+    ) -> None:
+        await self.login(client, active_employee)
+        for value, expected in (("not-a-uuid", 422), (str(uuid4()), 404)):
+            assert (await client.get(f"{BASE_PATH}/{value}")).status_code == expected
+            assert (await client.patch(f"{BASE_PATH}/{value}", json={"name": "Updated"})).status_code == expected
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("name", ""),
+            ("name", "x" * 121),
+            ("phone", ""),
+            ("phone", "x" * 33),
+            ("address", ""),
+            ("address", "x" * 501),
+            ("sleepingThresholdDays", -1),
+            ("sleepingThresholdDays", 3651),
+        ],
+    )
+    async def test_create_and_patch_validation(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        field: str,
+        value: object,
+    ) -> None:
+        await self.login(client, active_employee)
+        response = await client.post(f"{BASE_PATH}/create", json=self.payload(**{field: value}))
+        assert response.status_code == 422
+        created = await client.post(f"{BASE_PATH}/create", json=self.payload())
+        assert created.status_code == 201
+        original = created.json()["data"]
+        for invalid in (value, None):
+            response = await client.patch(f"{BASE_PATH}/{original['clientId']}", json={field: invalid})
+            assert response.status_code == 422
+        after = await client.get(f"{BASE_PATH}/{original['clientId']}")
+        assert after.json()["data"] == original
+
+    async def test_relations_null_clearing_and_patch_preserves_other_fields(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+    ) -> None:
+        await self.login(client, active_employee)
+        rep_response = await client.post(
+            "/protected/sales-representatives/create",
+            json={
+                "name": f"Rep {uuid4()}",
+                "phone": uuid4().hex,
+                "commissionPercent": 10,
+            },
+        )
+        assert rep_response.status_code == 201
+        rep = rep_response.json()["data"]
+        method_response = await client.post("/protected/payment-methods/create", json={"name": f"Method {uuid4()}"})
+        assert method_response.status_code == 201
+        method = method_response.json()["data"]
+        for path in (
+            f"/protected/sales-representatives/{rep['salesRepresentativeId']}",
+            f"/protected/payment-methods/{method['paymentMethodId']}",
+        ):
+            assert (await client.patch(path, json={"isActive": False})).status_code == 200
+        created = await client.post(
+            f"{BASE_PATH}/create",
+            json=self.payload(
+                salesRepresentativeId=rep["salesRepresentativeId"],
+                defaultPaymentMethodId=method["paymentMethodId"],
+                cooldownUntil="2026-10-12T10:00:00",
+                sleepingThresholdDays=0,
+            ),
+        )
+        assert created.status_code == 201
+        original = created.json()["data"]
+        assert original["salesRepresentativeName"] == rep["name"]
+        assert original["defaultPaymentMethodName"] == method["name"]
+        assert original["cooldownUntil"] == "2026-10-12T10:00:00"
+        path = f"{BASE_PATH}/{original['clientId']}"
+        for field in ("salesRepresentativeId", "defaultPaymentMethodId"):
+            response = await client.patch(path, json={field: str(uuid4())})
+            assert response.status_code == 422
+            assert (await client.get(path)).json()["data"] == original
+        changed = await client.patch(path, json={"sleepingThresholdDays": 3650})
+        assert changed.status_code == 200
+        assert changed.json()["data"] == {**original, "sleepingThresholdDays": 3650}
+        cleared = await client.patch(
+            path,
+            json={
+                "salesRepresentativeId": None,
+                "defaultPaymentMethodId": None,
+                "cooldownUntil": None,
+            },
+        )
+        assert cleared.status_code == 200
+        after = (await client.get(path)).json()["data"]
+        for field in (
+            "salesRepresentativeId",
+            "salesRepresentativeName",
+            "defaultPaymentMethodId",
+            "defaultPaymentMethodName",
+            "cooldownUntil",
+        ):
+            assert after[field] is None
+        assert after["name"] == original["name"]
+        assert after["phone"] == original["phone"]
+        assert after["address"] == original["address"]
+        assert after["lastDeliveryDate"] is None
+        assert after["lastDeliveryQuantity"] is None
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"isActive": None},
+            {"clientId": str(uuid4())},
+            {"lastDeliveryDate": "2026-10-12T10:00:00"},
+            {"lastDeliveryQuantity": 10},
+            {"cooldownUntil": "2026-10-12T10:00:00Z"},
+            {"cooldownUntil": "2026-10-12T10:00:00+03:00"},
+        ],
+    )
+    async def test_patch_rejects_read_only_fields_and_timezone_offsets(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        body: dict,
+    ) -> None:
+        await self.login(client, active_employee)
+        created = await client.post(f"{BASE_PATH}/create", json=self.payload())
+        assert created.status_code == 201
+        original = created.json()["data"]
+        path = f"{BASE_PATH}/{original['clientId']}"
+        response = await client.patch(path, json=body)
+        assert response.status_code == 422
+        assert (await client.get(path)).json()["data"] == original
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"isActive": False},
+            {"lastDeliveryQuantity": 10},
+            {"createdAt": "2026-10-12T10:00:00"},
+            {"cooldownUntil": "2026-10-12T10:00:00Z"},
+        ],
+    )
+    async def test_create_rejects_server_fields_and_timezone_offsets(
+        self,
+        client: AsyncClient,
+        active_employee: EmployeeTestData,
+        body: dict,
+    ) -> None:
+        await self.login(client, active_employee)
+        response = await client.post(f"{BASE_PATH}/create", json=self.payload(**body))
+        assert response.status_code == 422

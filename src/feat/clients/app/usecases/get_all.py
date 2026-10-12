@@ -9,6 +9,7 @@ class GetClientsDTO:
     include_deactivated: bool
     offset: int
     limit: int
+    search: str | None = None
 
 
 class GetClientsUseCase:
@@ -21,4 +22,5 @@ class GetClientsUseCase:
                 include_deactivated=dto.include_deactivated,
                 offset=dto.offset,
                 limit=dto.limit,
+                search=dto.search,
             )

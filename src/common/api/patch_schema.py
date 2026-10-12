@@ -26,8 +26,10 @@ class BasePatchSchema(BaseSchema):
         if not isinstance(data, dict) or cls.__entity__ is None:
             return data
         mapper = inspect(cls.__entity__)
-        for field_name in cls.model_fields:
-            if field_name not in data or data[field_name] is not None:
+        for field_name, info in cls.model_fields.items():
+            # Pydantic resolves aliases after this before-validator.
+            input_key = info.alias if info.alias in data else field_name
+            if input_key not in data or data[input_key] is not None:
                 continue
             if field_name in cls.__composition_fields__:
                 continue
@@ -56,8 +58,7 @@ class BasePatchSchema(BaseSchema):
         unknown = schema_fields - entity_fields - composition_fields
         if unknown:
             raise AttributeError(
-                f"{cls.__name__}: fields do not exist in {entity.__name__}: "
-                f"{', '.join(sorted(unknown))}",
+                f"{cls.__name__}: fields do not exist in {entity.__name__}: {', '.join(sorted(unknown))}",
             )
         forbidden = schema_fields - allowed_fields - composition_fields
         if forbidden:
