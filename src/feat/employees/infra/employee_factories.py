@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.employees.app.usecases.change_password import ChangeEmployeePasswordUseCase
+from src.feat.employees.app.usecases.check_duplicate import CheckEmployeeDuplicateUseCase
 from src.feat.employees.app.usecases.create import CreateEmployeeUseCase
 from src.feat.employees.app.usecases.get import GetEmployeeUseCase
 from src.feat.employees.app.usecases.get_all import GetEmployeesUseCase
@@ -17,6 +18,9 @@ class EmployeesUseCaseFactory:
     ) -> None:
         self._session_factory = session_factory
         self._password_service = password_service
+
+    def check_duplicate(self) -> CheckEmployeeDuplicateUseCase:
+        return CheckEmployeeDuplicateUseCase(uow=self._create_uow())
 
     def create_employee(self) -> CreateEmployeeUseCase:
         return CreateEmployeeUseCase(

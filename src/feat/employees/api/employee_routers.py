@@ -22,6 +22,7 @@ from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
 from src.feat.employees.app.usecases.create import CreateEmployeeDTO
+from src.feat.employees.app.usecases.check_duplicate import CheckEmployeeDuplicateDTO
 from src.feat.employees.app.usecases.get import GetEmployeeDTO
 from src.feat.employees.app.usecases.get_all import GetEmployeesDTO
 from src.feat.employees.app.usecases.update import UpdateEmployeeDTO
@@ -80,6 +81,23 @@ employees_router = APIRouter(
     prefix="/employees",
     tags=["Crud сотрудников для использования админом"],
 )
+
+
+@employees_router.get(
+    "/check-duplicate",
+    response_model=StdResponse[EmployeeResp | None],
+    description="Точное совпадение логина среди активных и деактивированных сотрудников. Доступ только администратору. Возвращает сотрудника либо data=null; создание всё равно проверяет уникальность и возвращает 409 при конфликте.",
+)
+async def check_duplicate_employee(
+    ctx: Context,
+    username: Annotated[str, Query(min_length=1, max_length=50)],
+) -> StdResponse[EmployeeResp | None]:
+    employee = await ctx.employees_use_cases.check_duplicate().execute(
+        CheckEmployeeDuplicateDTO(username=username),
+    )
+    return StdResponse(
+        data=EmployeeResp.model_validate(employee) if employee is not None else None,
+    )
 
 
 @employees_router.get(
