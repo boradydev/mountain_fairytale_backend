@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
@@ -282,6 +282,7 @@ class EditLock(BaseEntity):
 class DeliveryDocument(BaseEntity):
     __tablename__ = "delivery_documents"
     __table_args__ = (
+        Index("ix_delivery_documents_planned_date", "planned_date"),
         CheckConstraint(
             "(start_mileage IS NULL OR start_mileage >= 0) AND "
             "(end_mileage IS NULL OR (start_mileage IS NOT NULL AND end_mileage > start_mileage))",

@@ -5,6 +5,8 @@ from src.feat.delivery_document.app.usecases.create import CreateDeliveryDocumen
 from src.feat.delivery_document.app.usecases.edit_lock import DeliveryDocumentEditLockUseCase
 from src.feat.delivery_document.app.usecases.get import GetDeliveryDocumentUseCase
 from src.feat.delivery_document.app.usecases.get_all import GetDeliveryDocumentsUseCase
+from src.feat.delivery_document.app.usecases.get_day_documents import GetDayDocumentsUseCase
+from src.feat.delivery_document.app.usecases.get_days import GetDeliveryDaysUseCase
 from src.feat.delivery_document.app.usecases.update import UpdateDeliveryDocumentUseCase
 from src.feat.delivery_document.infra.delivery_document_uow import DeliveryDocumentsUOW
 
@@ -21,6 +23,12 @@ class DeliveryDocumentsUseCaseFactory:
 
     def get_delivery_documents(self) -> GetDeliveryDocumentsUseCase:
         return GetDeliveryDocumentsUseCase(uow=self._create_uow())
+
+    def get_delivery_days(self) -> GetDeliveryDaysUseCase:
+        return GetDeliveryDaysUseCase(uow=self._create_uow())
+
+    def get_day_documents(self) -> GetDayDocumentsUseCase:
+        return GetDayDocumentsUseCase(uow=self._create_uow())
 
     def update_delivery_document(self) -> UpdateDeliveryDocumentUseCase:
         return UpdateDeliveryDocumentUseCase(uow=self._create_uow())

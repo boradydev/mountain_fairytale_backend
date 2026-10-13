@@ -57,6 +57,9 @@ CREATE INDEX ix_delivery_documents_type_created_at
 CREATE INDEX ix_delivery_documents_type_is_active_created_at
     ON delivery_documents (document_type, is_active, created_at ASC);
 
+CREATE INDEX ix_delivery_documents_planned_date
+    ON delivery_documents (planned_date);
+
 
 CREATE TABLE points (
     point_id UUID PRIMARY KEY,

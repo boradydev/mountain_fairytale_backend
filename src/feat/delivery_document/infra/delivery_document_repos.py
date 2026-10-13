@@ -1,7 +1,9 @@
 from datetime import date, datetime
+from typing import Annotated
 from uuid import UUID
 
 from psycopg import errors as pg_excs
+from pydantic import Field, TypeAdapter
 from sqlalchemy import func, inspect as sa_inspect, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +12,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
 from src.feat.delivery_document.domain.abcs.delivery_document_repo_abcs import IDeliveryDocumentsRepository
+from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock, Point
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentEditLockNotFoundException,
@@ -20,14 +23,30 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentRelatedEntityNotFoundException,
     DeliveryDocumentUpdateException,
 )
+from src.feat.delivery_document.infra.sql.registry import SQL
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.products.domain.product_entities import Product
 
 
+_days_adapter = TypeAdapter(list[DeliveryDay])
+_day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discriminator="document_type")])
+
+
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def get_days(self, *, offset: int, limit: int) -> tuple[list[DeliveryDay], int]:
+        result = await self._session.execute(SQL.GET_DELIVERY_DAYS, {"offset": offset, "limit": limit})
+        row = result.mappings().one()
+        return _days_adapter.validate_python(row["delivery_days"]), row["total"]
+
+    async def get_day_documents(self, *, planned_date: date, include_cancelled: bool) -> list[DayDocumentRecord]:
+        result = await self._session.execute(
+            SQL.GET_DAY_DOCUMENTS, {"planned_date": planned_date, "include_cancelled": include_cancelled}
+        )
+        return [_day_document_adapter.validate_python(dict(row)) for row in result.mappings().all()]
 
     def _document_options(self):
         return (

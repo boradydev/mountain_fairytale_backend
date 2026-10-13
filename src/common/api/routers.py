@@ -4,6 +4,7 @@ from src.common.api.deps import get_access_token_pyload, verify_admin_access
 from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
 from src.feat.clients.api.client_routers import clients_router
+from src.feat.delivery_document.api.delivery_day_routers import delivery_days_router
 from src.feat.delivery_document.api.delivery_document_routers import (
     delivery_route_sheets_router,
     pickup_sheets_router,
@@ -27,6 +28,7 @@ protected = APIRouter(
 protected.include_router(me_router)
 protected.include_router(cars_router)
 protected.include_router(clients_router)
+protected.include_router(delivery_days_router)
 protected.include_router(delivery_route_sheets_router)
 protected.include_router(pickup_sheets_router)
 protected.include_router(drivers_router)
