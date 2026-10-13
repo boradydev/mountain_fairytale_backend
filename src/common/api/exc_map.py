@@ -8,9 +8,10 @@ AI Note:
     - To expose a new internal exception to the API, add it here with its status code and message.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Any
 
 from src.common.api.api_excs import (
     ForbiddenException,
@@ -79,6 +80,8 @@ from src.feat.sales_rep.domain.sales_rep_excs import (
 class Resp:
     status_code: int
     detail: str
+    extra_fields: Callable[[Any], Mapping[str, object]] | None = None
+    openapi_schema: Mapping[str, object] | None = None
 
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
@@ -122,6 +125,15 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         DeliveryDocumentLockedException: Resp(
             status_code=423,
             detail="Delivery document is locked by another employee",
+            extra_fields=lambda exc: {"ownerName": exc.owner_name},
+            openapi_schema={
+                "type": "object",
+                "properties": {
+                    "detail": {"type": "string"},
+                    "ownerName": {"type": "string"},
+                },
+                "required": ["detail", "ownerName"],
+            },
         ),
         DeliveryDocumentEditLockNotFoundException: Resp(
             status_code=409,

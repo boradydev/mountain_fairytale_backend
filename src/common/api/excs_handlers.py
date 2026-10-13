@@ -37,12 +37,11 @@ def get_business_exception_handler(
                 },
             )
 
-        return JSONResponse(
-            status_code=resp.status_code,
-            content={
-                "detail": resp.detail,
-            },
-        )
+        content: dict[str, Any] = {"detail": resp.detail}
+        if resp.extra_fields is not None:
+            content.update(resp.extra_fields(exc))
+
+        return JSONResponse(status_code=resp.status_code, content=content)
 
     return handler
 
@@ -115,9 +114,16 @@ def map_exceptions_to_responses(
             continue
 
         if resp.status_code not in responses:
-            responses[resp.status_code] = {
+            response: dict[str, Any] = {
                 "description": resp.detail,
             }
+            if resp.openapi_schema is not None:
+                response["content"] = {
+                    "application/json": {
+                        "schema": dict(resp.openapi_schema),
+                    },
+                }
+            responses[resp.status_code] = response
         else:
             responses[resp.status_code]["description"] += f" | {resp.detail}"
 
