@@ -45,3 +45,8 @@ class DeliveryDocumentEditLockNotFoundException(DomainException):
 @dataclass(frozen=True, slots=True)
 class DeliveryDocumentEditLockNotOwnedException(DomainException):
     delivery_document_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryDocumentCancelledException(DomainException):
+    delivery_document_id: UUID

@@ -2,7 +2,10 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src.feat.delivery_document.app.abcs.delivery_document_uow_abcs import IDeliveryDocumentsUOW
-from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDocumentNotFoundException
+from src.feat.delivery_document.domain.delivery_document_excs import (
+    DeliveryDocumentCancelledException,
+    DeliveryDocumentNotFoundException,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -23,10 +26,16 @@ class DeliveryDocumentEditLockUseCase:
             document = await repo.get_by_id(dto.delivery_document_id, document_type=dto.document_type, for_update=True)
             if document is None:
                 raise DeliveryDocumentNotFoundException(delivery_document_id=dto.delivery_document_id)
+            if not document.is_active and self._operation in {"acquire", "renew"}:
+                raise DeliveryDocumentCancelledException(delivery_document_id=dto.delivery_document_id)
             if self._operation == "acquire":
-                result = await repo.acquire_edit_lock(delivery_document_id=dto.delivery_document_id, employee_id=dto.employee_id)
+                result = await repo.acquire_edit_lock(
+                    delivery_document_id=dto.delivery_document_id, employee_id=dto.employee_id
+                )
             elif self._operation == "renew":
-                result = await repo.renew_edit_lock(delivery_document_id=dto.delivery_document_id, employee_id=dto.employee_id)
+                result = await repo.renew_edit_lock(
+                    delivery_document_id=dto.delivery_document_id, employee_id=dto.employee_id
+                )
             else:
                 await repo.release_edit_lock(delivery_document_id=dto.delivery_document_id, employee_id=dto.employee_id)
                 result = None

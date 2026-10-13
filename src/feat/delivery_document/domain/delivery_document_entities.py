@@ -5,17 +5,25 @@ from enum import Enum
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
+from src.common.domain.events import FieldChange
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
 from src.feat.delivery_document.domain.delivery_document_events import (
-    CancelDeliveryDocumentEvent, CreateDeliveryDocumentEvent, CreateItemEvent,
-    CreatePointEvent, DeleteItemEvent, DeletePointEvent, RestoreDeliveryDocumentEvent,
-    UpdateDeliveryDocumentEvent, UpdateItemEvent, UpdatePointEvent,
+    CancelDeliveryDocumentEvent,
+    CreateDeliveryDocumentEvent,
+    CreateItemEvent,
+    CreatePointEvent,
+    DeleteItemEvent,
+    DeletePointEvent,
+    RestoreDeliveryDocumentEvent,
+    UpdateDeliveryDocumentEvent,
+    UpdateItemEvent,
+    UpdatePointEvent,
 )
 from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDocumentUpdateException
 from src.feat.drivers.domain.driver_entities import Driver
@@ -46,8 +54,13 @@ class Item(BaseEntity):
     @classmethod
     def create(cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, quantity: int, price: float) -> Self:
         item = cls(point_id=point_id, product_id=product_id, quantity=quantity, price=price)
-        item._add_event(CreateItemEvent(actor_id=actor_id, point_id=point_id, product_id=product_id))
+        item._add_event(
+            CreateItemEvent(actor_id=actor_id, point_id=point_id, product_id=product_id, data=item.snapshot())
+        )
         return item
+
+    def snapshot(self) -> dict[str, Any]:
+        return {"product_id": self.product_id, "quantity": self.quantity, "price": self.price}
 
     def update(self, *, actor_id: UUID, quantity: int, price: float) -> None:
         changes = self._apply_update_changes(
@@ -55,12 +68,19 @@ class Item(BaseEntity):
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
         if changes:
-            self._add_event(UpdateItemEvent(
-                actor_id=actor_id, point_id=self.point_id, product_id=self.product_id, changes=changes,
-            ))
+            self._add_event(
+                UpdateItemEvent(
+                    actor_id=actor_id,
+                    point_id=self.point_id,
+                    product_id=self.product_id,
+                    changes=changes,
+                )
+            )
 
     def mark_deleted(self, *, actor_id: UUID) -> None:
-        self._add_event(DeleteItemEvent(actor_id=actor_id, point_id=self.point_id, product_id=self.product_id))
+        self._add_event(
+            DeleteItemEvent(actor_id=actor_id, point_id=self.point_id, product_id=self.product_id, data=self.snapshot())
+        )
 
 
 class Point(BaseEntity):
@@ -68,8 +88,12 @@ class Point(BaseEntity):
     UQ_DOCUMENT_CLIENT = "points_delivery_document_id_client_id_key"
     UQ_DOCUMENT_POSITION = "points_delivery_document_id_position_key"
     __table_args__ = (
-        UniqueConstraint("delivery_document_id", "client_id", name=UQ_DOCUMENT_CLIENT),
-        UniqueConstraint("delivery_document_id", "position", name=UQ_DOCUMENT_POSITION),
+        UniqueConstraint(
+            "delivery_document_id", "client_id", name=UQ_DOCUMENT_CLIENT, deferrable=True, initially="IMMEDIATE"
+        ),
+        UniqueConstraint(
+            "delivery_document_id", "position", name=UQ_DOCUMENT_POSITION, deferrable=True, initially="IMMEDIATE"
+        ),
     )
 
     point_id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -81,7 +105,7 @@ class Point(BaseEntity):
 
     client: Mapped[Client] = relationship(lazy="joined")
     items: Mapped[list[Item]] = relationship(cascade="all, delete-orphan", lazy="selectin")
-    _ALLOWED_UPDATE_FIELDS = {"client_id", "position"}
+    _ALLOWED_UPDATE_FIELDS = {"position"}
 
     @property
     def client_name(self) -> str:
@@ -112,25 +136,53 @@ class Point(BaseEntity):
         return self.client.sales_representative_name
 
     @classmethod
-    def create(cls, *, actor_id: UUID, delivery_document_id: UUID, client_id: UUID,
-               position: int, items: list[Any]) -> Self:
+    def create(
+        cls, *, actor_id: UUID, delivery_document_id: UUID, client_id: UUID, position: int, items: list[Any]
+    ) -> Self:
         point_id = uuid7()
-        point = cls(point_id=point_id, delivery_document_id=delivery_document_id,
-                    client_id=client_id, position=position, items=[])
-        point.items = [Item.create(actor_id=actor_id, point_id=point_id,
-                                   product_id=item.product_id, quantity=item.quantity, price=item.price)
-                       for item in items]
-        point._add_event(CreatePointEvent(actor_id=actor_id, point_id=point_id,
-                                          delivery_document_id=delivery_document_id))
+        point = cls(
+            point_id=point_id,
+            delivery_document_id=delivery_document_id,
+            client_id=client_id,
+            position=position,
+            items=[],
+        )
+        point.items = [
+            Item.create(
+                actor_id=actor_id,
+                point_id=point_id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.price,
+            )
+            for item in items
+        ]
+        point._add_event(
+            CreatePointEvent(
+                actor_id=actor_id, point_id=point_id, delivery_document_id=delivery_document_id, data=point.snapshot()
+            )
+        )
         return point
 
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "point_id": self.point_id,
+            "client_id": self.client_id,
+            "position": self.position,
+            "items": [item.snapshot() for item in self.items],
+        }
+
     def update(self, *, actor_id: UUID, client_id: UUID, position: int, items: list[Any]) -> None:
+        if client_id != self.client_id:
+            raise DeliveryDocumentUpdateException(
+                field="client_id",
+                message="Replace the point to change its client.",
+            )
+        previous_items = [item.snapshot() for item in self.items]
         changes = self._apply_update_changes(
             payload={"client_id": client_id, "position": position},
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
-        if changes:
-            self._add_event(UpdatePointEvent(actor_id=actor_id, point_id=self.point_id, changes=changes))
 
         if not hasattr(self, "_detached_events"):
             self._detached_events = []
@@ -141,8 +193,13 @@ class Point(BaseEntity):
             requested_ids.add(requested.product_id)
             item = existing.get(requested.product_id)
             if item is None:
-                item = Item.create(actor_id=actor_id, point_id=self.point_id,
-                                   product_id=requested.product_id, quantity=requested.quantity, price=requested.price)
+                item = Item.create(
+                    actor_id=actor_id,
+                    point_id=self.point_id,
+                    product_id=requested.product_id,
+                    quantity=requested.quantity,
+                    price=requested.price,
+                )
             else:
                 item.update(actor_id=actor_id, quantity=requested.quantity, price=requested.price)
             updated.append(item)
@@ -151,6 +208,11 @@ class Point(BaseEntity):
                 old_item.mark_deleted(actor_id=actor_id)
                 self._detached_events.extend(old_item.pull_events())
         self.items = updated
+        current_items = [item.snapshot() for item in self.items]
+        if previous_items != current_items:
+            changes["items"] = FieldChange(old=previous_items, new=current_items)
+        if changes:
+            self._add_event(UpdatePointEvent(actor_id=actor_id, point_id=self.point_id, changes=changes))
 
     def mark_deleted(self, *, actor_id: UUID) -> None:
         if not hasattr(self, "_detached_events"):
@@ -158,8 +220,14 @@ class Point(BaseEntity):
         for item in self.items:
             item.mark_deleted(actor_id=actor_id)
             self._detached_events.extend(item.pull_events())
-        self._add_event(DeletePointEvent(actor_id=actor_id, point_id=self.point_id,
-                                         delivery_document_id=self.delivery_document_id))
+        self._add_event(
+            DeletePointEvent(
+                actor_id=actor_id,
+                point_id=self.point_id,
+                delivery_document_id=self.delivery_document_id,
+                data=self.snapshot(),
+            )
+        )
 
     def pull_aggregate_events(self) -> list[Any]:
         events = self.pull_events()
@@ -178,7 +246,8 @@ class EditLock(BaseEntity):
     __tablename__ = "delivery_document_edit_locks"
     TTL = timedelta(minutes=2)
     delivery_document_id: Mapped[UUID] = mapped_column(
-        ForeignKey("delivery_documents.delivery_document_id", ondelete="CASCADE"), primary_key=True,
+        ForeignKey("delivery_documents.delivery_document_id", ondelete="CASCADE"),
+        primary_key=True,
     )
     employee_id: Mapped[UUID] = mapped_column(ForeignKey("employees.employee_id"))
     expires_at: Mapped[datetime] = mapped_column(DateTime)
@@ -190,8 +259,7 @@ class EditLock(BaseEntity):
         return self.employee.username
 
     @classmethod
-    def create(cls, *, delivery_document_id: UUID, employee_id: UUID,
-               expires_at: datetime) -> Self:
+    def create(cls, *, delivery_document_id: UUID, employee_id: UUID, expires_at: datetime) -> Self:
         return cls(delivery_document_id=delivery_document_id, employee_id=employee_id, expires_at=expires_at)
 
     def renew(self) -> None:
@@ -200,6 +268,13 @@ class EditLock(BaseEntity):
 
 class DeliveryDocument(BaseEntity):
     __tablename__ = "delivery_documents"
+    __table_args__ = (
+        CheckConstraint(
+            "(start_mileage IS NULL OR start_mileage >= 0) AND "
+            "(end_mileage IS NULL OR (start_mileage IS NOT NULL AND end_mileage > start_mileage))",
+            name="delivery_documents_mileage_check",
+        ),
+    )
     TYPE_DELIVERY_ROUTE_SHEET = DocumentType.DELIVERY.value
     TYPE_PICKUP_SHEET = DocumentType.PICKUP.value
 
@@ -216,7 +291,9 @@ class DeliveryDocument(BaseEntity):
     driver: Mapped[Driver | None] = relationship(lazy="joined")
     car: Mapped[Car | None] = relationship(lazy="joined")
     points: Mapped[list[Point]] = relationship(
-        cascade="all, delete-orphan", order_by="Point.position", lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="Point.position",
+        lazy="selectin",
     )
     edit_lock: Mapped[EditLock | None] = relationship(cascade="all, delete-orphan", lazy="joined", uselist=False)
     _ALLOWED_UPDATE_FIELDS = {"planned_date", "driver_id", "car_id", "start_mileage", "end_mileage"}
@@ -236,40 +313,84 @@ class DeliveryDocument(BaseEntity):
         return f"{self.car.model} {self.car.number}"
 
     @classmethod
-    def create(cls, *, actor_id: UUID, document_type: str, planned_date: date,
-               points: list[Any], driver_id: UUID | None = None, car_id: UUID | None = None,
-               start_mileage: float | None = None, end_mileage: float | None = None) -> Self:
+    def create(
+        cls,
+        *,
+        actor_id: UUID,
+        document_type: str,
+        planned_date: date,
+        points: list[Any],
+        driver_id: UUID | None = None,
+        car_id: UUID | None = None,
+        start_mileage: float | None = None,
+        end_mileage: float | None = None,
+    ) -> Self:
         if document_type not in {cls.TYPE_DELIVERY_ROUTE_SHEET, cls.TYPE_PICKUP_SHEET}:
             raise DeliveryDocumentUpdateException(field="document_type", message="Unsupported document type.")
         if document_type == cls.TYPE_DELIVERY_ROUTE_SHEET:
             if driver_id is None or car_id is None or start_mileage is None:
-                raise DeliveryDocumentUpdateException(field="delivery_fields", message="Driver, car and start mileage are required.")
+                raise DeliveryDocumentUpdateException(
+                    field="delivery_fields", message="Driver, car and start mileage are required."
+                )
         elif any(value is not None for value in (driver_id, car_id, start_mileage, end_mileage)):
-            raise DeliveryDocumentUpdateException(field="delivery_fields", message="Pickup sheets cannot contain delivery fields.")
+            raise DeliveryDocumentUpdateException(
+                field="delivery_fields", message="Pickup sheets cannot contain delivery fields."
+            )
         _validate_mileage(start_mileage, end_mileage)
         now = datetime.now()
         document_id = uuid7()
         document = cls(
-            delivery_document_id=document_id, document_type=document_type, created_at=now,
-            planned_date=planned_date, is_active=True, driver_id=driver_id, car_id=car_id,
-            start_mileage=start_mileage, end_mileage=end_mileage,
-            points=[Point.create(actor_id=actor_id, delivery_document_id=document_id,
-                                 client_id=point.client_id, position=index, items=point.items)
-                    for index, point in enumerate(points)],
+            delivery_document_id=document_id,
+            document_type=document_type,
+            created_at=now,
+            planned_date=planned_date,
+            is_active=True,
+            driver_id=driver_id,
+            car_id=car_id,
+            start_mileage=start_mileage,
+            end_mileage=end_mileage,
+            points=[
+                Point.create(
+                    actor_id=actor_id,
+                    delivery_document_id=document_id,
+                    client_id=point.client_id,
+                    position=index,
+                    items=point.items,
+                )
+                for index, point in enumerate(points)
+            ],
         )
-        document._add_event(CreateDeliveryDocumentEvent(actor_id=actor_id,
-            delivery_document_id=document_id, document_type=document_type))
+        document._add_event(
+            CreateDeliveryDocumentEvent(
+                actor_id=actor_id,
+                delivery_document_id=document_id,
+                document_type=document_type,
+                data=document.snapshot(),
+            )
+        )
         return document
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "planned_date": self.planned_date,
+            "is_active": self.is_active,
+            "driver_id": self.driver_id,
+            "car_id": self.car_id,
+            "start_mileage": self.start_mileage,
+            "end_mileage": self.end_mileage,
+            "points": [point.snapshot() for point in self.points],
+        }
 
     def update(self, *, actor_id: UUID, request: Any) -> None:
         changes: dict[str, Any] = {}
         payload = request.changes()
-        point_payload = payload.pop("points", None) if "points" in payload else None
+        payload.pop("points", None)
         # A supplied points field is a complete replacement, including the empty-list case.
         points_supplied = "points" in request.model_fields_set
         root_changes = self._apply_update_changes(payload=payload, allowed_fields=self._ALLOWED_UPDATE_FIELDS)
         changes.update(root_changes)
         if points_supplied:
+            previous_points = [point.snapshot() for point in self.points]
             if not hasattr(self, "_detached_events"):
                 self._detached_events = []
             requested_points = request.points
@@ -280,17 +401,27 @@ class DeliveryDocument(BaseEntity):
             used_ids: set[UUID] = set()
             for position, requested in enumerate(requested_points):
                 if requested.point_id is None:
-                    point = Point.create(actor_id=actor_id, delivery_document_id=self.delivery_document_id,
-                                         client_id=requested.client_id, position=position, items=requested.items)
+                    point = Point.create(
+                        actor_id=actor_id,
+                        delivery_document_id=self.delivery_document_id,
+                        client_id=requested.client_id,
+                        position=position,
+                        items=requested.items,
+                    )
                 else:
                     if requested.point_id in used_ids:
-                        raise DeliveryDocumentUpdateException(field="point_id", message="A point ID may appear only once.")
+                        raise DeliveryDocumentUpdateException(
+                            field="point_id", message="A point ID may appear only once."
+                        )
                     used_ids.add(requested.point_id)
                     point = old_by_id.get(requested.point_id)
                     if point is None:
-                        raise DeliveryDocumentUpdateException(field="point_id", message="The point does not belong to this document.")
-                    point.update(actor_id=actor_id, client_id=requested.client_id,
-                                 position=position, items=requested.items)
+                        raise DeliveryDocumentUpdateException(
+                            field="point_id", message="The point does not belong to this document."
+                        )
+                    point.update(
+                        actor_id=actor_id, client_id=requested.client_id, position=position, items=requested.items
+                    )
                 new_points.append(point)
             retained_ids = {point.point_id for point in new_points}
             for old_point in self.points:
@@ -298,23 +429,39 @@ class DeliveryDocument(BaseEntity):
                     old_point.mark_deleted(actor_id=actor_id)
                     self._detached_events.extend(old_point.pull_aggregate_events())
             self.points = new_points
+            current_points = [point.snapshot() for point in self.points]
+            if previous_points != current_points:
+                changes["points"] = FieldChange(old=previous_points, new=current_points)
         if self.document_type == self.TYPE_DELIVERY_ROUTE_SHEET:
             _validate_mileage(self.start_mileage, self.end_mileage)
         if changes:
-            self._add_event(UpdateDeliveryDocumentEvent(actor_id=actor_id,
-                delivery_document_id=self.delivery_document_id, changes=changes))
+            self._add_event(
+                UpdateDeliveryDocumentEvent(
+                    actor_id=actor_id, delivery_document_id=self.delivery_document_id, changes=changes
+                )
+            )
 
     def cancel(self, *, actor_id: UUID) -> None:
         if self.is_active:
             self.is_active = False
-            self._add_event(CancelDeliveryDocumentEvent(actor_id=actor_id,
-                delivery_document_id=self.delivery_document_id))
+            self._add_event(
+                CancelDeliveryDocumentEvent(
+                    actor_id=actor_id,
+                    delivery_document_id=self.delivery_document_id,
+                    changes={"is_active": FieldChange(old=True, new=False)},
+                )
+            )
 
     def restore(self, *, actor_id: UUID) -> None:
         if not self.is_active:
             self.is_active = True
-            self._add_event(RestoreDeliveryDocumentEvent(actor_id=actor_id,
-                delivery_document_id=self.delivery_document_id))
+            self._add_event(
+                RestoreDeliveryDocumentEvent(
+                    actor_id=actor_id,
+                    delivery_document_id=self.delivery_document_id,
+                    changes={"is_active": FieldChange(old=False, new=True)},
+                )
+            )
 
     def pull_aggregate_events(self) -> list[Any]:
         events = self.pull_events()
@@ -326,5 +473,9 @@ class DeliveryDocument(BaseEntity):
 
 
 def _validate_mileage(start: float | None, end: float | None) -> None:
+    if start is not None and start < 0:
+        raise DeliveryDocumentUpdateException(field="start_mileage", message="Start mileage cannot be negative.")
     if end is not None and (start is None or end <= start):
-        raise DeliveryDocumentUpdateException(field="end_mileage", message="End mileage must be greater than start mileage.")
+        raise DeliveryDocumentUpdateException(
+            field="end_mileage", message="End mileage must be greater than start mileage."
+        )

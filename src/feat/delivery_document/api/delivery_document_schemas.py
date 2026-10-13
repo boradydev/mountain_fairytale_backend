@@ -1,8 +1,8 @@
 from datetime import date, datetime
-from typing import Annotated, Self
+from typing import Self
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, model_validator
 
 from src.common.api import fields
 from src.common.api.patch_schema import BasePatchSchema
@@ -24,7 +24,7 @@ class UpdateItemReq(BaseSchema):
 
 class CreatePointReq(BaseSchema):
     client_id: UUID
-    items: Annotated[list[CreateItemReq], Field(min_length=1)]
+    items: list[CreateItemReq]
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
@@ -38,7 +38,7 @@ class UpdatePointReq(BaseSchema):
     # Omitted/null point_id means that this is a new point.
     point_id: UUID | None = None
     client_id: UUID
-    items: Annotated[list[UpdateItemReq], Field(min_length=1)]
+    items: list[UpdateItemReq]
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
@@ -54,7 +54,7 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
     car_id: UUID
     start_mileage: fields.Mileage
     end_mileage: fields.Mileage | None = None
-    points: Annotated[list[CreatePointReq], Field(min_length=1)]
+    points: list[CreatePointReq]
 
     @model_validator(mode="after")
     def validate_request(self) -> Self:
@@ -68,7 +68,7 @@ class CreatePickupSheetReq(BaseSchema):
     model_config = ConfigDict(extra="forbid")
 
     planned_date: date
-    points: Annotated[list[CreatePointReq], Field(min_length=1)]
+    points: list[CreatePointReq]
 
     @model_validator(mode="after")
     def validate_unique_clients(self) -> Self:
@@ -122,14 +122,14 @@ def _validate_mileage(start: float | None, end: float | None) -> None:
         raise ValueError("End mileage must be greater than start mileage.")
 
 
-def _validate_unique_clients(points: list[CreatePointReq]) -> None:
+def _validate_unique_clients(points: list[CreatePointReq] | list[UpdatePointReq]) -> None:
     client_ids = [point.client_id for point in points]
     if len(client_ids) != len(set(client_ids)):
         raise ValueError("A client can appear only once in a document.")
 
 
 def _validate_patch_points(points: list[UpdatePointReq]) -> None:
-    _validate_unique_clients(points)  # type: ignore[arg-type]
+    _validate_unique_clients(points)
     point_ids = [point.point_id for point in points if point.point_id is not None]
     if len(point_ids) != len(set(point_ids)):
         raise ValueError("A point ID can appear only once in a document.")

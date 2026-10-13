@@ -32,10 +32,13 @@ CREATE TABLE delivery_documents (
 
     CONSTRAINT delivery_documents_mileage_check
         CHECK (
-            end_mileage IS NULL
-            OR (
-                start_mileage IS NOT NULL
-                AND end_mileage > start_mileage
+            (start_mileage IS NULL OR start_mileage >= 0)
+            AND (
+                end_mileage IS NULL
+                OR (
+                    start_mileage IS NOT NULL
+                    AND end_mileage > start_mileage
+                )
             )
         ),
 
@@ -71,10 +74,10 @@ CREATE TABLE points (
         REFERENCES clients (client_id),
 
     CONSTRAINT points_delivery_document_id_client_id_key
-        UNIQUE (delivery_document_id, client_id),
+        UNIQUE (delivery_document_id, client_id) DEFERRABLE INITIALLY IMMEDIATE,
 
     CONSTRAINT points_delivery_document_id_position_key
-        UNIQUE (delivery_document_id, position),
+        UNIQUE (delivery_document_id, position) DEFERRABLE INITIALLY IMMEDIATE,
 
     CONSTRAINT points_position_check
         CHECK (position >= 0)

@@ -1,11 +1,10 @@
 from datetime import date
 from typing import Any
 
-import pytest
 from httpx import AsyncClient
 
 from src.core.uuid7 import uuid7
-from tests.helpers import unique_product_name, unique_phone
+from tests.helpers import unique_phone, unique_product_name
 from tests.integration.conftest import EmployeeTestData
 
 
@@ -161,7 +160,6 @@ class TestDeliveryDocumentRouters:
         assert document["points"][1]["items"][0]["quantity"] == 5
         assert document["points"][1]["items"][0]["price"] == 260.0
 
-
     async def test_create_and_get_pickup_sheet(
         self,
         client: AsyncClient,
@@ -213,7 +211,6 @@ class TestDeliveryDocumentRouters:
         assert document["points"][0]["items"][0]["quantity"] == 4
         assert document["points"][0]["items"][0]["price"] == 75.25
 
-
     async def test_create_validation_errors(
         self,
         client: AsyncClient,
@@ -240,22 +237,14 @@ class TestDeliveryDocumentRouters:
         )
 
         no_points = await client.post(
-            f"PICKUP_BASE_PATH/create",
-            json={
-                "plannedDate": date(2025, 3, 15).isoformat(),
-                "points": [],
-            },
-        )
-        assert no_points.status_code == 404
-
-        no_points = await client.post(
             f"{PICKUP_BASE_PATH}/create",
             json={
                 "plannedDate": date(2025, 3, 15).isoformat(),
                 "points": [],
             },
         )
-        assert no_points.status_code == 422
+        assert no_points.status_code == 201
+        assert no_points.json()["data"]["points"] == []
 
         point_without_items = {
             "clientId": str(first_client.client_id),
@@ -268,7 +257,8 @@ class TestDeliveryDocumentRouters:
                 "points": [point_without_items],
             },
         )
-        assert empty_items.status_code == 422
+        assert empty_items.status_code == 201
+        assert empty_items.json()["data"]["points"][0]["items"] == []
 
         duplicate_clients = await client.post(
             f"{PICKUP_BASE_PATH}/create",
@@ -333,7 +323,6 @@ class TestDeliveryDocumentRouters:
         )
         assert invalid_pickup_fields.status_code == 422
 
-
     async def test_patch_validation_errors(
         self,
         client: AsyncClient,
@@ -382,6 +371,8 @@ class TestDeliveryDocumentRouters:
         )
         assert null_required_field.status_code == 422
 
+        lock_response = await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock")
+        assert lock_response.status_code == 200
         empty_patch_items = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={
@@ -394,7 +385,8 @@ class TestDeliveryDocumentRouters:
                 ],
             },
         )
-        assert empty_patch_items.status_code == 422
+        assert empty_patch_items.status_code == 200
+        assert empty_patch_items.json()["data"]["points"][0]["items"] == []
 
         repeated_point_id = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}",
@@ -426,7 +418,6 @@ class TestDeliveryDocumentRouters:
             },
         )
         assert repeated_point_id.status_code == 422
-
 
     async def test_patch_replaces_points_and_preserves_them_when_omitted(
         self,
@@ -493,10 +484,7 @@ class TestDeliveryDocumentRouters:
             json={"plannedDate": date(2025, 3, 16).isoformat()},
         )
         assert field_only_patch.status_code == 200
-        assert [
-            point["clientId"]
-            for point in field_only_patch.json()["data"]["points"]
-        ] == [
+        assert [point["clientId"] for point in field_only_patch.json()["data"]["points"]] == [
             str(first_client.client_id),
             str(second_client.client_id),
         ]
@@ -577,7 +565,6 @@ class TestDeliveryDocumentRouters:
         )
         assert foreign_point.status_code == 422
 
-
     async def test_patch_without_lock_is_rejected_by_contract(
         self,
         client: AsyncClient,
@@ -614,7 +601,6 @@ class TestDeliveryDocumentRouters:
         # Контракт требует действующую блокировку владельца. Текущая реализация
         # use case пока может принять это изменение без блокировки.
         assert update_response.status_code == 409
-
 
     async def test_cancel_restore_and_list_filters(
         self,
@@ -661,10 +647,7 @@ class TestDeliveryDocumentRouters:
             params={"include_cancelled": False},
         )
         assert active_list.status_code == 200
-        active_ids = {
-            item["deliveryDocumentId"]
-            for item in active_list.json()["data"]["deliveryRouteSheets"]
-        }
+        active_ids = {item["deliveryDocumentId"] for item in active_list.json()["data"]["deliveryRouteSheets"]}
         assert document_id not in active_ids
 
         all_list = await client.get(
@@ -672,10 +655,7 @@ class TestDeliveryDocumentRouters:
             params={"include_cancelled": True},
         )
         assert all_list.status_code == 200
-        all_ids = {
-            item["deliveryDocumentId"]
-            for item in all_list.json()["data"]["deliveryRouteSheets"]
-        }
+        all_ids = {item["deliveryDocumentId"] for item in all_list.json()["data"]["deliveryRouteSheets"]}
         assert document_id in all_ids
 
         restore_response = await client.post(
@@ -689,7 +669,6 @@ class TestDeliveryDocumentRouters:
         assert restored["points"][0]["items"][0]["productId"] == product["productId"]
         assert restored["points"][0]["items"][0]["quantity"] == 6
         assert restored["points"][0]["items"][0]["price"] == 130.0
-
 
     async def test_edit_lock_acquire_renew_release_and_other_owner_restrictions(
         self,
@@ -737,12 +716,12 @@ class TestDeliveryDocumentRouters:
         foreign_renew = await client.patch(
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
-        assert foreign_renew.status_code in {403, 404, 409}
+        assert foreign_renew.status_code == 403
 
         foreign_release = await client.delete(
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
-        assert foreign_release.status_code in {403, 404, 409}
+        assert foreign_release.status_code == 403
 
         await self.login(client, active_employee)
         renew_response = await client.patch(
@@ -760,7 +739,6 @@ class TestDeliveryDocumentRouters:
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
         assert missing_renew.status_code == 409
-
 
     async def test_delivery_document_routes_require_authentication(
         self,
@@ -789,9 +767,11 @@ class TestDeliveryDocumentRouters:
         # 1. Создаем документ
         create_response = await client.post(
             f"{DELIVERY_BASE_PATH}/create",
-            json=self.delivery_payload(driver["driverId"], str(car.car_id), [
-                self.point_payload(str(delivery_client.client_id), product["productId"])
-            ]),
+            json=self.delivery_payload(
+                driver["driverId"],
+                str(car.car_id),
+                [self.point_payload(str(delivery_client.client_id), product["productId"])],
+            ),
         )
         document_id = create_response.json()["data"]["deliveryDocumentId"]
 
@@ -822,9 +802,11 @@ class TestDeliveryDocumentRouters:
 
         create_response = await client.post(
             f"{DELIVERY_BASE_PATH}/create",
-            json=self.delivery_payload(driver["driverId"], str(car.car_id), [
-                self.point_payload(str(delivery_client.client_id), product["productId"])
-            ]),
+            json=self.delivery_payload(
+                driver["driverId"],
+                str(car.car_id),
+                [self.point_payload(str(delivery_client.client_id), product["productId"])],
+            ),
         )
         document_id = create_response.json()["data"]["deliveryDocumentId"]
 
@@ -865,12 +847,12 @@ class TestDeliveryDocumentRouters:
             "clientId": str(test_client.client_id),
             "items": [
                 {"productId": product["productId"], "quantity": 2, "price": 100.0},
-                {"productId": product["productId"], "quantity": 3, "price": 100.0}
-            ]
+                {"productId": product["productId"], "quantity": 3, "price": 100.0},
+            ],
         }
         dup_resp = await client.post(
             f"{PICKUP_BASE_PATH}/create",
-            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [duplicate_products_payload]}
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [duplicate_products_payload]},
         )
         assert dup_resp.status_code == 422
 
@@ -878,7 +860,7 @@ class TestDeliveryDocumentRouters:
         bad_quantity_payload = self.point_payload(str(test_client.client_id), product["productId"], quantity=0)
         q_resp = await client.post(
             f"{PICKUP_BASE_PATH}/create",
-            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_quantity_payload]}
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_quantity_payload]},
         )
         assert q_resp.status_code == 422
 
@@ -886,7 +868,7 @@ class TestDeliveryDocumentRouters:
         bad_price_payload = self.point_payload(str(test_client.client_id), product["productId"], price=-10.5)
         p_resp = await client.post(
             f"{PICKUP_BASE_PATH}/create",
-            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_price_payload]}
+            json={"plannedDate": date(2025, 3, 15).isoformat(), "points": [bad_price_payload]},
         )
         assert p_resp.status_code == 422
 
@@ -896,7 +878,7 @@ class TestDeliveryDocumentRouters:
             "driverId": driver["driverId"],
             "carId": str(car.car_id),
             "startMileage": 10.0,
-            "points": [self.point_payload(str(test_client.client_id), product["productId"])]
+            "points": [self.point_payload(str(test_client.client_id), product["productId"])],
         }
         pickup_err_resp = await client.post(f"{PICKUP_BASE_PATH}/create", json=pickup_with_delivery_fields)
         assert pickup_err_resp.status_code == 422

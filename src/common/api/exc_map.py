@@ -39,6 +39,7 @@ from src.feat.clients.domain.client_excs import (
     ClientRelatedEntityNotFoundException,
 )
 from src.feat.delivery_document.domain.delivery_document_excs import (
+    DeliveryDocumentCancelledException,
     DeliveryDocumentEditLockNotFoundException,
     DeliveryDocumentEditLockNotOwnedException,
     DeliveryDocumentLockedException,
@@ -109,6 +110,7 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),
         ClientRelatedEntityNotFoundException: Resp(status_code=422, detail="Client related entity not found"),
         DeliveryDocumentNotFoundException: Resp(status_code=404, detail="Delivery document not found"),
+        DeliveryDocumentCancelledException: Resp(status_code=409, detail="Delivery document is cancelled"),
         DeliveryDocumentUpdateException: Resp(status_code=422, detail="Delivery document update error"),
         DeliveryDocumentRelatedEntityNotFoundException: Resp(
             status_code=422,

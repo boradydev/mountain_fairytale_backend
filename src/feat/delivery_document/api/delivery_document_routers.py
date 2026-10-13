@@ -72,7 +72,7 @@ _DOCUMENT_EXCEPTIONS = (
 )
 async def get_delivery_route_sheets(
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
     include_cancelled: Annotated[bool, Query()] = False,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1)] = 100,
@@ -107,7 +107,7 @@ async def get_delivery_route_sheets(
 async def get_delivery_route_sheet(
     delivery_document_id: Annotated[UUID, Path()],
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
         GetDeliveryDocumentDTO(
@@ -237,6 +237,7 @@ async def restore_delivery_route_sheet(
         UnauthorizedException,
         delivery_document_excs.DeliveryDocumentNotFoundException,
         delivery_document_excs.DeliveryDocumentLockedException,
+        delivery_document_excs.DeliveryDocumentCancelledException,
     ),
 )
 async def acquire_delivery_route_sheet_edit_lock(
@@ -263,6 +264,7 @@ async def acquire_delivery_route_sheet_edit_lock(
         delivery_document_excs.DeliveryDocumentNotFoundException,
         delivery_document_excs.DeliveryDocumentEditLockNotFoundException,
         delivery_document_excs.DeliveryDocumentEditLockNotOwnedException,
+        delivery_document_excs.DeliveryDocumentCancelledException,
     ),
 )
 async def renew_delivery_route_sheet_edit_lock(
@@ -314,7 +316,7 @@ async def release_delivery_route_sheet_edit_lock(
 )
 async def get_pickup_sheets(
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
     include_cancelled: Annotated[bool, Query()] = False,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1)] = 100,
@@ -349,7 +351,7 @@ async def get_pickup_sheets(
 async def get_pickup_sheet(
     delivery_document_id: Annotated[UUID, Path()],
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
         GetDeliveryDocumentDTO(
@@ -475,6 +477,7 @@ async def restore_pickup_sheet(
         UnauthorizedException,
         delivery_document_excs.DeliveryDocumentNotFoundException,
         delivery_document_excs.DeliveryDocumentLockedException,
+        delivery_document_excs.DeliveryDocumentCancelledException,
     ),
 )
 async def acquire_pickup_sheet_edit_lock(
@@ -501,6 +504,7 @@ async def acquire_pickup_sheet_edit_lock(
         delivery_document_excs.DeliveryDocumentNotFoundException,
         delivery_document_excs.DeliveryDocumentEditLockNotFoundException,
         delivery_document_excs.DeliveryDocumentEditLockNotOwnedException,
+        delivery_document_excs.DeliveryDocumentCancelledException,
     ),
 )
 async def renew_pickup_sheet_edit_lock(

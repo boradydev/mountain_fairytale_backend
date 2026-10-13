@@ -10,6 +10,7 @@ class CreateDeliveryDocumentEvent(BaseDomainEvent):
     actor_id: UUID
     delivery_document_id: UUID
     document_type: str
+    data: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -23,12 +24,14 @@ class UpdateDeliveryDocumentEvent(BaseDomainEvent):
 class CancelDeliveryDocumentEvent(BaseDomainEvent):
     actor_id: UUID
     delivery_document_id: UUID
+    changes: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RestoreDeliveryDocumentEvent(BaseDomainEvent):
     actor_id: UUID
     delivery_document_id: UUID
+    changes: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -36,6 +39,7 @@ class CreatePointEvent(BaseDomainEvent):
     actor_id: UUID
     point_id: UUID
     delivery_document_id: UUID
+    data: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -50,6 +54,7 @@ class DeletePointEvent(BaseDomainEvent):
     actor_id: UUID
     point_id: UUID
     delivery_document_id: UUID
+    data: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -57,6 +62,7 @@ class CreateItemEvent(BaseDomainEvent):
     actor_id: UUID
     point_id: UUID
     product_id: UUID
+    data: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -72,3 +78,4 @@ class DeleteItemEvent(BaseDomainEvent):
     actor_id: UUID
     point_id: UUID
     product_id: UUID
+    data: dict[str, Any]
