@@ -52,11 +52,13 @@ class TestDeliveryDocumentRouters:
         *,
         quantity: int = 2,
         price: float = 100.0,
+        product_name: str = "Товар",
     ) -> dict[str, Any]:
         return {
             "clientId": client_id,
             "items": [
                 {
+                    "productName": product_name,
                     "productId": product_id,
                     "quantity": quantity,
                     "price": price,
@@ -110,12 +112,14 @@ class TestDeliveryDocumentRouters:
                 product["productId"],
                 quantity=3,
                 price=250.75,
+                product_name=product["name"],
             ),
             self.point_payload(
                 str(client_two.client_id),
                 product["productId"],
                 quantity=5,
                 price=260.0,
+                product_name=product["name"],
             ),
         ]
 
@@ -188,6 +192,7 @@ class TestDeliveryDocumentRouters:
                         product["productId"],
                         quantity=4,
                         price=75.25,
+                        product_name=product["name"],
                     ),
                 ],
             },
@@ -284,11 +289,13 @@ class TestDeliveryDocumentRouters:
                         "clientId": str(second_client.client_id),
                         "items": [
                             {
+                                "productName": product["name"],
                                 "productId": product["productId"],
                                 "quantity": 1,
                                 "price": 10.0,
                             },
                             {
+                                "productName": product["name"],
                                 "productId": product["productId"],
                                 "quantity": 2,
                                 "price": 10.0,
@@ -397,6 +404,7 @@ class TestDeliveryDocumentRouters:
                         "clientId": str(first_client.client_id),
                         "items": [
                             {
+                                "productName": product["name"],
                                 "productId": product["productId"],
                                 "quantity": 1,
                                 "price": 100.0,
@@ -408,6 +416,7 @@ class TestDeliveryDocumentRouters:
                         "clientId": str(second_client.client_id),
                         "items": [
                             {
+                                "productName": product["name"],
                                 "productId": product["productId"],
                                 "quantity": 1,
                                 "price": 100.0,
@@ -498,6 +507,7 @@ class TestDeliveryDocumentRouters:
                         "clientId": str(second_client.client_id),
                         "items": [
                             {
+                                "productName": second_product["name"],
                                 "productId": second_product["productId"],
                                 "quantity": 8,
                                 "price": 215.0,
@@ -554,6 +564,7 @@ class TestDeliveryDocumentRouters:
                         "clientId": str(first_client.client_id),
                         "items": [
                             {
+                                "productName": first_product["name"],
                                 "productId": first_product["productId"],
                                 "quantity": 1,
                                 "price": 100.0,
@@ -846,8 +857,8 @@ class TestDeliveryDocumentRouters:
         duplicate_products_payload = {
             "clientId": str(test_client.client_id),
             "items": [
-                {"productId": product["productId"], "quantity": 2, "price": 100.0},
-                {"productId": product["productId"], "quantity": 3, "price": 100.0},
+                {"productName": product["name"], "productId": product["productId"], "quantity": 2, "price": 100.0},
+                {"productName": product["name"], "productId": product["productId"], "quantity": 3, "price": 100.0},
             ],
         }
         dup_resp = await client.post(

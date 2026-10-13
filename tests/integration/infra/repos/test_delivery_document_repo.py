@@ -96,12 +96,13 @@ async def _create_related_entities(
     return clients, product, driver, car
 
 
-def _make_point(client_id, product_id, *, quantity: int, price: float) -> SimpleNamespace:
+def _make_point(client_id, product_id, *, quantity: int, price: float, product_name: str = "Товар") -> SimpleNamespace:
     return SimpleNamespace(
         client_id=client_id,
         items=[
             SimpleNamespace(
                 product_id=product_id,
+                product_name=product_name,
                 quantity=quantity,
                 price=price,
             ),
@@ -124,6 +125,7 @@ async def _create_document(
         _make_point(
             client.client_id,
             product.product_id,
+            product_name=product.name,
             quantity=quantities[index],
             price=125.5 + index,
         )
@@ -171,12 +173,8 @@ async def test_add_and_get_by_id(postgres) -> None:
         assert result.document_type == DocumentType.DELIVERY
         assert result.planned_date == date(2025, 3, 15)
         assert [point.position for point in result.points] == [0, 1]
-        assert [point.client_id for point in result.points] == [
-            client.client_id for client in clients
-        ]
-        assert [point.client_name for point in result.points] == [
-            client.name for client in clients
-        ]
+        assert [point.client_id for point in result.points] == [client.client_id for client in clients]
+        assert [point.client_name for point in result.points] == [client.name for client in clients]
         assert len(result.points[0].items) == 1
         assert result.points[0].items[0].product_id == product.product_id
         assert result.points[0].items[0].product_name == product.name
@@ -542,6 +540,7 @@ async def test_validate_references_rejects_missing_entities(
                     items=[
                         SimpleNamespace(
                             product_id=product_id,
+                            product_name="Товар",
                             quantity=1,
                             price=10.0,
                         ),
@@ -733,6 +732,7 @@ async def test_duplicate_product_in_same_point_is_forbidden(postgres) -> None:
         )
         duplicate_item = SimpleNamespace(
             product_id=product.product_id,
+            product_name=product.name,
             quantity=1,
             price=10.0,
         )

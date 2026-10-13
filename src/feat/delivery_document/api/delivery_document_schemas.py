@@ -1,8 +1,8 @@
 from datetime import date, datetime
-from typing import Self
+from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from src.common.api import fields
 from src.common.api.patch_schema import BasePatchSchema
@@ -12,12 +12,14 @@ from src.feat.delivery_document.domain.delivery_document_entities import Deliver
 
 class CreateItemReq(BaseSchema):
     product_id: UUID
+    product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
 
 
 class UpdateItemReq(BaseSchema):
     product_id: UUID
+    product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
 

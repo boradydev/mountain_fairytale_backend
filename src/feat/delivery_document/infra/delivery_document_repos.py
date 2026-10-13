@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
 from src.feat.delivery_document.domain.abcs.delivery_document_repo_abcs import IDeliveryDocumentsRepository
-from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock, Item, Point
+from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock, Point
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentEditLockNotFoundException,
     DeliveryDocumentEditLockNotOwnedException,
@@ -35,7 +35,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             joinedload(DeliveryDocument.car),
             joinedload(DeliveryDocument.edit_lock).joinedload(EditLock.employee),
             selectinload(DeliveryDocument.points).joinedload(Point.client),
-            selectinload(DeliveryDocument.points).selectinload(Point.items).joinedload(Item.product),
+            selectinload(DeliveryDocument.points).selectinload(Point.items),
         )
 
     async def add(self, document: DeliveryDocument) -> None:

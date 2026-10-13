@@ -71,7 +71,9 @@ def patch_points(document: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "pointId": point["pointId"],
             "clientId": point["clientId"],
-            "items": [{key: item[key] for key in ("productId", "quantity", "price")} for item in point["items"]],
+            "items": [
+                {key: item[key] for key in ("productId", "productName", "quantity", "price")} for item in point["items"]
+            ],
         }
         for point in document["points"]
     ]
@@ -134,7 +136,7 @@ async def test_existing_inactive_references_and_new_rows(client: AsyncClient, do
     assert saved["points"][0]["items"][0]["price"] == 0.0
     # Inactivity is checked for a new item in each point, not globally per document.
     bad_points = patch_points(saved)
-    bad_points[1]["items"] = [{"productId": product_id, "quantity": 1, "price": 99.0}]
+    bad_points[1]["items"] = [{"productName": "Товар", "productId": product_id, "quantity": 1, "price": 99.0}]
     response = await client.patch(case["path"], json={"plannedDate": "2025-04-01", "points": bad_points})
     assert response.status_code == 422
     assert (await client.get(case["path"])).json()["data"] == saved
@@ -152,7 +154,7 @@ async def test_existing_inactive_references_and_new_rows(client: AsyncClient, do
         assert response.status_code == 422
     assert (await client.patch(f"/protected/products/{product_id}", json={"isActive": True})).status_code == 200
     points = patch_points(saved)
-    points[1]["items"] = [{"productId": product_id, "quantity": 1, "price": 99.0}]
+    points[1]["items"] = [{"productName": "Товар", "productId": product_id, "quantity": 1, "price": 99.0}]
     assert (await client.patch(case["path"], json={"points": points})).status_code == 200
 
 
@@ -383,3 +385,113 @@ async def test_event_failure_rolls_back_document_and_lock(
     assert (await client.get(case["path"])).json()["data"] == case["document"]
     assert await read_events(postgres, case["document"]) == previous_events
     assert (await client.patch(f"{case['path']}/edit-lock")).status_code == 200
+
+
+async def test_product_name_is_client_snapshot_and_immutable(client: AsyncClient, document_case, postgres) -> None:
+    case = document_case
+    product_id = case["product"]["productId"]
+    catalog_name = unique_product_name("renamed_catalog")
+    response = await client.patch(f"/protected/products/{product_id}", json={"name": catalog_name})
+    assert response.status_code == 200
+    historical_name = "  Вода Горная / 19 л  "
+    # Simulate a selection made before a concurrent catalog rename.
+    payload = {
+        **case["payload"],
+        "points": [
+            DeliveryAPI.point_payload(case["customers"][0]["clientId"], product_id, product_name=historical_name),
+        ],
+    }
+    response = await client.post(f"{case['base']}/create", json=payload)
+    assert response.status_code == 201
+    saved = response.json()["data"]
+    path = f"{case['base']}/{saved['deliveryDocumentId']}"
+    assert saved["points"][0]["items"][0]["productName"] == historical_name
+    assert (await client.post(f"{path}/edit-lock")).status_code == 200
+
+    response = await client.patch(
+        f"/protected/products/{product_id}", json={"name": unique_product_name("renamed_again")}
+    )
+    assert response.status_code == 200
+    assert (await client.get(path)).json()["data"] == saved
+    events = await read_events(postgres, saved)
+    created = next(event for event in events if event["event_type"] == "CreateItemEvent")
+    assert created["payload"]["data"]["product_name"] == historical_name
+    root = next(event for event in events if event["event_type"] == "CreateDeliveryDocumentEvent")
+    assert root["payload"]["data"]["points"][0]["items"][0]["product_name"] == historical_name
+
+    points = patch_points(saved)
+    points[0]["items"][0].update(productName=catalog_name, quantity=7, price=45.0)
+    response = await client.patch(path, json={"points": points})
+    assert response.status_code == 200
+    saved = response.json()["data"]
+    assert saved["points"][0]["items"] == [
+        {"productId": product_id, "productName": historical_name, "quantity": 7, "price": 45.0},
+    ]
+    events = await read_events(postgres, saved)
+    updated = next(event for event in events if event["event_type"] == "UpdateItemEvent")
+    assert updated["payload"]["changes"] == {"quantity": {"old": 2, "new": 7}, "price": {"old": 100.0, "new": 45.0}}
+    root_update = next(event for event in events if event["event_type"] == "UpdateDeliveryDocumentEvent")
+    for state in ("old", "new"):
+        assert root_update["payload"]["changes"]["points"][state][0]["items"][0]["product_name"] == historical_name
+    # A name-only edit is ignored and must not create history for a nonexistent change.
+    assert (await client.patch(path, json={"points": points})).status_code == 200
+    assert (await client.get(path)).json()["data"] == saved
+    assert await read_events(postgres, saved) == events
+
+    assert (await client.patch(f"/protected/products/{product_id}", json={"isActive": False})).status_code == 200
+    points[0]["items"][0].update(quantity=8, price=0.0)
+    response = await client.patch(path, json={"points": points})
+    assert response.status_code == 200
+    assert response.json()["data"]["points"][0]["items"][0]["productName"] == historical_name
+    for suffix, active in (("cancel", False), ("restore", True)):
+        response = await client.post(f"{path}/{suffix}")
+        assert response.status_code == 200
+        assert response.json()["data"]["isActive"] is active
+        assert response.json()["data"]["points"][0]["items"][0]["productName"] == historical_name
+    assert (await client.post(f"{path}/edit-lock")).status_code == 200
+    assert (await client.patch(f"/protected/products/{product_id}", json={"isActive": True})).status_code == 200
+    points[0]["items"] = []
+    assert (await client.patch(path, json={"points": points})).status_code == 200
+    points[0]["items"] = [{"productId": product_id, "productName": catalog_name, "quantity": 1, "price": 99.0}]
+    response = await client.patch(path, json={"points": points})
+    assert response.status_code == 200
+    readded = response.json()["data"]
+    assert readded["points"][0]["pointId"] == saved["points"][0]["pointId"]
+    assert readded["points"][0]["items"][0]["productName"] == catalog_name
+    events = await read_events(postgres, readded)
+    deleted = next(event for event in events if event["event_type"] == "DeleteItemEvent")
+    assert deleted["payload"]["data"]["product_name"] == historical_name
+    created_items = [event for event in events if event["event_type"] == "CreateItemEvent"]
+    assert [event["payload"]["data"]["product_name"] for event in created_items] == [historical_name, catalog_name]
+
+
+@pytest.mark.parametrize("invalid_name", [None, "", "x" * 121, 123])
+async def test_product_name_validation_is_atomic(client: AsyncClient, document_case, postgres, invalid_name) -> None:
+    case = document_case
+    saved = case["document"]
+    events = await read_events(postgres, saved)
+    points = patch_points(saved)
+    points[0]["items"][0]["quantity"] = 77
+    # A later, invalid row prevents all document changes, including earlier valid rows.
+    points[1]["items"] = [
+        {"productId": case["product"]["productId"], "productName": invalid_name, "quantity": 1, "price": 0.0}
+    ]
+    response = await client.patch(case["path"], json={"plannedDate": "2025-04-01", "points": points})
+    assert response.status_code == 422
+    assert (await client.get(case["path"])).json()["data"] == saved
+    assert await read_events(postgres, saved) == events
+    response = await client.post(f"{case['base']}/create", json={**case["payload"], "points": [points[1]]})
+    assert response.status_code == 422
+
+
+async def test_product_name_is_required_and_accepts_120_characters(client: AsyncClient, document_case) -> None:
+    case = document_case
+    points = patch_points(case["document"])
+    points[0]["items"][0].pop("productName")
+    assert (await client.patch(case["path"], json={"points": points})).status_code == 422
+    assert (await client.post(f"{case['base']}/create", json={**case["payload"], "points": points})).status_code == 422
+    name = "Ж" * 120
+    points[0]["items"][0]["productName"] = name
+    response = await client.post(f"{case['base']}/create", json={**case["payload"], "points": points})
+    assert response.status_code == 201
+    assert response.json()["data"]["points"][0]["items"][0]["productName"] == name

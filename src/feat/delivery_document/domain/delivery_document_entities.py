@@ -28,7 +28,6 @@ from src.feat.delivery_document.domain.delivery_document_events import (
 from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDocumentUpdateException
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
-from src.feat.products.domain.product_entities import Product
 
 
 class DocumentType(str, Enum):
@@ -38,29 +37,41 @@ class DocumentType(str, Enum):
 
 class Item(BaseEntity):
     __tablename__ = "delivery_document_items"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(product_name) BETWEEN 1 AND 120", name="delivery_document_items_product_name_check"
+        ),
+    )
 
     point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"), primary_key=True)
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"), primary_key=True)
+    product_name: Mapped[str] = mapped_column(Text)
     quantity: Mapped[int] = mapped_column(Integer)
     price: Mapped[float] = mapped_column(Float)
-    product: Mapped[Product] = relationship(lazy="joined")
 
     _ALLOWED_UPDATE_FIELDS = {"quantity", "price"}
 
-    @property
-    def product_name(self) -> str:
-        return self.product.name
-
     @classmethod
-    def create(cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, quantity: int, price: float) -> Self:
-        item = cls(point_id=point_id, product_id=product_id, quantity=quantity, price=price)
+    def create(
+        cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, product_name: str, quantity: int, price: float
+    ) -> Self:
+        if not 1 <= len(product_name) <= 120:
+            raise DeliveryDocumentUpdateException(
+                field="product_name", message="Product name must have 1–120 characters."
+            )
+        item = cls(point_id=point_id, product_id=product_id, product_name=product_name, quantity=quantity, price=price)
         item._add_event(
             CreateItemEvent(actor_id=actor_id, point_id=point_id, product_id=product_id, data=item.snapshot())
         )
         return item
 
     def snapshot(self) -> dict[str, Any]:
-        return {"product_id": self.product_id, "quantity": self.quantity, "price": self.price}
+        return {
+            "product_id": self.product_id,
+            "product_name": self.product_name,
+            "quantity": self.quantity,
+            "price": self.price,
+        }
 
     def update(self, *, actor_id: UUID, quantity: int, price: float) -> None:
         changes = self._apply_update_changes(
@@ -152,6 +163,7 @@ class Point(BaseEntity):
                 actor_id=actor_id,
                 point_id=point_id,
                 product_id=item.product_id,
+                product_name=item.product_name,
                 quantity=item.quantity,
                 price=item.price,
             )
@@ -197,6 +209,7 @@ class Point(BaseEntity):
                     actor_id=actor_id,
                     point_id=self.point_id,
                     product_id=requested.product_id,
+                    product_name=requested.product_name,
                     quantity=requested.quantity,
                     price=requested.price,
                 )

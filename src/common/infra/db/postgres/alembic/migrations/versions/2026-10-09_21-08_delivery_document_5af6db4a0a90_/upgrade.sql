@@ -90,6 +90,7 @@ CREATE INDEX ix_points_delivery_document_id
 CREATE TABLE delivery_document_items (
     point_id UUID NOT NULL,
     product_id UUID NOT NULL,
+    product_name TEXT NOT NULL,
     quantity INTEGER NOT NULL,
     price DOUBLE PRECISION NOT NULL,
 
@@ -107,6 +108,9 @@ CREATE TABLE delivery_document_items (
 
     CONSTRAINT delivery_document_items_quantity_check
         CHECK (quantity > 0),
+
+    CONSTRAINT delivery_document_items_product_name_check
+        CHECK (char_length(product_name) BETWEEN 1 AND 120),
 
     CONSTRAINT delivery_document_items_price_check
         CHECK (price >= 0)
