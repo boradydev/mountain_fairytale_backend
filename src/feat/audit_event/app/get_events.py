@@ -30,22 +30,46 @@ class GetEventsUseCase:
     def __init__(self, uow: IAuditUOW) -> None:
         self._uow = uow
 
-    async def execute(self, *, search: str | None, cursor: str | None, limit: int) -> AuditPage:
+    async def execute(
+        self, *, search: str | None, cursor: str | None, limit: int, after: str | None = None
+    ) -> AuditPage:
+        if cursor is not None and after is not None:
+            raise InvalidAuditCursorException
         search = (search or "").strip().lower()
         fingerprint = hashlib.sha256(search.encode()).hexdigest()
         before_at, before_id = self._decode_cursor(cursor, fingerprint) if cursor is not None else (None, None)
+        after_at, after_id = self._decode_cursor(after, fingerprint, "newer") if after is not None else (None, None)
         async with self._uow as uow:
-            rows = await uow.events.get_page(search=search, before_at=before_at, before_id=before_id, limit=limit + 1)
+            rows = await uow.events.get_page(
+                search=search,
+                before_at=before_at,
+                before_id=before_id,
+                limit=limit + 1,
+                after_at=after_at,
+                after_id=after_id,
+            )
         page = rows[:limit]
         next_cursor = None
         if len(rows) > limit:
             last = page[-1]
-            body = {"v": 1, "at": last.created_at.isoformat(), "id": str(last.event_id), "filter": fingerprint}
-            next_cursor = base64.urlsafe_b64encode(json.dumps(body).encode()).decode().rstrip("=")
-        return AuditPage(events=[self._view(row) for row in page], next_cursor=next_cursor)
+            next_cursor = self._encode_cursor(
+                last.created_at, last.event_id, fingerprint, "newer" if after is not None else "older"
+            )
+        latest = page[-1] if after is not None and page else page[0] if page else None
+        latest_cursor = (
+            self._encode_cursor(latest.created_at, latest.event_id, fingerprint, "newer")
+            if latest
+            else (after or self._encode_cursor(datetime.min.replace(tzinfo=UTC), UUID(int=0), fingerprint, "newer"))
+        )
+        return AuditPage(events=[self._view(row) for row in page], next_cursor=next_cursor, latest_cursor=latest_cursor)
 
     @staticmethod
-    def _decode_cursor(cursor: str, fingerprint: str) -> tuple[datetime, UUID]:
+    def _encode_cursor(timestamp: datetime, event_id: UUID, fingerprint: str, direction: str) -> str:
+        body = {"v": 1, "at": timestamp.isoformat(), "id": str(event_id), "filter": fingerprint, "direction": direction}
+        return base64.urlsafe_b64encode(json.dumps(body).encode()).decode().rstrip("=")
+
+    @staticmethod
+    def _decode_cursor(cursor: str, fingerprint: str, direction: str = "older") -> tuple[datetime, UUID]:
         try:
             body = json.loads(base64.b64decode(cursor + "=" * (-len(cursor) % 4), altchars=b"-_", validate=True))
             if not isinstance(body, dict) or not isinstance(body.get("at"), str) or not isinstance(body.get("id"), str):
@@ -53,6 +77,8 @@ class GetEventsUseCase:
             timestamp = datetime.fromisoformat(body["at"])
             if body["v"] != 1 or body["filter"] != fingerprint or timestamp.tzinfo is None:
                 raise ValueError("Invalid cursor")
+            if body.get("direction", "older") != direction:
+                raise ValueError("Invalid cursor direction")
             return timestamp.astimezone(UTC), UUID(body["id"])
         except (ValueError, KeyError, TypeError, binascii.Error) as exc:
             raise InvalidAuditCursorException from exc

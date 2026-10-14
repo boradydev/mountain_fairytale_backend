@@ -16,7 +16,9 @@ events_router = APIRouter(prefix="/events", tags=["Журнал событий"]
     "",
     response_model=StdResponse[AuditPageResp],
     description="Аудит доступен всем сотрудникам. Сортировка createdAt DESC, eventId DESC. "
-    "Курсор привязан к search; nextCursor=null завершает список. Секреты и блокировки не записываются.",
+    "Курсоры привязаны к search. after загружает новые события в порядке ASC; "
+    "cursor и after несовместимы. latestCursor служит для проверки обновлений. "
+    "nextCursor=null завершает страницу направления. Секреты и блокировки не записываются.",
     responses=map_exceptions_to_responses(InvalidAuditCursorException),
 )
 async def get_events(
@@ -24,6 +26,7 @@ async def get_events(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
     search: Annotated[str | None, Query(max_length=500)] = None,
+    after: Annotated[str | None, Query(max_length=2048)] = None,
 ) -> StdResponse[AuditPageResp]:
-    page = await ctx.audit_use_cases.get_events().execute(search=search, cursor=cursor, limit=limit)
+    page = await ctx.audit_use_cases.get_events().execute(search=search, cursor=cursor, limit=limit, after=after)
     return StdResponse(limit=limit, data=AuditPageResp.model_validate(page))

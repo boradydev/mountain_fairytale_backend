@@ -69,9 +69,25 @@ class EventsRepository(IEventRepository):
         ]
 
     async def get_page(
-        self, *, search: str, before_at: datetime | None, before_id: UUID | None, limit: int
+        self,
+        *,
+        search: str,
+        before_at: datetime | None,
+        before_id: UUID | None,
+        limit: int,
+        after_at: datetime | None = None,
+        after_id: UUID | None = None,
     ) -> list[AuditRecord]:
         result = await self._session.execute(
-            SQL.GET_PAGE, {"search": search, "before_at": before_at, "before_id": before_id, "limit": limit}
+            SQL.GET_PAGE,
+            {
+                "search": search,
+                "before_at": before_at,
+                "before_id": before_id,
+                "limit": limit,
+                "after_at": after_at,
+                "after_id": after_id,
+                "newer": after_at is not None,
+            },
         )
         return [AuditRecord(**dict(row)) for row in result.mappings().all()]

@@ -38,8 +38,12 @@ LEFT JOIN LATERAL (
 ) names ON TRUE
 WHERE (CAST(:before_at AS timestamptz) IS NULL OR
        (e.created_at, e.event_id) < (CAST(:before_at AS timestamptz), CAST(:before_id AS uuid)))
+  AND (CAST(:after_at AS timestamptz) IS NULL OR
+       (e.created_at, e.event_id) > (CAST(:after_at AS timestamptz), CAST(:after_id AS uuid)))
   AND (:search = '' OR strpos(lower(concat_ws(' ', actor.username,
        COALESCE(names.display_name, employee_subject.username), e.payload->>'subject_type',
        e.payload->'data', (e.payload->'changes') - 'password_hash' - 'password')), :search) > 0)
-ORDER BY e.created_at DESC, e.event_id DESC
+ORDER BY CASE WHEN CAST(:newer AS boolean) THEN e.created_at END ASC,
+         CASE WHEN CAST(:newer AS boolean) THEN e.event_id END ASC,
+         e.created_at DESC, e.event_id DESC
 LIMIT :limit;

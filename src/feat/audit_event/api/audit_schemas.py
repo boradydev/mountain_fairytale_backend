@@ -38,3 +38,4 @@ class AuditEventResp(BaseSchema):
 class AuditPageResp(BaseSchema):
     events: list[AuditEventResp]
     next_cursor: str | None
+    latest_cursor: str | None = None

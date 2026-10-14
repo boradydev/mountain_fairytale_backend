@@ -24,6 +24,13 @@ class IEventRepository(ABC):
 
     @abstractmethod
     async def get_page(
-        self, *, search: str, before_at: datetime | None, before_id: UUID | None, limit: int
+        self,
+        *,
+        search: str,
+        before_at: datetime | None,
+        before_id: UUID | None,
+        limit: int,
+        after_at: datetime | None = None,
+        after_id: UUID | None = None,
     ) -> list[AuditRecord]:
-        """Возвращает безопасные записи аудита строго перед курсором."""
+        """Возвращает аудит перед курсором либо новые записи после него."""

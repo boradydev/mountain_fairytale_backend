@@ -21,3 +21,4 @@ class AuditEventView:
 class AuditPage:
     events: list[AuditEventView]
     next_cursor: str | None
+    latest_cursor: str | None = None
