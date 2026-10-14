@@ -1,6 +1,6 @@
 # src/infra/services/event_publisher/password_service.py
 import logging
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import fields, is_dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
@@ -9,14 +9,30 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.app.abcs.event_pub_service_abcs import IEventPublisher
+from src.common.domain.entities import BaseEntity
 from src.common.domain.event_record import EventRecord
 from src.common.domain.events import BaseDomainEvent
 from src.common.infra.db.postgres.repos.events.event_repos import EventsRepository
 from src.core.uuid7 import uuid7
+from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
+from src.feat.drivers.domain.driver_entities import Driver
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
+from src.feat.products.domain.product_entities import Product
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 logger = logging.getLogger(__name__)
+
+
+_REFERENCE_FIELDS: dict[str, tuple[type[BaseEntity], str, tuple[str, ...]]] = {
+    "sales_representative_id": (SalesRepresentative, "sales_representative_id", ("name",)),
+    "default_payment_method_id": (PaymentMethod, "payment_method_id", ("name",)),
+    "driver_id": (Driver, "driver_id", ("name",)),
+    "car_id": (Car, "car_id", ("model", "number")),
+    "client_id": (Client, "client_id", ("name",)),
+    "product_id": (Product, "product_id", ("name",)),
+}
 
 
 class EventPublisher(IEventPublisher):
@@ -39,14 +55,8 @@ class EventPublisher(IEventPublisher):
 
         try:
             operation_id = uuid7()
-            prepared = []
-            for event in events:
-                if event.subject_type == "delivery_point" and type(event).__name__.startswith("Create") and event.data:
-                    client_id = event.data.get("client_id")
-                    name = await self._session.scalar(select(Client.name).where(Client.client_id == client_id))
-                    event = replace(event, data={**event.data, "display_name": name or str(client_id)})
-                prepared.append(event)
-            records = [self._to_record(event, operation_id=operation_id) for event in prepared]
+            records = [self._to_record(event, operation_id=operation_id) for event in events]
+            await self._snapshot_references(records)
 
             # Передаем внутреннюю сессию в репозиторий событий
             repository = EventsRepository(
@@ -62,6 +72,55 @@ class EventPublisher(IEventPublisher):
                 "Failed to save domain events inside transaction.",
             )
             raise
+
+    async def _snapshot_references(self, records: list[EventRecord]) -> None:
+        # Обрабатываем только бизнес-значения: actor_id и идентичность события остаются UUID.
+        references: dict[str, dict[str, dict[str, Any]]] = {}
+
+        def collect(value: Any, field: str | None = None) -> None:
+            if field in _REFERENCE_FIELDS and isinstance(value, str):
+                references.setdefault(field, {}).setdefault(value, {"id": value, "display_name": None})
+            elif isinstance(value, dict):
+                for key, item in value.items():
+                    collect(item, field if key in {"old", "new"} else key)
+            elif isinstance(value, list):
+                for item in value:
+                    collect(item, field)
+
+        for record in records:
+            collect(record.payload.get("data", {}))
+            collect(record.payload.get("changes", {}))
+
+        # Один запрос на справочник для всех старых/новых значений всей операции.
+        for field, values in references.items():
+            model, id_field, name_fields = _REFERENCE_FIELDS[field]
+            id_column = getattr(model, id_field)
+            result = await self._session.execute(
+                select(id_column, *(getattr(model, name) for name in name_fields)).where(
+                    id_column.in_([UUID(value) for value in values])
+                )
+            )
+            for row in result:
+                values[str(row[0])]["display_name"] = " ".join(str(part) for part in row[1:] if part is not None)
+
+        def snapshot(value: Any, field: str | None = None) -> Any:
+            if field in references and isinstance(value, str):
+                return dict(references[field][value])
+            if isinstance(value, dict):
+                return {key: snapshot(item, field if key in {"old", "new"} else key) for key, item in value.items()}
+            if isinstance(value, list):
+                return [snapshot(item, field) for item in value]
+            return value
+
+        for record in records:
+            payload = record.payload
+            payload["data"] = snapshot(payload.get("data", {}))
+            if "changes" in payload:
+                payload["changes"] = snapshot(payload["changes"])
+            if payload.get("subject_type") == "delivery_point" and record.event_type.startswith("Create"):
+                client = payload["data"].get("client_id")
+                if isinstance(client, dict):
+                    payload["data"]["display_name"] = client["display_name"] or client["id"]
 
     @staticmethod
     def _to_record(
