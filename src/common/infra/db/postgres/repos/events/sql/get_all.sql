@@ -1,5 +1,6 @@
 SELECT
     event_id,
+    operation_id,
     event_type,
     actor_id,
     created_at,

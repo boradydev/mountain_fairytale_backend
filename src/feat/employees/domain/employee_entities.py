@@ -5,12 +5,22 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
-from src.feat.employees.domain.employee_events import UpdateEmployeeEvent, CreateEmployeeEvent
+from src.core.uuid7 import uuid7
+from src.feat.employees.domain.employee_events import (
+    CreateEmployeeEvent,
+    EmployeeLoginEvent,
+    EmployeePasswordChangedEvent,
+    UpdateEmployeeEvent,
+)
 
 
 class Employee(BaseEntity):
+    _EVENT_FIELDS = {"role", "username", "commission_percent", "is_active"}
+    _EVENT_SUBJECT_TYPE = "employee"
+    _EVENT_ID_FIELD = "employee_id"
+    _EVENT_NAME_FIELDS = ("username",)
+
     __tablename__ = "employees"
 
     employee_id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -92,9 +102,8 @@ class Employee(BaseEntity):
         self.password_hash = new_password_hash
 
         self._add_event(
-            UpdateEmployeeEvent(
-                actor_id=actor_id,
-                employee_id=self.employee_id,
-                changes={"password_hash": new_password_hash},
-            ),
+            EmployeePasswordChangedEvent(actor_id=actor_id, employee_id=self.employee_id),
         )
+
+    def record_login(self) -> None:
+        self._add_event(EmployeeLoginEvent(actor_id=self.employee_id))

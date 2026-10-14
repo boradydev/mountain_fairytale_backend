@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Self
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from sqlalchemy import CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,6 +36,16 @@ class DocumentType(str, Enum):
 
 
 class Item(BaseEntity):
+    _EVENT_FIELDS = {"product_id", "product_name", "quantity", "price"}
+    _EVENT_SUBJECT_TYPE = "delivery_item"
+    _EVENT_NAME_FIELDS = ("product_name",)
+
+    def _event_subject_id(self) -> UUID:
+        return uuid5(self.point_id, str(self.product_id))
+
+    def _event_snapshot(self) -> dict[str, Any]:
+        return {**self.snapshot(), "display_name": self.product_name}
+
     __tablename__ = "delivery_document_items"
     __table_args__ = (
         CheckConstraint(
@@ -95,6 +105,14 @@ class Item(BaseEntity):
 
 
 class Point(BaseEntity):
+    _EVENT_FIELDS = {"point_id", "client_id", "position", "items"}
+    _EVENT_SUBJECT_TYPE = "delivery_point"
+    _EVENT_ID_FIELD = "point_id"
+    _EVENT_NAME_FIELDS = ("display_name",)
+
+    def _event_snapshot(self) -> dict[str, Any]:
+        return self.snapshot()
+
     __tablename__ = "points"
     UQ_DOCUMENT_CLIENT = "points_delivery_document_id_client_id_key"
     UQ_DOCUMENT_POSITION = "points_delivery_document_id_position_key"
@@ -280,6 +298,23 @@ class EditLock(BaseEntity):
 
 
 class DeliveryDocument(BaseEntity):
+    _EVENT_FIELDS = {
+        "planned_date",
+        "document_type",
+        "is_active",
+        "driver_id",
+        "car_id",
+        "start_mileage",
+        "end_mileage",
+        "points",
+    }
+    _EVENT_SUBJECT_TYPE = "delivery_document"
+    _EVENT_ID_FIELD = "delivery_document_id"
+    _EVENT_NAME_FIELDS = ("planned_date",)
+
+    def _event_snapshot(self) -> dict[str, Any]:
+        return {**self.snapshot(), "document_type": self.document_type, "display_name": self.planned_date.isoformat()}
+
     __tablename__ = "delivery_documents"
     __table_args__ = (
         Index("ix_delivery_documents_planned_date", "planned_date"),

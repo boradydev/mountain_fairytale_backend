@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.common.api.api_abcs import ITokenService
 from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.common.infra.services.token.settings import JwtSettings
+from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
@@ -35,3 +36,4 @@ class AppContext:
     sales_representatives_use_cases: SalesRepresentativesUseCaseFactory
 
     token_settings: JwtSettings
+    audit_use_cases: AuditUseCaseFactory

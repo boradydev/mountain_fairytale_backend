@@ -9,6 +9,7 @@ from src.common.infra.factories.app_context import AppContext
 from src.common.infra.services.password_service import PasswordService
 from src.common.infra.services.token.jwt_service import JwtTokenService
 from src.common.infra.services.token.settings import JwtSettings
+from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
@@ -72,6 +73,7 @@ async def lifespan(app: FastAPI):
         products_use_cases=products_use_cases,
         sales_representatives_use_cases=sales_representatives_use_cases,
         token_settings=token_settings,
+        audit_use_cases=AuditUseCaseFactory(postgres.session_factory),
     )
 
     app.state.ctx = ctx  # type: ignore[assignment]

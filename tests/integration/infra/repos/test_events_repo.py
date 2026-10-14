@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
-from collections.abc import AsyncGenerator
-from typing import Any
 
 from src.common.domain.event_record import EventRecord
 from src.common.infra.db.postgres.repos.events.event_repos import EventsRepository
@@ -16,6 +16,22 @@ def make_event(index: int, created_at: datetime | None = None) -> EventRecord:
         actor_id=uuid7(),
         created_at=created_at or datetime.now(),
         payload={"index": index},
+    )
+
+
+async def test_cursor_breaks_equal_timestamps_by_uuid(postgres):
+    tied = datetime.now(UTC)
+    records = [make_event(index, created_at=tied) for index in range(5)]
+    async with postgres.session_factory() as session:
+        repository = EventsRepository(session)
+        await repository.add_many(records)
+        await session.commit()
+        first = await repository.get_page(search="", before_at=None, before_id=None, limit=2)
+        second = await repository.get_page(
+            search="", before_at=first[-1].created_at, before_id=first[-1].event_id, limit=3
+        )
+    assert [event.event_id for event in [*first, *second]] == sorted(
+        (record.event_id for record in records), reverse=True
     )
 
 

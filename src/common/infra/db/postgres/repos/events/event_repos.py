@@ -1,12 +1,15 @@
 import json
+from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.common.domain.event_record import EventRecord
+from src.common.domain.abcs.event_repo_abcs import IEventRepository
+from src.common.domain.event_record import AuditRecord, EventRecord
 from src.common.infra.db.postgres.repos.events.sql.registry import SQL
 
 
-class EventsRepository:
+class EventsRepository(IEventRepository):
     def __init__(
         self,
         session: AsyncSession,
@@ -23,9 +26,10 @@ class EventsRepository:
         params = [
             {
                 "event_id": record.event_id,
+                "operation_id": record.operation_id,
                 "event_type": record.event_type,
                 "actor_id": record.actor_id,
-                "created_at": record.created_at,
+                "created_at": record.created_at.astimezone(UTC),
                 "payload": json.dumps(record.payload),
             }
             for record in records
@@ -55,6 +59,7 @@ class EventsRepository:
         return [
             EventRecord(
                 event_id=row["event_id"],
+                operation_id=row["operation_id"],
                 event_type=row["event_type"],
                 actor_id=row["actor_id"],
                 created_at=row["created_at"],
@@ -62,3 +67,11 @@ class EventsRepository:
             )
             for row in rows
         ]
+
+    async def get_page(
+        self, *, search: str, before_at: datetime | None, before_id: UUID | None, limit: int
+    ) -> list[AuditRecord]:
+        result = await self._session.execute(
+            SQL.GET_PAGE, {"search": search, "before_at": before_at, "before_id": before_id, "limit": limit}
+        )
+        return [AuditRecord(**dict(row)) for row in result.mappings().all()]

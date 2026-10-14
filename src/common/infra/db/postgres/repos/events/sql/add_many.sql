@@ -1,5 +1,6 @@
 INSERT INTO events (
     event_id,
+    operation_id,
     event_type,
     actor_id,
     created_at,
@@ -7,6 +8,7 @@ INSERT INTO events (
 )
 VALUES (
     :event_id,
+    :operation_id,
     :event_type,
     :actor_id,
     :created_at,

@@ -5,22 +5,24 @@ from uuid import UUID
 from sqlalchemy import DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
-from src.feat.pay_methods.domain.pay_method_events import UpdatePaymentMethodEvent, CreatePaymentMethodEvent
+from src.core.uuid7 import uuid7
+from src.feat.pay_methods.domain.pay_method_events import CreatePaymentMethodEvent, UpdatePaymentMethodEvent
 
 
 class PaymentMethod(BaseEntity):
+    _EVENT_FIELDS = {"name", "is_active"}
+    _EVENT_SUBJECT_TYPE = "payment_method"
+    _EVENT_ID_FIELD = "payment_method_id"
+    _EVENT_NAME_FIELDS = ("name",)
+
     __tablename__ = "payment_methods"
 
     payment_method_id: Mapped[UUID] = mapped_column(primary_key=True)
-    
+
     UQ_NAME = "payment_methods_name_key"
-    name: Mapped[str] = mapped_column(
-        Text, 
-        UniqueConstraint(name=UQ_NAME)
-    )
-    
+    name: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_NAME))
+
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 

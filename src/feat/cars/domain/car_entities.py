@@ -13,6 +13,11 @@ from src.feat.cars.domain.car_number import CAR_NUMBER_PATTERN, normalize_car_nu
 
 
 class Car(BaseEntity):
+    _EVENT_FIELDS = {"model", "current_mileage", "number", "is_active"}
+    _EVENT_SUBJECT_TYPE = "car"
+    _EVENT_ID_FIELD = "car_id"
+    _EVENT_NAME_FIELDS = ("model", "number")
+
     __tablename__ = "cars"
     __table_args__ = (CheckConstraint(f"number ~ '{CAR_NUMBER_PATTERN}'", name="cars_number_format_check"),)
 

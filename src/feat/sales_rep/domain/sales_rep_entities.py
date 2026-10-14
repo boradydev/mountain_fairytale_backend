@@ -5,23 +5,25 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.core.uuid7 import uuid7
 from src.feat.sales_rep.domain.sales_rep_events import CreateSalesRepresentativeEvent, UpdateSalesRepresentativeEvent
 
 
 class SalesRepresentative(BaseEntity):
+    _EVENT_FIELDS = {"name", "is_active", "commission_percent", "phone"}
+    _EVENT_SUBJECT_TYPE = "sales_representative"
+    _EVENT_ID_FIELD = "sales_representative_id"
+    _EVENT_NAME_FIELDS = ("name",)
+
     __tablename__ = "sales_representatives"
 
     sales_representative_id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
-    
+
     UQ_PHONE = "sales_representatives_phone_key"
-    phone: Mapped[str] = mapped_column(
-        Text, 
-        UniqueConstraint(name=UQ_PHONE)
-    )
-    
+    phone: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_PHONE))
+
     commission_percent: Mapped[float] = mapped_column(Float)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)

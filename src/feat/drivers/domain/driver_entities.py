@@ -5,13 +5,17 @@ from uuid import UUID
 from sqlalchemy import DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.common.domain import events
-from src.core.uuid7 import uuid7
 from src.common.domain.entities import BaseEntity
+from src.core.uuid7 import uuid7
 from src.feat.drivers.domain.driver_events import CreateDriverEvent, UpdateDriverEvent
 
 
 class Driver(BaseEntity):
+    _EVENT_FIELDS = {"name", "is_active"}
+    _EVENT_SUBJECT_TYPE = "driver"
+    _EVENT_ID_FIELD = "driver_id"
+    _EVENT_NAME_FIELDS = ("name",)
+
     __tablename__ = "drivers"
 
     driver_id: Mapped[UUID] = mapped_column(primary_key=True)

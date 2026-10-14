@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+
 from uuid6 import UUID
 
 from src.common.domain.events import BaseDomainEvent
@@ -21,3 +22,8 @@ class UpdateEmployeeEvent(BaseDomainEvent):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class EmployeeLoginEvent(BaseDomainEvent):
     actor_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EmployeePasswordChangedEvent(BaseDomainEvent):
+    employee_id: UUID

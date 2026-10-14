@@ -20,6 +20,7 @@ from src.common.api.api_excs import (
 )
 from src.common.infra.services.token.excs import InvalidAccessTokenException, InvalidRefreshTokenException
 from src.core.excs import BaseAppException
+from src.feat.audit_event.domain.audit_excs import InvalidAuditCursorException
 from src.feat.auth.domain.auth_excs import (
     AuthEmployeeDeactivateException,
     AuthEmployeeNotFoundByUsernameException,
@@ -87,6 +88,7 @@ class Resp:
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
     {
+        InvalidAuditCursorException: Resp(status_code=422, detail="Invalid event cursor"),
         InvalidCredentialsException: Resp(status_code=401, detail="Invalid credentials"),
         UnauthorizedException: Resp(status_code=401, detail="Unauthorized"),
         InvalidAccessTokenException: Resp(status_code=401, detail="Unauthorized"),

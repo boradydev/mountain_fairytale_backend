@@ -5,7 +5,6 @@ from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.feat.auth.app.auth_dtos import AuthTokensDTO
 from src.feat.auth.domain import auth_excs
 from src.feat.employees.app.abcs.employee_uow_abcs import IEmployeesUOW
-from src.feat.employees.domain.employee_events import EmployeeLoginEvent
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -57,13 +56,8 @@ class LoginUseCase:
                 employee_id=str(employee.employee_id),
             )
 
-            await uow.commit(
-                events=[
-                    EmployeeLoginEvent(
-                        actor_id=employee.employee_id,
-                    ),
-                ],
-            )
+            employee.record_login()
+            await uow.commit(events=employee.pull_events())
 
             return AuthTokensDTO(
                 access_token=access_token,

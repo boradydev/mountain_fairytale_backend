@@ -12,6 +12,22 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class Client(BaseEntity):
+    _EVENT_FIELDS = {
+        "name",
+        "cooldown_until",
+        "last_delivery_quantity",
+        "sleeping_threshold_days",
+        "address",
+        "sales_representative_id",
+        "last_delivery_date",
+        "default_payment_method_id",
+        "is_active",
+        "phone",
+    }
+    _EVENT_SUBJECT_TYPE = "client"
+    _EVENT_ID_FIELD = "client_id"
+    _EVENT_NAME_FIELDS = ("name",)
+
     __tablename__ = "clients"
 
     UQ_PHONE = "clients_phone_key"

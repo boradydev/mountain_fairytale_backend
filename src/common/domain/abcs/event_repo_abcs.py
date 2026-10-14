@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
+from uuid import UUID
 
-from src.common.domain.event_record import EventRecord
+from src.common.domain.event_record import AuditRecord, EventRecord
 
 
 class IEventRepository(ABC):
@@ -19,3 +21,9 @@ class IEventRepository(ABC):
         limit: int,
     ) -> list[EventRecord]:
         """Возвращает события истории с пагинацией."""
+
+    @abstractmethod
+    async def get_page(
+        self, *, search: str, before_at: datetime | None, before_id: UUID | None, limit: int
+    ) -> list[AuditRecord]:
+        """Возвращает безопасные записи аудита строго перед курсором."""

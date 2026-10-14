@@ -5,23 +5,25 @@ from uuid import UUID
 from sqlalchemy import DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
 from src.feat.products.domain.product_events import CreateProductEvent, UpdateProductEvent
 from src.feat.products.domain.product_excs import ProductDomainUpdateException
-from src.common.domain.entities import BaseEntity
 
 
 class Product(BaseEntity):
+    _EVENT_FIELDS = {"name", "is_active", "base_price"}
+    _EVENT_SUBJECT_TYPE = "product"
+    _EVENT_ID_FIELD = "product_id"
+    _EVENT_NAME_FIELDS = ("name",)
+
     __tablename__ = "products"
 
     product_id: Mapped[UUID] = mapped_column(primary_key=True)
-    
+
     UQ_NAME = "products_name_key"
-    name: Mapped[str] = mapped_column(
-        Text, 
-        UniqueConstraint(name=UQ_NAME)
-    )
-    
+    name: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_NAME))
+
     base_price: Mapped[float] = mapped_column(Float)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
@@ -64,7 +66,7 @@ class Product(BaseEntity):
         **payload: Any,
     ) -> None:
         self._validate_update(payload)
-        
+
         changes = self._apply_update_changes(
             payload=payload,
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
