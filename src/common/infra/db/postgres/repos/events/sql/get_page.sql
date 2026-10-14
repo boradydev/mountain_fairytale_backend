@@ -1,3 +1,4 @@
+WITH filtered_events AS (
 SELECT e.*, actor.username AS actor_name,
        document_subject.document_type AS document_type,
        COALESCE(names.display_name, employee_subject.username) AS subject_name,
@@ -43,7 +44,12 @@ WHERE (CAST(:before_at AS timestamptz) IS NULL OR
   AND (:search = '' OR strpos(lower(concat_ws(' ', actor.username,
        COALESCE(names.display_name, employee_subject.username), e.payload->>'subject_type',
        e.payload->'data', (e.payload->'changes') - 'password_hash' - 'password')), :search) > 0)
-ORDER BY CASE WHEN CAST(:newer AS boolean) THEN e.created_at END ASC,
-         CASE WHEN CAST(:newer AS boolean) THEN e.event_id END ASC,
-         e.created_at DESC, e.event_id DESC
+  AND (CAST(:date_from AS timestamptz) IS NULL OR e.created_at >= CAST(:date_from AS timestamptz))
+  AND (CAST(:date_to AS timestamptz) IS NULL OR e.created_at < CAST(:date_to AS timestamptz))
+)
+SELECT * FROM filtered_events
+WHERE (CAST(:action AS text) IS NULL OR action = :action)
+ORDER BY CASE WHEN CAST(:newer AS boolean) THEN created_at END ASC,
+         CASE WHEN CAST(:newer AS boolean) THEN event_id END ASC,
+         created_at DESC, event_id DESC
 LIMIT :limit;

@@ -31,12 +31,34 @@ class GetEventsUseCase:
         self._uow = uow
 
     async def execute(
-        self, *, search: str | None, cursor: str | None, limit: int, after: str | None = None
+        self,
+        *,
+        search: str | None,
+        cursor: str | None,
+        limit: int,
+        after: str | None = None,
+        action: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> AuditPage:
         if cursor is not None and after is not None:
             raise InvalidAuditCursorException
         search = (search or "").strip().lower()
-        fingerprint = hashlib.sha256(search.encode()).hexdigest()
+        for timestamp in (date_from, date_to):
+            if timestamp is not None and timestamp.tzinfo is None:
+                raise InvalidAuditCursorException
+        date_from = date_from.astimezone(UTC) if date_from else None
+        date_to = date_to.astimezone(UTC) if date_to else None
+        if date_from and date_to and date_from >= date_to:
+            raise InvalidAuditCursorException
+        filter_text = (
+            search
+            if not any((action, date_from, date_to))
+            else json.dumps(
+                [search, action, date_from.isoformat() if date_from else None, date_to.isoformat() if date_to else None]
+            )
+        )
+        fingerprint = hashlib.sha256(filter_text.encode()).hexdigest()
         before_at, before_id = self._decode_cursor(cursor, fingerprint) if cursor is not None else (None, None)
         after_at, after_id = self._decode_cursor(after, fingerprint, "newer") if after is not None else (None, None)
         async with self._uow as uow:
@@ -47,6 +69,9 @@ class GetEventsUseCase:
                 limit=limit + 1,
                 after_at=after_at,
                 after_id=after_id,
+                action=action,
+                date_from=date_from,
+                date_to=date_to,
             )
         page = rows[:limit]
         next_cursor = None

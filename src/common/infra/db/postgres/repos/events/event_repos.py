@@ -77,6 +77,9 @@ class EventsRepository(IEventRepository):
         limit: int,
         after_at: datetime | None = None,
         after_id: UUID | None = None,
+        action: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
     ) -> list[AuditRecord]:
         result = await self._session.execute(
             SQL.GET_PAGE,
@@ -88,6 +91,9 @@ class EventsRepository(IEventRepository):
                 "after_at": after_at,
                 "after_id": after_id,
                 "newer": after_at is not None,
+                "action": action,
+                "date_from": date_from,
+                "date_to": date_to,
             },
         )
         return [AuditRecord(**dict(row)) for row in result.mappings().all()]
