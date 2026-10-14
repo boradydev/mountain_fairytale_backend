@@ -21,3 +21,4 @@ class AuditRecord(EventRecord):
     actor_name: str | None
     subject_name: str | None
     action: str
+    document_type: str | None = None

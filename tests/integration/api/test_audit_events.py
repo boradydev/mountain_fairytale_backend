@@ -136,11 +136,22 @@ async def test_document_operation_and_lock_exclusion(client, document_case, post
     assert any(row["event_type"] == "CreateItemEvent" for row in rows)
     point = next(row for row in rows if row["event_type"] == "CreatePointEvent")
     assert point["payload"]["data"]["display_name"]
+    response = await client.get("/protected/events", params={"limit": 100})
+    assert response.status_code == 200
+    entry = next(event for event in response.json()["data"]["events"] if event["subject"]["id"] == document_id)
+    expected_type = "pickup_sheet" if document_case["base"].endswith("pickup-sheets") else "delivery_route_sheet"
+    assert entry["subject"]["documentType"] == expected_type
     assert (await client.patch(document_case["path"] + "/edit-lock")).status_code == 200
     assert (await client.delete(document_case["path"] + "/edit-lock")).status_code == 200
     async with postgres.session_factory() as session:
         after = await session.scalar(text("SELECT count(*) FROM events"))
     assert after == before
+    assert (await client.post(document_case["path"] + "/cancel")).status_code == 200
+    response = await client.get("/protected/events", params={"limit": 100})
+    cancelled = next(event for event in response.json()["data"]["events"] if event["subject"]["id"] == document_id)
+    assert cancelled["action"] == "cancelled"
+    assert cancelled["data"] == {}
+    assert cancelled["subject"]["documentType"] == expected_type
 
 
 async def test_requires_authorization(client):

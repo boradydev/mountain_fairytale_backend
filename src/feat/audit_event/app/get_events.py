@@ -76,6 +76,7 @@ class GetEventsUseCase:
                 "type": payload.get("subject_type", "unknown"),
                 "id": payload.get("subject_id", str(row.event_id)),
                 "displayName": row.subject_name,
+                "documentType": row.document_type,
             },
             data=public_values(payload.get("data", {})),
             changes=public_values(changes),

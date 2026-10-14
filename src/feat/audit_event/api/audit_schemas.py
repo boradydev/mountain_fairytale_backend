@@ -15,6 +15,7 @@ class AuditSubjectResp(BaseSchema):
     type: str
     id: UUID
     display_name: str | None
+    document_type: str | None = None
 
 
 class AuditChangeResp(BaseSchema):

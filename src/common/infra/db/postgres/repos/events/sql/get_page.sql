@@ -1,4 +1,5 @@
 SELECT e.*, actor.username AS actor_name,
+       document_subject.document_type AS document_type,
        COALESCE(names.display_name, employee_subject.username) AS subject_name,
        CASE
            WHEN e.event_type = 'EmployeeLoginEvent' THEN 'login'
@@ -16,6 +17,8 @@ SELECT e.*, actor.username AS actor_name,
        END AS action
 FROM events e
 LEFT JOIN employees actor ON actor.employee_id = e.actor_id
+LEFT JOIN delivery_documents document_subject ON e.payload->>'subject_type' = 'delivery_document'
+    AND document_subject.delivery_document_id::text = e.payload->>'subject_id'
 LEFT JOIN employees employee_subject ON e.payload->>'subject_type' = 'employee'
     AND employee_subject.employee_id::text = e.payload->>'subject_id'
 LEFT JOIN LATERAL (
