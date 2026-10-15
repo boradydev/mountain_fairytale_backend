@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Self
 from uuid import UUID, uuid5
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
@@ -13,6 +25,7 @@ from src.common.domain.events import FieldChange
 from src.core.uuid7 import uuid7
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
+from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
 from src.feat.delivery_document.domain.delivery_document_events import (
     CancelDeliveryDocumentEvent,
     CreateDeliveryDocumentEvent,
@@ -57,13 +70,13 @@ class Item(BaseEntity):
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"), primary_key=True)
     product_name: Mapped[str] = mapped_column(Text)
     quantity: Mapped[int] = mapped_column(Integer)
-    price: Mapped[float] = mapped_column(Float)
+    price: Mapped[Decimal] = mapped_column(Numeric)
 
     _ALLOWED_UPDATE_FIELDS = {"quantity", "price"}
 
     @classmethod
     def create(
-        cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, product_name: str, quantity: int, price: float
+        cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, product_name: str, quantity: int, price: Decimal
     ) -> Self:
         if not 1 <= len(product_name) <= 120:
             raise DeliveryDocumentUpdateException(
@@ -83,7 +96,7 @@ class Item(BaseEntity):
             "price": self.price,
         }
 
-    def update(self, *, actor_id: UUID, quantity: int, price: float) -> None:
+    def update(self, *, actor_id: UUID, quantity: int, price: Decimal) -> None:
         changes = self._apply_update_changes(
             payload={"quantity": quantity, "price": price},
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
@@ -134,6 +147,9 @@ class Point(BaseEntity):
 
     client: Mapped[Client] = relationship(lazy="joined")
     items: Mapped[list[Item]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+    commission: Mapped[PointCommission | None] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    )
     _ALLOWED_UPDATE_FIELDS = {"position"}
 
     @property
@@ -344,6 +360,9 @@ class DeliveryDocument(BaseEntity):
         order_by="Point.position",
         lazy="selectin",
     )
+    employee_commissions: Mapped[list[DocumentEmployeeCommission]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
     edit_lock: Mapped[EditLock | None] = relationship(cascade="all, delete-orphan", lazy="joined", uselist=False)
     _ALLOWED_UPDATE_FIELDS = {"planned_date", "driver_id", "car_id", "start_mileage", "end_mileage"}
 
@@ -398,6 +417,7 @@ class DeliveryDocument(BaseEntity):
             car_id=car_id,
             start_mileage=start_mileage,
             end_mileage=end_mileage,
+            employee_commissions=[],
             points=[
                 Point.create(
                     actor_id=actor_id,

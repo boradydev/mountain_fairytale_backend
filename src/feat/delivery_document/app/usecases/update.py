@@ -58,6 +58,7 @@ class UpdateDeliveryDocumentUseCase:
                     car_id=document.car_id,
                 )
             await repo.validate_references(document)
+            await repo.capture_commissions(document, is_new=False)
             await repo.update(document)
             events = document.pull_aggregate_events()
             loaded = await repo.get_by_id(

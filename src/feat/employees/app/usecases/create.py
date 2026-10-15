@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from src.common.app.abcs.password_service_abcs import IPasswordService
@@ -11,7 +12,7 @@ class CreateEmployeeDTO:
     actor_id: UUID
     username: str
     password: str
-    commission_percent: float
+    commission_percent: Decimal
     role: str = "employee"
 
 

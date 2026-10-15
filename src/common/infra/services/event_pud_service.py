@@ -2,6 +2,7 @@
 import logging
 from dataclasses import fields, is_dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -159,6 +160,9 @@ class EventPublisher(IEventPublisher):
     def _serialize_value(
         value: Any,
     ) -> Any:
+        if isinstance(value, Decimal):
+            return float(value)
+
         if isinstance(value, UUID):
             return str(value)
 

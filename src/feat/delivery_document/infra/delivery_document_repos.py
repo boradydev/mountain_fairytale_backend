@@ -9,8 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from src.common.domain.money import decimal_value, line_amount, sum_amounts
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
+from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
 from src.feat.delivery_document.domain.abcs.delivery_document_repo_abcs import IDeliveryDocumentsRepository
 from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock, Point
@@ -27,6 +29,7 @@ from src.feat.delivery_document.infra.sql.registry import SQL
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.products.domain.product_entities import Product
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 _days_adapter = TypeAdapter(list[DeliveryDay])
@@ -36,6 +39,54 @@ _day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discrimin
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None:
+        """Capture new recipients once; recalculate amounts using historical rates."""
+        with self._session.no_autoflush:
+            new_points = [point for point in document.points if point.commission is None]
+            assignments = {}
+            if new_points:
+                rows = await self._session.execute(
+                    select(
+                        Client.client_id,
+                        SalesRepresentative.sales_representative_id,
+                        SalesRepresentative.commission_percent,
+                    )
+                    .outerjoin(
+                        SalesRepresentative,
+                        (Client.sales_representative_id == SalesRepresentative.sales_representative_id)
+                        & SalesRepresentative.is_active.is_(True),
+                    )
+                    .where(Client.client_id.in_([point.client_id for point in new_points]))
+                )
+                assignments = {row.client_id: row for row in rows}
+            for point in document.points:
+                if point.commission is None:
+                    assignment = assignments[point.client_id]
+                    point.commission = PointCommission(
+                        point_id=point.point_id,
+                        sales_representative_id=assignment.sales_representative_id,
+                        commission_percent=decimal_value(assignment.commission_percent or 0),
+                    )
+                turnover = sum_amounts(line_amount(item.quantity, item.price) for item in point.items)
+                point.commission.recalculate(turnover)
+            if is_new:
+                employees = (
+                    await self._session.scalars(
+                        select(Employee).where(Employee.is_active.is_(True), Employee.role != "admin")
+                    )
+                ).all()
+                document.employee_commissions = [
+                    DocumentEmployeeCommission(
+                        delivery_document_id=document.delivery_document_id,
+                        employee_id=employee.employee_id,
+                        commission_percent=decimal_value(employee.commission_percent),
+                    )
+                    for employee in employees
+                ]
+            turnover = sum_amounts(point.commission.turnover for point in document.points if point.commission)
+            for entry in document.employee_commissions:
+                entry.recalculate(turnover)
 
     async def get_days(self, *, offset: int, limit: int) -> tuple[list[DeliveryDay], int]:
         result = await self._session.execute(SQL.GET_DELIVERY_DAYS, {"offset": offset, "limit": limit})

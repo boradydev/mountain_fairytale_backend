@@ -8,6 +8,9 @@ from src.feat.delivery_document.domain.delivery_document_entities import Deliver
 
 class IDeliveryDocumentsRepository(ABC):
     @abstractmethod
+    async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None: ...
+
+    @abstractmethod
     async def get_days(self, *, offset: int, limit: int) -> tuple[list[DeliveryDay], int]: ...
 
     @abstractmethod

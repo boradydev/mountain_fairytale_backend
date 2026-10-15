@@ -1,8 +1,9 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint
+from sqlalchemy import DateTime, Numeric, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.common.domain.entities import BaseEntity
@@ -24,7 +25,7 @@ class Product(BaseEntity):
     UQ_NAME = "products_name_key"
     name: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_NAME))
 
-    base_price: Mapped[float] = mapped_column(Float)
+    base_price: Mapped[Decimal] = mapped_column(Numeric)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
@@ -40,7 +41,7 @@ class Product(BaseEntity):
         *,
         actor_id: UUID,
         name: str,
-        base_price: float,
+        base_price: Decimal,
     ) -> Self:
         product = cls(
             product_id=uuid7(),

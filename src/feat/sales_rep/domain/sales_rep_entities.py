@@ -1,8 +1,9 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Float, Text, UniqueConstraint
+from sqlalchemy import DateTime, Numeric, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.common.domain.entities import BaseEntity
@@ -24,7 +25,7 @@ class SalesRepresentative(BaseEntity):
     UQ_PHONE = "sales_representatives_phone_key"
     phone: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_PHONE))
 
-    commission_percent: Mapped[float] = mapped_column(Float)
+    commission_percent: Mapped[Decimal] = mapped_column(Numeric)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
@@ -42,7 +43,7 @@ class SalesRepresentative(BaseEntity):
         actor_id: UUID,
         name: str,
         phone: str,
-        commission_percent: float,
+        commission_percent: Decimal,
     ) -> Self:
         rep = cls(
             sales_representative_id=uuid7(),

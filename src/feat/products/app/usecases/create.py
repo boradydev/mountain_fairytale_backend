@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from src.feat.products.app.abcs.product_uow_abcs import IProductsUOW
@@ -9,7 +10,7 @@ from src.feat.products.domain.product_entities import Product
 class CreateProductDTO:
     actor_id: UUID
     name: str
-    base_price: float
+    base_price: Decimal
 
 
 class CreateProductUseCase:

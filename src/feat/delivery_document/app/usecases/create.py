@@ -42,6 +42,7 @@ class CreateDeliveryDocumentUseCase:
                 end_mileage=dto.end_mileage,
             )
             await uow.delivery_documents.validate_references(document)
+            await uow.delivery_documents.capture_commissions(document, is_new=True)
             await uow.delivery_documents.add(document)
             events = document.pull_aggregate_events()
             loaded = await uow.delivery_documents.get_by_id(

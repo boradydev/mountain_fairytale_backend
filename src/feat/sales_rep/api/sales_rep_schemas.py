@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -25,7 +26,7 @@ class SalesRepresentativesResp(BaseSchema):
 class CreateSalesRepresentativeReq(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=120)]
     phone: Annotated[str, Field(min_length=1, max_length=32)]
-    commission_percent: Annotated[float, Field(ge=0, le=100)]
+    commission_percent: Annotated[Decimal, Field(ge=0, le=100)]
 
 
 class UpdateSalesRepresentativeReq(BasePatchSchema):
@@ -33,5 +34,5 @@ class UpdateSalesRepresentativeReq(BasePatchSchema):
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     phone: str | None = Field(default=None, min_length=1, max_length=32)
-    commission_percent: float | None = Field(default=None, ge=0, le=100)
+    commission_percent: Decimal | None = Field(default=None, ge=0, le=100)
     is_active: bool | None = None

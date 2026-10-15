@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
-
-from uuid6 import UUID
+from uuid import UUID
 
 from src.common.domain.events import BaseDomainEvent
 

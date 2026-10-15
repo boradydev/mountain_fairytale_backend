@@ -95,7 +95,7 @@ CREATE TABLE delivery_document_items (
     product_id UUID NOT NULL,
     product_name TEXT NOT NULL,
     quantity INTEGER NOT NULL,
-    price DOUBLE PRECISION NOT NULL,
+    price NUMERIC NOT NULL,
 
     CONSTRAINT delivery_document_items_pkey
         PRIMARY KEY (point_id, product_id),

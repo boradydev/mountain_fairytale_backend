@@ -4,7 +4,7 @@ CREATE TABLE sales_representatives (
     sales_representative_id UUID PRIMARY KEY,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
-    commission_percent DOUBLE PRECISION NOT NULL,
+    commission_percent NUMERIC NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL,
     CONSTRAINT sales_representatives_phone_key UNIQUE (phone)

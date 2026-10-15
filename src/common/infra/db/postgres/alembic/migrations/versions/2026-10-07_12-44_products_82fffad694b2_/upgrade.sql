@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TABLE products (
     product_id UUID PRIMARY KEY,
     name TEXT NOT NULL,
-    base_price DOUBLE PRECISION NOT NULL,
+    base_price NUMERIC NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL,
     CONSTRAINT products_name_key UNIQUE (name)

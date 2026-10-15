@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.common.app.abcs.password_service_abcs import IPasswordService
 from src.common.domain.const import SYSTEM_ACTOR_ID
 from src.common.infra.bootstrap.admins.settings import AdminSettings
@@ -23,7 +25,7 @@ async def ensure_admin(
         username=settings.ADMIN_USERNAME,
         password=settings.ADMIN_PASSWORD,
         role="admin",
-        commission_percent=0,
+        commission_percent=Decimal(0),
     )
 
     use_case = CreateEmployeeUseCase(

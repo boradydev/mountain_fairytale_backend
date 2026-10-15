@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
@@ -10,7 +11,7 @@ class CreateSalesRepresentativeDTO:
     actor_id: UUID
     name: str
     phone: str
-    commission_percent: float
+    commission_percent: Decimal
 
 
 class CreateSalesRepresentativeUseCase:

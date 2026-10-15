@@ -181,7 +181,10 @@ async def test_client_identity_and_point_replacement_are_atomic(client: AsyncCli
     assert loaded["points"][1]["items"] == saved["points"][0]["items"]
     events = await read_events(postgres, saved)
     deleted = next(event for event in events if event["event_type"] == "DeletePointEvent")
-    assert deleted["payload"]["data"]["client_id"] == saved["points"][0]["clientId"]
+    assert deleted["payload"]["data"]["client_id"] == {
+        "id": saved["points"][0]["clientId"],
+        "display_name": saved["points"][0]["clientName"],
+    }
     assert deleted["payload"]["data"]["items"][0]["price"] == 12.5
     assert any(event["event_type"] == "DeleteItemEvent" for event in events)
 

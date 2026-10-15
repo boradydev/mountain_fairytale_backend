@@ -39,6 +39,10 @@ from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
+from src.feat.commissions.domain.commission_excs import (
+    InactiveCommissionTargetException,
+    SameCommissionTargetException,
+)
 from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentCancelledException,
     DeliveryDocumentEditLockNotFoundException,
@@ -88,6 +92,8 @@ class Resp:
 
 APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
     {
+        InactiveCommissionTargetException: Resp(status_code=409, detail="Target representative is deactivated"),
+        SameCommissionTargetException: Resp(status_code=422, detail="Source and target representative must differ"),
         InvalidAuditCursorException: Resp(status_code=422, detail="Invalid event cursor"),
         InvalidCredentialsException: Resp(status_code=401, detail="Invalid credentials"),
         UnauthorizedException: Resp(status_code=401, detail="Unauthorized"),

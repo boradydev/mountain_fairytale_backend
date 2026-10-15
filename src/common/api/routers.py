@@ -5,6 +5,7 @@ from src.feat.audit_event.api.audit_routers import events_router
 from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
 from src.feat.clients.api.client_routers import clients_router
+from src.feat.commissions.api.commission_routers import commissions_router
 from src.feat.dashboard_updates.api.dashboard_updates_routers import dashboard_updates_router
 from src.feat.delivery_document.api.delivery_day_routers import delivery_days_router
 from src.feat.delivery_document.api.delivery_document_routers import (
@@ -31,6 +32,7 @@ protected.include_router(me_router)
 protected.include_router(events_router)
 protected.include_router(cars_router)
 protected.include_router(clients_router)
+protected.include_router(commissions_router)
 protected.include_router(delivery_days_router)
 protected.include_router(dashboard_updates_router)
 protected.include_router(delivery_route_sheets_router)

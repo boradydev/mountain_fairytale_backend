@@ -13,6 +13,7 @@ from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.commissions.infra.commission_factories import CommissionsUseCaseFactory
 from src.feat.dashboard_updates.app.dashboard_changes import DashboardChanges
 from src.feat.delivery_document.infra.delivery_document_factories import (
     DeliveryDocumentsUseCaseFactory,
@@ -79,6 +80,9 @@ async def lifespan(app: FastAPI):
         payment_methods_use_cases=payment_methods_use_cases,
         products_use_cases=products_use_cases,
         sales_representatives_use_cases=sales_representatives_use_cases,
+        commissions_use_cases=CommissionsUseCaseFactory(
+            postgres.session_factory, on_committed=dashboard_changes.publish
+        ),
         token_settings=token_settings,
         audit_use_cases=AuditUseCaseFactory(postgres.session_factory),
         dashboard_changes=dashboard_changes,

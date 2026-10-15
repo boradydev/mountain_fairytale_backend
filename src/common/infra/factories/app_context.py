@@ -9,6 +9,7 @@ from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.commissions.infra.commission_factories import CommissionsUseCaseFactory
 from src.feat.dashboard_updates.app.dashboard_changes import DashboardChanges
 from src.feat.delivery_document.infra.delivery_document_factories import (
     DeliveryDocumentsUseCaseFactory,
@@ -35,6 +36,7 @@ class AppContext:
     payment_methods_use_cases: PaymentMethodsUseCaseFactory
     products_use_cases: ProductsUseCaseFactory
     sales_representatives_use_cases: SalesRepresentativesUseCaseFactory
+    commissions_use_cases: CommissionsUseCaseFactory
 
     token_settings: JwtSettings
     audit_use_cases: AuditUseCaseFactory
