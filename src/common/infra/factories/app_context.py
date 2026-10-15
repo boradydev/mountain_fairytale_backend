@@ -9,6 +9,7 @@ from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.dashboard_updates.app.dashboard_changes import DashboardChanges
 from src.feat.delivery_document.infra.delivery_document_factories import (
     DeliveryDocumentsUseCaseFactory,
 )
@@ -37,3 +38,4 @@ class AppContext:
 
     token_settings: JwtSettings
     audit_use_cases: AuditUseCaseFactory
+    dashboard_changes: DashboardChanges

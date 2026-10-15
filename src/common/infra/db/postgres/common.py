@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.common.app.abcs.uow_abcs import InterfaceUOW
 from src.common.domain.events import BaseDomainEvent
+from src.feat.dashboard_updates.app.dashboard_changes import DashboardChanges
 
 
 class IPostgresUOW(InterfaceUOW, ABC):
@@ -48,6 +49,9 @@ class IPostgresUOW(InterfaceUOW, ABC):
         """Фиксирует все изменения текущей транзакции в хранилище."""
         await self._event_publisher.publish_many(events=events)
         await self._session.commit()
+        changes = self._session.info.get("dashboard_changes")
+        if isinstance(changes, DashboardChanges):
+            changes.publish(events)
 
     async def rollback(self) -> None:
         """Отменяет все незафиксированные изменения в текущей транзакции."""

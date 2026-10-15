@@ -13,6 +13,7 @@ from src.feat.audit_event.infra.audit_factories import AuditUseCaseFactory
 from src.feat.auth.infra.auth_factories import AuthUseCaseFactory
 from src.feat.cars.infra.car_factories import CarsUseCaseFactory
 from src.feat.clients.infra.client_factories import ClientsUseCaseFactory
+from src.feat.dashboard_updates.app.dashboard_changes import DashboardChanges
 from src.feat.delivery_document.infra.delivery_document_factories import (
     DeliveryDocumentsUseCaseFactory,
 )
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Fastapi application...")
 
     postgres = Postgres()
+    dashboard_changes = DashboardChanges()
+    postgres.session_factory.configure(info={"dashboard_changes": dashboard_changes})
     token_settings = JwtSettings()
     token_service = JwtTokenService(settings=token_settings)
     passwd_service = PasswordService()
@@ -74,6 +77,7 @@ async def lifespan(app: FastAPI):
         sales_representatives_use_cases=sales_representatives_use_cases,
         token_settings=token_settings,
         audit_use_cases=AuditUseCaseFactory(postgres.session_factory),
+        dashboard_changes=dashboard_changes,
     )
 
     app.state.ctx = ctx  # type: ignore[assignment]
