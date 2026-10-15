@@ -34,7 +34,6 @@ async def lifespan(app: FastAPI):
 
     postgres = Postgres()
     dashboard_changes = DashboardChanges()
-    postgres.session_factory.configure(info={"dashboard_changes": dashboard_changes})
     token_settings = JwtSettings()
     token_service = JwtTokenService(settings=token_settings)
     passwd_service = PasswordService()
@@ -49,17 +48,22 @@ async def lifespan(app: FastAPI):
         token_service=token_service,
     )
     cars_use_cases = CarsUseCaseFactory(session_factory=postgres.session_factory)
-    clients_use_cases = ClientsUseCaseFactory(session_factory=postgres.session_factory)
+    clients_use_cases = ClientsUseCaseFactory(
+        session_factory=postgres.session_factory, on_committed=dashboard_changes.publish
+    )
     delivery_documents_use_cases = DeliveryDocumentsUseCaseFactory(
         session_factory=postgres.session_factory,
+        on_committed=dashboard_changes.publish,
     )
     drivers_use_cases = DriversUseCaseFactory(session_factory=postgres.session_factory)
     payment_methods_use_cases = PaymentMethodsUseCaseFactory(
         session_factory=postgres.session_factory,
+        on_committed=dashboard_changes.publish,
     )
     products_use_cases = ProductsUseCaseFactory(session_factory=postgres.session_factory)
     sales_representatives_use_cases = SalesRepresentativesUseCaseFactory(
         session_factory=postgres.session_factory,
+        on_committed=dashboard_changes.publish,
     )
 
     ctx = AppContext(

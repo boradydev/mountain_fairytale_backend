@@ -2,11 +2,12 @@ from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.app.abcs.uow_abcs import CommittedEventsHandler
+from src.common.infra.db.postgres.common import IPostgresUOW
+from src.common.infra.services.event_pud_service import EventPublisher
 from src.feat.sales_rep.app.abcs.sales_rep_uow_abcs import ISalesRepresentativesUOW
 from src.feat.sales_rep.domain.abcs.sales_rep_repo_abcs import ISalesRepresentativesRepository
 from src.feat.sales_rep.infra.sales_rep_repos import SalesRepresentativesRepository
-from src.common.infra.db.postgres.common import IPostgresUOW
-from src.common.infra.services.event_pud_service import EventPublisher
 
 
 class SalesRepresentativesUOW(IPostgresUOW, ISalesRepresentativesUOW):
@@ -19,8 +20,11 @@ class SalesRepresentativesUOW(IPostgresUOW, ISalesRepresentativesUOW):
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
+        *,
+        on_committed: CommittedEventsHandler | None,
     ) -> None:
         self._session_factory = session_factory
+        self._on_committed = on_committed
 
     async def __aenter__(self) -> Self:
         self._session = self._session_factory()

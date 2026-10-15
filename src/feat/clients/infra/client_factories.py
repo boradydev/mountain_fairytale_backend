@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.app.abcs.uow_abcs import CommittedEventsHandler
 from src.feat.clients.app.usecases.check_duplicate import CheckClientDuplicateUseCase
 from src.feat.clients.app.usecases.create import CreateClientUseCase
 from src.feat.clients.app.usecases.get import GetClientUseCase
@@ -12,8 +13,11 @@ class ClientsUseCaseFactory:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
+        *,
+        on_committed: CommittedEventsHandler,
     ) -> None:
         self._session_factory = session_factory
+        self._on_committed = on_committed
 
     def create_client(self) -> CreateClientUseCase:
         return CreateClientUseCase(uow=self._create_uow())
@@ -31,7 +35,7 @@ class ClientsUseCaseFactory:
         return CheckClientDuplicateUseCase(uow=self._create_uow())
 
     def _create_uow(self) -> ClientsUOW:
-        return ClientsUOW(session_factory=self._session_factory)
+        return ClientsUOW(session_factory=self._session_factory, on_committed=self._on_committed)
 
     @property
     def create_uow(self) -> ClientsUOW:

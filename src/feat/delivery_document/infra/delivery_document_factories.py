@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.app.abcs.uow_abcs import CommittedEventsHandler
 from src.feat.delivery_document.app.usecases.change_status import ChangeDeliveryDocumentStatusUseCase
 from src.feat.delivery_document.app.usecases.create import CreateDeliveryDocumentUseCase
 from src.feat.delivery_document.app.usecases.edit_lock import DeliveryDocumentEditLockUseCase
@@ -12,8 +13,11 @@ from src.feat.delivery_document.infra.delivery_document_uow import DeliveryDocum
 
 
 class DeliveryDocumentsUseCaseFactory:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self, session_factory: async_sessionmaker[AsyncSession], *, on_committed: CommittedEventsHandler
+    ) -> None:
         self._session_factory = session_factory
+        self._on_committed = on_committed
 
     def create_delivery_document(self) -> CreateDeliveryDocumentUseCase:
         return CreateDeliveryDocumentUseCase(uow=self._create_uow())
@@ -49,7 +53,7 @@ class DeliveryDocumentsUseCaseFactory:
         return DeliveryDocumentEditLockUseCase(uow=self._create_uow(), operation="release")
 
     def _create_uow(self) -> DeliveryDocumentsUOW:
-        return DeliveryDocumentsUOW(session_factory=self._session_factory)
+        return DeliveryDocumentsUOW(session_factory=self._session_factory, on_committed=self._on_committed)
 
     @property
     def create_uow(self) -> DeliveryDocumentsUOW:

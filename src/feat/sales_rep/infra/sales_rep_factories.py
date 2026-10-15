@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.app.abcs.uow_abcs import CommittedEventsHandler
 from src.feat.sales_rep.app.usecases.check_duplicate import CheckSalesRepresentativeDuplicateUseCase
 from src.feat.sales_rep.app.usecases.create import CreateSalesRepresentativeUseCase
 from src.feat.sales_rep.app.usecases.get import GetSalesRepresentativeUseCase
@@ -12,8 +13,11 @@ class SalesRepresentativesUseCaseFactory:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
+        *,
+        on_committed: CommittedEventsHandler,
     ) -> None:
         self._session_factory = session_factory
+        self._on_committed = on_committed
 
     def get_sales_representative(self) -> GetSalesRepresentativeUseCase:
         return GetSalesRepresentativeUseCase(
@@ -43,6 +47,7 @@ class SalesRepresentativesUseCaseFactory:
     def _create_uow(self) -> SalesRepresentativesUOW:
         return SalesRepresentativesUOW(
             session_factory=self._session_factory,
+            on_committed=self._on_committed,
         )
 
     @property

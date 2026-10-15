@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from types import TracebackType
 from typing import Self
 
 from src.common.app.abcs.event_pub_service_abcs import IEventPublisher
 from src.common.domain.events import BaseDomainEvent
+
+
+type CommittedEventsHandler = Callable[[list[BaseDomainEvent]], None]
 
 
 class InterfaceUOW(ABC):

@@ -122,7 +122,7 @@ def clients_uow_factory(
     postgres: Postgres,
 ) -> Callable[[], ClientsUOW]:
     def factory() -> ClientsUOW:
-        return ClientsUOW(session_factory=postgres.session_factory)
+        return ClientsUOW(session_factory=postgres.session_factory, on_committed=None)
 
     return factory
 

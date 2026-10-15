@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.common.app.abcs.uow_abcs import CommittedEventsHandler
 from src.feat.pay_methods.app.usecases.check_duplicate import CheckPaymentMethodDuplicateUseCase
 from src.feat.pay_methods.app.usecases.create import CreatePaymentMethodUseCase
 from src.feat.pay_methods.app.usecases.get import GetPaymentMethodUseCase
@@ -12,8 +13,11 @@ class PaymentMethodsUseCaseFactory:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
+        *,
+        on_committed: CommittedEventsHandler,
     ) -> None:
         self._session_factory = session_factory
+        self._on_committed = on_committed
 
     def create_payment_method(self) -> CreatePaymentMethodUseCase:
         return CreatePaymentMethodUseCase(
@@ -43,6 +47,7 @@ class PaymentMethodsUseCaseFactory:
     def _create_uow(self) -> PaymentMethodsUOW:
         return PaymentMethodsUOW(
             session_factory=self._session_factory,
+            on_committed=self._on_committed,
         )
 
     @property
