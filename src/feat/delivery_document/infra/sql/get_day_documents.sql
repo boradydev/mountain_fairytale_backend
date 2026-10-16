@@ -43,4 +43,4 @@ LEFT JOIN LATERAL (
 ) AS document_points ON TRUE
 WHERE d.planned_date = :planned_date
   AND (d.is_active OR :include_cancelled)
-ORDER BY d.is_active DESC, d.created_at DESC, d.delivery_document_id DESC;
+ORDER BY d.is_active DESC, d.created_at ASC, d.delivery_document_id DESC;

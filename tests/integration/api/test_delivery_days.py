@@ -246,7 +246,7 @@ async def test_day_documents_are_flat_complete_and_match_document_api(case):
     assert body["total"] == 2
     assert body["offset"] is None
     assert body["limit"] is None
-    assert [d["documentType"] for d in body["data"]["documents"]] == ["pickupSheet", "deliveryRouteSheet"]
+    assert [d["documentType"] for d in body["data"]["documents"]] == ["deliveryRouteSheet", "pickupSheet"]
     for listed in body["data"]["documents"]:
         original = delivery if listed["documentType"] == "deliveryRouteSheet" else pickup
         direct = (await case.client.get(case.path(original))).json()["data"]
