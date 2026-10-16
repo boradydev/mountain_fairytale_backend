@@ -199,6 +199,40 @@ async def test_historical_snapshots_edit_restore_and_rates(
     assert find(june["salesRepresentatives"], "salesRepresentativeId", case["rep"])["ordersCount"] == 1
 
 
+async def test_include_deactivated_employees_preserves_accruals_and_summary(
+    client, commission_case, admin_employee, active_employee
+):
+    case = commission_case
+    await DeliveryAPI.login(client, admin_employee)
+    response = await client.post(
+        "/admin/employees/create",
+        json={"username": unique_username("inactive_no_accruals"), "password": "test", "commissionPercent": "0"},
+    )
+    assert response.status_code == 201, response.text
+    employee_id = response.json()["data"]["employeeId"]
+    for target_id in (employee_id, case["manager"]):
+        response = await client.patch(f"/admin/employees/{target_id}", json={"isActive": False})
+        assert response.status_code == 200, response.text
+    await DeliveryAPI.login(client, active_employee)
+
+    default = await report(client)
+    assert employee_id not in [row["employeeId"] for row in default["employees"]]
+    historical = find(default["employees"], "employeeId", case["manager"])
+    assert historical["isActive"] is False
+    assert Decimal(historical["commissionPayable"]) > 0
+
+    expanded = await report(client, include=True)
+    inactive = find(expanded["employees"], "employeeId", employee_id)
+    assert inactive["isActive"] is False
+    assert Decimal(inactive["turnoverBase"]) == 0
+    assert Decimal(inactive["commissionPayable"]) == 0
+    assert inactive["commissionRateBreakdown"] == []
+    assert find(expanded["employees"], "employeeId", case["manager"]) == historical
+    assert str(admin_employee.employee_id) not in [row["employeeId"] for row in expanded["employees"]]
+    assert expanded["summary"] == default["summary"]
+    assert (await report(client))["employees"] == default["employees"]
+
+
 async def test_reassign_inactive_clients_source_and_visibility(client, commission_case):
     case = commission_case
     assert (await client.patch(f"/protected/clients/{case['third']}", json={"isActive": False})).status_code == 200

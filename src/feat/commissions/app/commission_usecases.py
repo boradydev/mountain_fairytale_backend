@@ -118,7 +118,7 @@ class GetCommissionsUseCase:
                 by_employee.setdefault(entry.employee_id, []).append(entry)
             for employee in await repo.employees():
                 accruals = by_employee.get(employee.employee_id, [])
-                if employee.is_active or accruals:
+                if employee.is_active or include_deactivated or accruals:
                     employees.append(
                         EmployeeCommissionResp(
                             employee_id=employee.employee_id,

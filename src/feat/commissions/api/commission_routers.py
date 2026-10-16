@@ -28,7 +28,7 @@ Month = Annotated[int, Query(ge=1, le=12)]
     responses=map_exceptions_to_responses(UnauthorizedException),
 )
 async def get_monthly_commissions(ctx: Context, year: Year, month: Month, include_deactivated: bool = False):
-    """Monthly exact accruals from saved snapshots; inactive filter only changes representative visibility."""
+    """Monthly exact accruals from saved snapshots; inactive filter only changes recipient visibility."""
     report = await ctx.commissions_use_cases.get_report().execute(
         year=year, month=month, include_deactivated=include_deactivated
     )
