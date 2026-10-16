@@ -14,7 +14,7 @@ class EmployeeResp(BaseSchema):
     employee_id: UUID
     username: str
     role: str
-    commission_percent: float
+    commission_percent: float | None
     is_active: bool
     created_at: datetime
 
@@ -26,7 +26,7 @@ class EmployeesResp(BaseSchema):
 class CreateEmployeeReq(BaseSchema):
     username: Annotated[str, Field(min_length=1, max_length=50)]
     password: Annotated[str, Field(min_length=0, max_length=50)]
-    commission_percent: Annotated[Decimal, Field(ge=0, le=100)]
+    commission_percent: Annotated[Decimal | None, Field(ge=0, le=100)] = None
 
     @field_validator("username")
     @classmethod

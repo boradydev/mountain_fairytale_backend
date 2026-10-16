@@ -143,7 +143,7 @@ def employee_factory(
         username: str | None = None,
         password: str = "test_password",
         role: str = "employee",
-        commission_percent: float = 0.0,
+        commission_percent: float | None = 0.0,
         is_active: bool = True,
     ) -> EmployeeTestData:
         employee = Employee.create(
@@ -238,7 +238,7 @@ async def active_employee(
 async def admin_employee(
     employee_factory: Callable[..., Coroutine[Any, Any, EmployeeTestData]],
 ) -> EmployeeTestData:
-    return await employee_factory(role="admin")
+    return await employee_factory(role="admin", commission_percent=None)
 
 
 @pytest.fixture

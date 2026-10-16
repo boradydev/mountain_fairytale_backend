@@ -73,7 +73,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             if is_new:
                 employees = (
                     await self._session.scalars(
-                        select(Employee).where(Employee.is_active.is_(True), Employee.role != "admin")
+                        select(Employee).where(Employee.is_active.is_(True), Employee.commission_percent.is_not(None))
                     )
                 ).all()
                 document.employee_commissions = [
@@ -83,6 +83,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                         commission_percent=decimal_value(employee.commission_percent),
                     )
                     for employee in employees
+                    if employee.commission_percent is not None
                 ]
             turnover = sum_amounts(point.commission.turnover for point in document.points if point.commission)
             for entry in document.employee_commissions:

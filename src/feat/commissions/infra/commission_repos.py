@@ -75,11 +75,7 @@ class CommissionsRepository(ICommissionsRepository):
 
     async def employees(self) -> list[Employee]:
         return list(
-            (
-                await self._session.scalars(
-                    select(Employee).where(Employee.role != "admin").order_by(Employee.username, Employee.employee_id)
-                )
-            ).all()
+            (await self._session.scalars(select(Employee).order_by(Employee.username, Employee.employee_id))).all()
         )
 
     async def clients(self) -> list[Client]:

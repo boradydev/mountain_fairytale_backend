@@ -21,8 +21,8 @@ from src.feat.employees.api.employee_schemas import (
 from src.feat.employees.app.usecases.change_password import (
     ChangeEmployeePasswordDTO,
 )
-from src.feat.employees.app.usecases.create import CreateEmployeeDTO
 from src.feat.employees.app.usecases.check_duplicate import CheckEmployeeDuplicateDTO
+from src.feat.employees.app.usecases.create import CreateEmployeeDTO
 from src.feat.employees.app.usecases.get import GetEmployeeDTO
 from src.feat.employees.app.usecases.get_all import GetEmployeesDTO
 from src.feat.employees.app.usecases.update import UpdateEmployeeDTO
@@ -46,8 +46,8 @@ API CONTRACT — EMPLOYEES
     6. Пароль никогда не возвращается API.
     7. Request/response schemas используют camelCase через BaseSchema.
     8. Поле commissionPercent входит в ответ сотрудника для всех ролей, включая администратора.
-    9. commissionPercent обязательно при создании и должно быть в диапазоне 0–100.
-    10. commissionPercent можно изменять через PATCH; допустимый диапазон — 0–100.
+    9. commissionPercent необязательно: null означает отсутствие комиссии, число 0–100 задаёт ставку.
+    10. commissionPercent: число 0–100 или null для отключения комиссии; пропуск сохраняет ставку.
 
 Авторизация:
     Токен доступа (access token) может быть передан двумя способами:
@@ -86,7 +86,11 @@ employees_router = APIRouter(
 @employees_router.get(
     "/check-duplicate",
     response_model=StdResponse[EmployeeResp | None],
-    description="Точное совпадение логина среди активных и деактивированных сотрудников. Доступ только администратору. Возвращает сотрудника либо data=null; создание всё равно проверяет уникальность и возвращает 409 при конфликте.",
+    description=(
+        "Точное совпадение логина среди активных и деактивированных сотрудников. Доступ только администратору. "
+        "Возвращает сотрудника либо data=null; создание всё равно проверяет уникальность "
+        "и возвращает 409 при конфликте."
+    ),
 )
 async def check_duplicate_employee(
     ctx: Context,
@@ -215,7 +219,7 @@ async def get_employee(
         CreateEmployeeReq:
             - username — обязательная строка;
             - password — строка, включая возможность пустого пароля;
-            - commissionPercent — обязательное число типа float в диапазоне 0–100.
+            - commissionPercent — необязательная ставка в диапазоне 0–100 или null (по умолчанию null).
 
     Результат:
         HTTP 201.
@@ -230,12 +234,12 @@ async def get_employee(
     Ошибки:
         401 — пользователь не авторизован.
         409 — username уже занят другим сотрудником.
-        422 — отсутствует commissionPercent или нарушены ограничения полей.
+        422 — нарушены ограничения полей.
 
     Критические сценарии для API-тестов:
         1. Создание сотрудника с непустым паролем и commissionPercent в диапазоне 0–100.
         2. Создание сотрудника с пустым паролем и валидным commissionPercent.
-        3. Отсутствие commissionPercent -> 422.
+        3. Отсутствие commissionPercent или null -> сотрудник без комиссии.
         4. commissionPercent ниже 0 или выше 100 -> 422.
         5. Проверка employeeId и commissionPercent в ответе.
         6. Проверка isActive == true.
@@ -286,7 +290,7 @@ async def create_employee(
         Body:
             UpdateEmployeeReq.
             Поля: username, commissionPercent, is_active.
-            commissionPercent можно изменять через PATCH; допустимый диапазон — 0–100.
+            commissionPercent: число 0–100 или null для отключения комиссии; пропуск сохраняет ставку.
 
     Результат:
         HTTP 200.
@@ -302,7 +306,7 @@ async def create_employee(
         1. Изменяются только поля, предусмотренные API-схемой.
         2. Деактивация и повторная активация сотрудника происходят через изменение поля is_active.
         3. Сотрудник сохраняет свой employeeId.
-        4. commissionPercent можно изменять на значение от 0 до 100 включительно.
+        4. commissionPercent можно назначить (0–100) или очистить (null), в том числе у admin.
         5. Деактивация bootstrap-администратора запрещена (403).
 
     Критические сценарии для API-тестов:

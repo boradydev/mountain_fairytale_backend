@@ -1,16 +1,17 @@
 import pytest
 from httpx import AsyncClient
 
-from tests.integration.conftest import EmployeeTestData
 from src.core.uuid7 import uuid7
 from tests.helpers import unique_username
+from tests.integration.conftest import EmployeeTestData
 
 
 BASE_PATH = "/admin/employees"
 
 
 class TestEmployeeRouters:
-    """Интеграционные тесты API сотрудников.
+    """
+    Интеграционные тесты API сотрудников.
 
     Согласно контракту: доступ только для администраторов.
     """
@@ -157,7 +158,11 @@ class TestEmployeeRouters:
             "password": "strong_password123",
         }
         response = await client.post(f"{BASE_PATH}/create", json=payload)
-        assert response.status_code == 422
+        assert response.status_code == 201
+        employee_id = response.json()["data"]["employeeId"]
+        assert response.json()["data"]["commissionPercent"] is None
+        saved = await client.get(f"{BASE_PATH}/{employee_id}")
+        assert saved.json()["data"]["commissionPercent"] is None
 
     @pytest.mark.parametrize("commission_percent", [-0.01, 100.01])
     async def test_create_employee_commission_percent_out_of_range(

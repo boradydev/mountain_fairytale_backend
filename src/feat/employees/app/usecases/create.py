@@ -12,7 +12,7 @@ class CreateEmployeeDTO:
     actor_id: UUID
     username: str
     password: str
-    commission_percent: Decimal
+    commission_percent: Decimal | None = None
     role: str = "employee"
 
 

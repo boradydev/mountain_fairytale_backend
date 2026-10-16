@@ -35,7 +35,7 @@ class Employee(BaseEntity):
 
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text)
-    commission_percent: Mapped[Decimal] = mapped_column(Numeric)
+    commission_percent: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
@@ -52,7 +52,7 @@ class Employee(BaseEntity):
         username: str,
         password_hash: str,
         role: str,
-        commission_percent: Decimal,
+        commission_percent: Decimal | None = None,
     ) -> Self:
         employee = cls(
             employee_id=uuid7(),
