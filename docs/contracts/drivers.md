@@ -10,6 +10,10 @@
 - `src/common/api/routers.py`
 - `src/common/api/exc_map.py`
 
+Общее поведение диалогов Flutter — «ОК / Сохранить», поиск дубликатов через
+600 мс, выборочный PATCH и индикаторы — описано в
+[контракте форм справочников](entity_forms.md).
+
 ## Общие правила
 
 - Все эндпоинты находятся под `/protected/drivers` и требуют access token.
