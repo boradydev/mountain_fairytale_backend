@@ -7,11 +7,21 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
 from src.core.uuid7 import uuid7
+from src.feat.clients.domain.client_order_models import LastOrder
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class Client(BaseEntity):
+    @property
+    def last_order(self) -> LastOrder | None:
+        """Read projection from documents, never persisted in clients."""
+        return getattr(self, "_last_order", None)
+
+    @last_order.setter
+    def last_order(self, value: LastOrder | None) -> None:
+        object.__setattr__(self, "_last_order", value)
+
     _EVENT_FIELDS = {
         "name",
         "cooldown_until",

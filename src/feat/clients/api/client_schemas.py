@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Annotated
+from datetime import date, datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AfterValidator, ConfigDict, Field
@@ -18,6 +18,18 @@ def _validate_local_datetime(value: datetime) -> datetime:
 ServerLocalDateTime = Annotated[datetime, AfterValidator(_validate_local_datetime)]
 
 
+class LastOrderItemResp(BaseSchema):
+    product_id: UUID
+    product_name: str
+    quantity: int
+
+
+class LastOrderResp(BaseSchema):
+    date: date
+    fulfillment_types: list[Literal["delivery", "pickup"]]
+    items: list[LastOrderItemResp]
+
+
 class ClientResp(BaseSchema):
     client_id: UUID
     name: str
@@ -27,6 +39,7 @@ class ClientResp(BaseSchema):
 
     last_delivery_date: datetime | None
     last_delivery_quantity: int | None
+    last_order: LastOrderResp | None = None
     cooldown_until: datetime | None
 
     sales_representative_id: UUID | None
