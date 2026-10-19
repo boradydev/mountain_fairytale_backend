@@ -26,3 +26,25 @@ def unique_phone() -> str:
 
 def unique_product_name(prefix: str = "product") -> str:
     return f"{prefix}_{uuid7().hex}"
+
+
+def delivery_address(**overrides):
+    value = {
+        "district": "Шпаковский муниципальный округ",
+        "locality": "г. Михайловск",
+        "street": "Локомотивная улица",
+        "house": "147",
+        "latitude": 45.1373445,
+        "longitude": 41.9974531,
+        "confirmed": True,
+        "source": "manual",
+        "deliveryDetails": "",
+    }
+    value.update(overrides)
+    return value
+
+
+def delivery_address_entity():
+    value = delivery_address()
+    value["delivery_details"] = value.pop("deliveryDetails")
+    return value

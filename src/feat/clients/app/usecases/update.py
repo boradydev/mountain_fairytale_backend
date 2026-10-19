@@ -25,6 +25,8 @@ class UpdateClientUseCase:
                 raise ClientNotFoundException(client_id=dto.client_id)
 
             changes = dto.payload.changes()
+            if dto.payload.delivery_address is not None:
+                changes["address"] = dto.payload.delivery_address.formatted
 
             client.update(actor_id=dto.actor_id, **changes)
             await uow.clients.update(client)

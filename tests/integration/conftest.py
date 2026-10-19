@@ -16,7 +16,7 @@ from src.feat.clients.domain.client_entities import Client
 from src.feat.clients.infra.client_uow import ClientsUOW
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.infra.employee_uow import EmployeesUOW
-from tests.helpers import unique_car_number, unique_username
+from tests.helpers import delivery_address_entity, unique_car_number, unique_username
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +209,7 @@ def client_factory(
         from uuid import uuid4
 
         client = Client.create(
+            delivery_address=delivery_address_entity(),
             actor_id=uuid7(),
             name=name,
             phone=phone or uuid4().hex,

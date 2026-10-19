@@ -162,7 +162,8 @@ class Point(BaseEntity):
 
     @property
     def address(self) -> str:
-        return self.client.address
+        details = self.client.delivery_address.get("delivery_details", "")
+        return self.client.address + (f" — {details}" if details else "")
 
     @property
     def default_payment_method_id(self) -> UUID | None:

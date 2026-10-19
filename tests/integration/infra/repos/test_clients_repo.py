@@ -17,13 +17,13 @@ from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.pay_methods.infra.pay_method_repos import PaymentMethodsRepository
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 from src.feat.sales_rep.infra.sales_rep_repos import SalesRepresentativesRepository
-from tests.helpers import unique_phone
+from tests.helpers import delivery_address_entity, unique_phone
 
 
 @pytest.fixture(autouse=True)
 async def clean_clients_table(postgres) -> AsyncGenerator[None, Any]:
     await postgres.execute("TRUNCATE TABLE clients RESTART IDENTITY CASCADE;")
-    yield
+    return
 
 
 @pytest.mark.integration
@@ -386,6 +386,7 @@ async def _create_client(
     default_payment_method_id: Any = None,
 ) -> Client:
     client = Client.create(
+            delivery_address=delivery_address_entity(),
         actor_id=uuid7(),
         name=name,
         phone=phone or uuid4().hex,

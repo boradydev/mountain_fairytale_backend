@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from src.common.infra.services.event_pud_service import EventPublisher
 from src.core.uuid7 import uuid7
-from tests.helpers import unique_car_number, unique_phone, unique_product_name
+from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
     PICKUP_BASE_PATH,
@@ -28,7 +28,7 @@ async def document_case(request, client, active_employee) -> dict[str, Any]:
             json={
                 "name": f"Contract client {uuid7()}",
                 "phone": unique_phone(),
-                "address": "Contract address",
+                "deliveryAddress": delivery_address(),
                 "sleepingThresholdDays": 10,
             },
         )

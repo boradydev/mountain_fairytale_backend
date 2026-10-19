@@ -5,6 +5,7 @@ from src.feat.clients.app.usecases.check_duplicate import CheckClientDuplicateUs
 from src.feat.clients.app.usecases.create import CreateClientUseCase
 from src.feat.clients.app.usecases.get import GetClientUseCase
 from src.feat.clients.app.usecases.get_all import GetClientsUseCase
+from src.feat.clients.app.usecases.optimize_route import OptimizeRouteUseCase, RouteOptimizer
 from src.feat.clients.app.usecases.update import UpdateClientUseCase
 from src.feat.clients.infra.client_uow import ClientsUOW
 
@@ -18,6 +19,9 @@ class ClientsUseCaseFactory:
     ) -> None:
         self._session_factory = session_factory
         self._on_committed = on_committed
+
+    def optimize_route(self, geo: RouteOptimizer) -> OptimizeRouteUseCase:
+        return OptimizeRouteUseCase(self._create_uow(), geo)
 
     def create_client(self) -> CreateClientUseCase:
         return CreateClientUseCase(uow=self._create_uow())

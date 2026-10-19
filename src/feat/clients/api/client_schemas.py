@@ -6,6 +6,7 @@ from pydantic import AfterValidator, ConfigDict, Field
 
 from src.common.api.patch_schema import BasePatchSchema
 from src.common.api.schemas import BaseSchema
+from src.feat.clients.api.address_schemas import DeliveryAddress
 from src.feat.clients.domain.client_entities import Client
 
 
@@ -35,6 +36,7 @@ class ClientResp(BaseSchema):
     name: str
     phone: str
     address: str
+    delivery_address: DeliveryAddress
     sleeping_threshold_days: int
 
     last_delivery_date: datetime | None
@@ -61,7 +63,7 @@ class CreateClientReq(BaseSchema):
 
     name: Annotated[str, Field(min_length=1, max_length=120)]
     phone: Annotated[str, Field(min_length=1, max_length=32)]
-    address: Annotated[str, Field(min_length=1, max_length=500)]
+    delivery_address: DeliveryAddress
     cooldown_until: ServerLocalDateTime | None = None
     sleeping_threshold_days: Annotated[int, Field(ge=0, le=3650)]
     sales_representative_id: UUID | None = None
@@ -75,7 +77,7 @@ class UpdateClientReq(BasePatchSchema):
 
     name: Annotated[str | None, Field(default=None, min_length=1, max_length=120)]
     phone: Annotated[str | None, Field(default=None, min_length=1, max_length=32)]
-    address: Annotated[str | None, Field(default=None, min_length=1, max_length=500)]
+    delivery_address: DeliveryAddress | None = None
     cooldown_until: ServerLocalDateTime | None = None
     sleeping_threshold_days: Annotated[int | None, Field(default=None, ge=0, le=3650)]
     sales_representative_id: UUID | None = None

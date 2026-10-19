@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 
 from src.core.uuid7 import uuid7
-from tests.helpers import unique_car_number, unique_phone, unique_product_name
+from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
     PICKUP_BASE_PATH,
@@ -78,7 +78,7 @@ async def case(client, active_employee, postgres) -> DaysCase:
             json={
                 "name": f"Day client {uuid7()}",
                 "phone": unique_phone(),
-                "address": "Адрес",
+                "deliveryAddress": delivery_address(),
                 "sleepingThresholdDays": 10,
             },
         )
@@ -356,7 +356,8 @@ async def test_document_client_fields_match_direct_api_after_catalog_changes(cas
         ).status_code == 200
     assert (
         await case.client.patch(
-            f"/protected/clients/{case.customer_ids[0]}", json={"name": "Новое имя клиента", "address": "Новый адрес"}
+            f"/protected/clients/{case.customer_ids[0]}",
+            json={"name": "Новое имя клиента", "deliveryAddress": delivery_address(house="148")},
         )
     ).status_code == 200
     direct = (await case.client.get(case.path(document))).json()["data"]
@@ -364,7 +365,7 @@ async def test_document_client_fields_match_direct_api_after_catalog_changes(cas
     assert listed == {**direct, "documentType": "deliveryRouteSheet"}
     point = listed["points"][0]
     assert point["clientName"] == "Новое имя клиента"
-    assert point["address"] == "Новый адрес"
+    assert point["address"].endswith("Локомотивная улица, 148")
     assert point["defaultPaymentMethodId"] == payment["paymentMethodId"]
     assert point["defaultPaymentMethodName"] == payment["name"]
     assert point["salesRepresentativeId"] == representative["salesRepresentativeId"]

@@ -39,14 +39,14 @@ from src.feat.employees.domain.employee_entities import Employee
 from src.feat.employees.infra.employee_repos import EmployeesRepository
 from src.feat.products.domain.product_entities import Product
 from src.feat.products.infra.product_repos import ProductsRepository
-from tests.helpers import unique_car_number, unique_phone, unique_product_name, unique_username
+from tests.helpers import delivery_address_entity, unique_car_number, unique_phone, unique_product_name, unique_username
 
 
 @pytest.fixture(autouse=True)
 async def clean_delivery_documents_table(postgres) -> AsyncGenerator[None, Any]:
     """Очищает документы доставки и связанные с ними таблицы перед каждым тестом."""
     await postgres.execute("TRUNCATE TABLE delivery_documents RESTART IDENTITY CASCADE;")
-    yield
+    return
 
 
 async def _create_related_entities(
@@ -59,6 +59,7 @@ async def _create_related_entities(
     clients_repository = ClientsRepository(session=session)
     clients = [
         Client.create(
+            delivery_address=delivery_address_entity(),
             actor_id=uuid7(),
             name=f"Тестовый клиент {uuid7()}",
             phone=unique_phone(),
