@@ -6,3 +6,5 @@ __pycache__/
 .coverage
 alembic.md
 AGENTS.md
+# Local Geoapify research responses (no credentials).
+tmp/geoapify_probe/
