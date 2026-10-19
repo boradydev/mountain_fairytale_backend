@@ -4,7 +4,6 @@ import os
 import re
 import threading
 import time
-from collections import OrderedDict
 from functools import lru_cache
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -15,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from src.feat.clients.api.address_schemas import AddressCandidate, AddressSearchReq, AddressSearchResp
 from src.feat.clients.domain.location_excs import GeoQuotaExceeded, GeoUnavailable, InvalidGeoResponse
+from src.feat.clients.infra.tile_cache import TileCache, TileKey
 
 
 class _Action(BaseModel):
@@ -50,9 +50,20 @@ class Geoapify:
         self._lock = asyncio.Semaphore(4)
         self._request_lock = threading.Lock()
         self._last_request = 0.0
-        self._tiles: OrderedDict[tuple[int, int, int], bytes] = OrderedDict()
+        self._tiles = TileCache()
 
     def _request(self, path: str, params: dict[str, str], body: object = None, *, maps: bool = False) -> bytes:
+        return self._response(path, params, body, maps=maps)[0] or b""
+
+    def _response(
+        self,
+        path: str,
+        params: dict[str, str],
+        body: object = None,
+        *,
+        maps: bool = False,
+        etag: str | None = None,
+    ) -> tuple[bytes | None, str | None]:
         key = os.environ.get("GEOAPIFY_API_KEY", "")
         if not key:
             raise GeoUnavailable
@@ -63,6 +74,8 @@ class Geoapify:
             data=None if body is None else json.dumps(body).encode(),
             headers={"Content-Type": "application/json", "User-Agent": "MountainFairytale/1.0"},
         )
+        if etag:
+            request.add_header("If-None-Match", etag)
         try:
             with self._request_lock:
                 time.sleep(max(0, 0.22 - (time.monotonic() - self._last_request)))
@@ -71,8 +84,13 @@ class Geoapify:
                 data = response.read(8_000_001)
                 if len(data) > 8_000_000:
                     raise InvalidGeoResponse
-                return data
+                return data, response.headers.get("ETag")
         except HTTPError as exc:
+            if exc.code == 304 and etag:
+                updated_etag = exc.headers.get("ETag") or etag
+                exc.close()
+                return None, updated_etag
+            exc.close()
             if exc.code == 429:
                 raise GeoQuotaExceeded from None
             raise GeoUnavailable from None
@@ -190,18 +208,12 @@ class Geoapify:
     async def tile(self, z: int, x: int, y: int) -> bytes:
         if not 8 <= z <= 19 or not 0 <= x < 2**z or not 0 <= y < 2**z:
             raise InvalidGeoResponse
-        key = (z, x, y)
+        return await self._tiles.get((z, x, y), self._load_tile)
+
+    async def _load_tile(self, key: TileKey, etag: str | None) -> tuple[bytes | None, str | None]:
+        z, x, y = key
         async with self._lock:
-            if key in self._tiles:
-                self._tiles.move_to_end(key)
-                return self._tiles[key]
-            data = await asyncio.to_thread(self._request, f"tile/osm-carto/{z}/{x}/{y}.png", {}, maps=True)
-            if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-                raise InvalidGeoResponse
-            self._tiles[key] = data
-            if len(self._tiles) > 512:
-                self._tiles.popitem(last=False)
-            return data
+            return await asyncio.to_thread(self._response, f"tile/osm-carto/{z}/{x}/{y}.png", {}, maps=True, etag=etag)
 
 
 @lru_cache(maxsize=1)
