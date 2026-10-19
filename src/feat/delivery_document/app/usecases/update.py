@@ -49,6 +49,26 @@ class UpdateDeliveryDocumentUseCase:
                     owner_name=lock.owner_name,
                 )
             previous_assignment = (document.planned_date, document.driver_id, document.car_id)
+            previous_car_id = document.car_id
+            previous_end_mileage = document.end_mileage
+            payload = dto.payload.changes()
+            car_changed = "car_id" in payload and payload["car_id"] != previous_car_id
+            correction = payload.get("previous_car_mileage")
+            confirmed = payload.get("car_change_confirmed") is True
+            if car_changed:
+                if not {"start_mileage", "end_mileage"} <= payload.keys():
+                    raise DeliveryDocumentUpdateException(
+                        field="car_id", message="Supply new start and end mileage when replacing a car."
+                    )
+                if previous_end_mileage is not None and not confirmed:
+                    raise DeliveryDocumentUpdateException(
+                        field="car_id", message="Confirm car replacement after recorded end mileage."
+                    )
+            if correction is not None and not (car_changed and previous_end_mileage is not None and confirmed):
+                raise DeliveryDocumentUpdateException(
+                    field="previous_car_mileage",
+                    message="Mileage correction requires a confirmed recorded car replacement.",
+                )
             document.update(actor_id=dto.actor_id, request=dto.payload)
             if previous_assignment != (document.planned_date, document.driver_id, document.car_id):
                 await repo.validate_active_assignments(
@@ -59,8 +79,15 @@ class UpdateDeliveryDocumentUseCase:
                 )
             await repo.validate_references(document)
             await repo.capture_commissions(document, is_new=False)
+            car_events = await repo.sync_car_mileage(
+                document,
+                actor_id=dto.actor_id,
+                previous_car_id=previous_car_id,
+                previous_end_mileage=previous_end_mileage,
+                previous_car_mileage=correction,
+            )
             await repo.update(document)
-            events = document.pull_aggregate_events()
+            events = document.pull_aggregate_events() + car_events
             loaded = await repo.get_by_id(
                 document.delivery_document_id,
                 document_type=document.document_type,

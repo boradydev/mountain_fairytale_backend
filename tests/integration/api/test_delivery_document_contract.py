@@ -334,13 +334,133 @@ async def test_mileage_validates_combined_state_and_explicit_null(client: AsyncC
     path = document_case["path"]
     assert (await client.patch(path, json={"endMileage": 200.0})).status_code == 200
     saved = (await client.get(path)).json()["data"]
-    assert (await client.patch(path, json={"startMileage": 200.0})).status_code == 422
+    assert (await client.patch(path, json={"startMileage": 201.0})).status_code == 422
     assert (await client.get(path)).json()["data"] == saved
     assert (await client.patch(path, json={"endMileage": None})).status_code == 200
     assert (await client.get(path)).json()["data"]["endMileage"] is None
     for field in ("plannedDate", "driverId", "carId", "startMileage", "points"):
         assert (await client.patch(path, json={field: None})).status_code == 422
     assert (await client.patch(path, json={"startMileage": -1})).status_code == 422
+
+
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
+async def test_mileage_sync_preserves_newer_readings_and_manual_corrections(client, document_case) -> None:
+    case = document_case
+    car_path = f"/protected/cars/{case['document']['carId']}"
+    assert (await client.patch(case["path"], json={"endMileage": 200})).status_code == 200
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 200
+    # An unrelated save does not undo a user's explicit odometer correction.
+    assert (await client.patch(car_path, json={"currentMileage": 150})).status_code == 200
+    assert (await client.patch(case["path"], json={"endMileage": 200, "points": []})).status_code == 200
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 150
+    # Historical lower readings remain in the document but never rewind the car.
+    assert (await client.patch(case["path"], json={"endMileage": 120})).status_code == 200
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 150
+    assert (await client.patch(case["path"], json={"endMileage": None})).status_code == 200
+    assert (await client.post(f"{case['path']}/cancel")).status_code == 200
+    assert (await client.post(f"{case['path']}/restore")).status_code == 200
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 150
+
+
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
+async def test_zero_distance_and_sequential_trips_update_car(client, document_case) -> None:
+    case = document_case
+    car_path = f"/protected/cars/{case['document']['carId']}"
+    zero = await client.post(f"{case['base']}/create", json={**case["payload"], "endMileage": 100})
+    assert zero.status_code == 201
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 100
+    assert (await client.patch(case["path"], json={"endMileage": 200})).status_code == 200
+    evening = await client.post(
+        f"{case['base']}/create", json={**case["payload"], "startMileage": 200, "endMileage": 300}
+    )
+    assert evening.status_code == 201
+    assert (await client.get(car_path)).json()["data"]["currentMileage"] == 300
+    assert (await client.get(case["path"])).json()["data"]["startMileage"] == 100
+
+
+@pytest.mark.parametrize("correction", [None, 90.0, 450.0])
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
+async def test_recorded_car_replacement_is_atomic_and_audited(client, postgres, document_case, correction) -> None:
+    case = document_case
+    old_id = case["document"]["carId"]
+    assert (await client.patch(case["path"], json={"endMileage": 200})).status_code == 200
+    new_car = (
+        await client.post(
+            "/protected/cars/create",
+            json={"model": "Replacement", "number": unique_car_number(), "currentMileage": 500},
+        )
+    ).json()["data"]
+    payload = {"carId": new_car["carId"], "startMileage": 500, "endMileage": None}
+    assert (await client.patch(case["path"], json=payload)).status_code == 422
+    assert (await client.get(case["path"])).json()["data"]["carId"] == old_id
+    payload["carChangeConfirmed"] = True
+    if correction is not None:
+        payload["previousCarMileage"] = correction
+    response = await client.patch(case["path"], json=payload)
+    assert response.status_code == 200
+    loaded = (await client.get(case["path"])).json()["data"]
+    assert loaded["carId"] == new_car["carId"]
+    assert loaded["startMileage"] == 500
+    assert loaded["endMileage"] is None
+    assert (await client.get(f"/protected/cars/{old_id}")).json()["data"]["currentMileage"] == (
+        200 if correction is None else correction
+    )
+    assert (await client.get(f"/protected/cars/{new_car['carId']}")).json()["data"]["currentMileage"] == 500
+    if correction is not None:
+        async with postgres.session_factory() as session:
+            result = await session.execute(
+                text("SELECT payload FROM events WHERE payload->>'car_id' = :id AND event_type = 'UpdateCarEvent'"),
+                {"id": old_id},
+            )
+            assert any(row[0]["changes"]["current_mileage"] == {"old": 200, "new": correction} for row in result)
+    assert (await client.patch(case["path"], json={"previousCarMileage": 0})).status_code == 422
+
+
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
+async def test_car_mileage_rolls_back_with_document_on_event_failure(client, document_case, monkeypatch) -> None:
+    case = document_case
+    old_id = case["document"]["carId"]
+    assert (await client.patch(case["path"], json={"endMileage": 200})).status_code == 200
+    new_car = (
+        await client.post(
+            "/protected/cars/create",
+            json={"model": "Rollback", "number": unique_car_number(), "currentMileage": 500},
+        )
+    ).json()["data"]
+
+    async def fail_publish(*args, **kwargs):
+        raise RuntimeError("test event failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(EventPublisher, "publish_many", fail_publish)
+        with pytest.raises(RuntimeError, match="test event failure"):
+            await client.patch(
+                case["path"],
+                json={
+                    "carId": new_car["carId"],
+                    "startMileage": 500,
+                    "endMileage": 600,
+                    "carChangeConfirmed": True,
+                    "previousCarMileage": 90,
+                },
+            )
+    assert (await client.get(case["path"])).json()["data"]["carId"] == old_id
+    assert (await client.get(f"/protected/cars/{old_id}")).json()["data"]["currentMileage"] == 200
+    assert (await client.get(f"/protected/cars/{new_car['carId']}")).json()["data"]["currentMileage"] == 500
+
+
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
+async def test_concurrent_trip_saves_keep_highest_car_mileage(client, document_case) -> None:
+    case = document_case
+    other = (await client.post(f"{case['base']}/create", json=case["payload"])).json()["data"]
+    other_path = f"{case['base']}/{other['deliveryDocumentId']}"
+    assert (await client.post(f"{other_path}/edit-lock")).status_code == 200
+    responses = await asyncio.gather(
+        client.patch(case["path"], json={"endMileage": 400}),
+        client.patch(other_path, json={"endMileage": 300}),
+    )
+    assert [r.status_code for r in responses] == [200, 200]
+    assert (await client.get(f"/protected/cars/{case['document']['carId']}")).json()["data"]["currentMileage"] == 400
 
 
 async def test_concurrent_lock_acquisition_has_one_owner(

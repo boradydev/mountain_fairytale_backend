@@ -43,8 +43,9 @@ class CreateDeliveryDocumentUseCase:
             )
             await uow.delivery_documents.validate_references(document)
             await uow.delivery_documents.capture_commissions(document, is_new=True)
+            car_events = await uow.delivery_documents.sync_car_mileage(document, actor_id=dto.actor_id)
             await uow.delivery_documents.add(document)
-            events = document.pull_aggregate_events()
+            events = document.pull_aggregate_events() + car_events
             loaded = await uow.delivery_documents.get_by_id(
                 document.delivery_document_id,
                 document_type=document.document_type,

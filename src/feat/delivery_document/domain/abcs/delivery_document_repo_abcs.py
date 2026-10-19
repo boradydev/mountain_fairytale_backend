@@ -2,11 +2,23 @@ from abc import ABC, abstractmethod
 from datetime import date
 from uuid import UUID
 
+from src.common.domain.events import BaseDomainEvent
 from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock
 
 
 class IDeliveryDocumentsRepository(ABC):
+    @abstractmethod
+    async def sync_car_mileage(
+        self,
+        document: DeliveryDocument,
+        *,
+        actor_id: UUID,
+        previous_car_id: UUID | None = None,
+        previous_end_mileage: float | None = None,
+        previous_car_mileage: float | None = None,
+    ) -> list[BaseDomainEvent]: ...
+
     @abstractmethod
     async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None: ...
 

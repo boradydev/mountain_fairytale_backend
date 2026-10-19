@@ -220,7 +220,7 @@ class TestCarRouters:
         response = await client.patch(f"{BASE_PATH}/{uuid7()}", json={"model": "Any"})
         assert response.status_code == 404
 
-    async def test_update_car_decreasing_mileage_is_unprocessable(
+    async def test_update_car_decreasing_mileage_is_allowed(
         self,
         client: AsyncClient,
         active_employee: EmployeeTestData,
@@ -234,8 +234,9 @@ class TestCarRouters:
             json={"currentMileage": 99},
         )
 
-        assert response.status_code == 422
-        assert response.json()["detail"] == "Car domain update error"
+        assert response.status_code == 200
+        loaded = await client.get(f"{BASE_PATH}/{car.car_id}")
+        assert loaded.json()["data"]["currentMileage"] == 99
 
     async def test_unauthorized_access(
         self,

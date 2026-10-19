@@ -23,6 +23,8 @@ class ICarsRepository(ABC):
     async def get_by_id(
         self,
         car_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> Car | None:
         """Возвращает автомобиль по ID."""
 

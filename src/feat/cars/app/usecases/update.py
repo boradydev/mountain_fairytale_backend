@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
 from src.feat.cars.api.car_schemas import UpdateCarReq
 from src.feat.cars.app.abcs.car_uow_abcs import ICarsUOW
-from src.feat.cars.domain.car_excs import CarNotFoundException
 from src.feat.cars.domain.car_entities import Car
+from src.feat.cars.domain.car_excs import CarNotFoundException
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -27,7 +26,7 @@ class UpdateCarUseCase:
         dto: UpdateCarDTO,
     ) -> Car:
         async with self._uow as uow:
-            car = await uow.cars.get_by_id(dto.car_id)
+            car = await uow.cars.get_by_id(dto.car_id, for_update=True)
 
             if car is None:
                 raise CarNotFoundException(

@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from src.common.domain.events import BaseDomainEvent
 from src.common.domain.money import decimal_value, line_amount, sum_amounts
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
@@ -39,6 +40,47 @@ _day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discrimin
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def sync_car_mileage(
+        self,
+        document: DeliveryDocument,
+        *,
+        actor_id: UUID,
+        previous_car_id: UUID | None = None,
+        previous_end_mileage: float | None = None,
+        previous_car_mileage: float | None = None,
+    ) -> list[BaseDomainEvent]:
+        if document.car_id is None:
+            return []
+        end_changed = document.car_id != previous_car_id or document.end_mileage != previous_end_mileage
+        car_ids = set()
+        if end_changed and document.end_mileage is not None:
+            car_ids.add(document.car_id)
+        if previous_car_mileage is not None and previous_car_id is not None:
+            car_ids.add(previous_car_id)
+        if not car_ids:
+            return []
+        # Reload after locking: joined document.car may contain a stale mileage.
+        # Stable lock order also permits simultaneous replacements in opposite directions.
+        with self._session.no_autoflush:
+            cars = (
+                await self._session.scalars(
+                    select(Car)
+                    .where(Car.car_id.in_(car_ids))
+                    .order_by(Car.car_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            ).all()
+        events = []
+        for car in cars:
+            if car.car_id == previous_car_id and previous_car_mileage is not None:
+                car.update(actor_id=actor_id, current_mileage=previous_car_mileage)
+            elif car.car_id == document.car_id and document.end_mileage is not None:
+                # Historical documents never rewind the odometer automatically.
+                car.update(actor_id=actor_id, current_mileage=max(car.current_mileage, document.end_mileage))
+            events.extend(car.pull_events())
+        return events
 
     async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None:
         """Capture new recipients once; recalculate amounts using historical rates."""

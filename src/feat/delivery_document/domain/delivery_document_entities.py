@@ -336,7 +336,7 @@ class DeliveryDocument(BaseEntity):
         Index("ix_delivery_documents_planned_date", "planned_date"),
         CheckConstraint(
             "(start_mileage IS NULL OR start_mileage >= 0) AND "
-            "(end_mileage IS NULL OR (start_mileage IS NOT NULL AND end_mileage > start_mileage))",
+            "(end_mileage IS NULL OR (start_mileage IS NOT NULL AND end_mileage >= start_mileage))",
             name="delivery_documents_mileage_check",
         ),
     )
@@ -544,7 +544,7 @@ class DeliveryDocument(BaseEntity):
 def _validate_mileage(start: float | None, end: float | None) -> None:
     if start is not None and start < 0:
         raise DeliveryDocumentUpdateException(field="start_mileage", message="Start mileage cannot be negative.")
-    if end is not None and (start is None or end <= start):
+    if end is not None and (start is None or end < start):
         raise DeliveryDocumentUpdateException(
-            field="end_mileage", message="End mileage must be greater than start mileage."
+            field="end_mileage", message="End mileage cannot be less than start mileage."
         )

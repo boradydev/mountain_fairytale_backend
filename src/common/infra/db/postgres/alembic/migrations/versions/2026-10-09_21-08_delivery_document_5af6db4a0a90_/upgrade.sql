@@ -37,7 +37,7 @@ CREATE TABLE delivery_documents (
                 end_mileage IS NULL
                 OR (
                     start_mileage IS NOT NULL
-                    AND end_mileage > start_mileage
+                    AND end_mileage >= start_mileage
                 )
             )
         ),

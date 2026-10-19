@@ -609,7 +609,7 @@ async def test_pickup_sheet_persists_null_transport_fields(postgres) -> None:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("invalid_end_mileage", [50.0, 100.0])
+@pytest.mark.parametrize("invalid_end_mileage", [50.0, 99.0])
 async def test_delivery_mileage_validation_on_update(
     postgres,
     invalid_end_mileage: float,
@@ -660,7 +660,7 @@ async def test_delivery_mileage_validation_on_update(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("invalid_end_mileage", [50.0, 100.0])
+@pytest.mark.parametrize("invalid_end_mileage", [50.0, 99.0])
 async def test_delivery_mileage_validation_on_create(
     postgres,
     invalid_end_mileage: float,

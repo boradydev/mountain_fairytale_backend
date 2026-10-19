@@ -1,13 +1,13 @@
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.feat.cars.domain.abcs.car_repo_abcs import ICarsRepository
-from src.feat.cars.domain.car_excs import CarNumberAlreadyExistsException
 from src.feat.cars.domain.car_entities import Car
+from src.feat.cars.domain.car_excs import CarNumberAlreadyExistsException
 
 
 class CarsRepository(ICarsRepository):
@@ -46,10 +46,14 @@ class CarsRepository(ICarsRepository):
     async def get_by_id(
         self,
         car_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> Car | None:
         stmt = select(Car).where(
             Car.car_id == car_id,
         )
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
 
         result = await self._session.execute(stmt)
 

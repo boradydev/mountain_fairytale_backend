@@ -1,4 +1,5 @@
 from datetime import datetime
+from math import isfinite
 from typing import Any, Self
 from uuid import UUID
 
@@ -99,8 +100,8 @@ class Car(BaseEntity):
 
         new_mileage = payload.get("current_mileage")
 
-        if new_mileage is not None and new_mileage < self.current_mileage:
+        if new_mileage is not None and (not isfinite(new_mileage) or new_mileage < 0):
             raise CarDomainUpdateException(
                 field="current_mileage",
-                message=(f"New mileage ({new_mileage}) cannot be less than current mileage ({self.current_mileage})."),
+                message="Mileage must be finite and nonnegative.",
             )

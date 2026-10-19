@@ -315,7 +315,7 @@ class TestDeliveryDocumentRouters:
                     str(car.car_id),
                     [valid_point],
                 ),
-                "endMileage": 100.0,
+                "endMileage": 99.0,
             },
         )
         assert invalid_mileage.status_code == 422

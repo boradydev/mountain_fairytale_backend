@@ -60,8 +60,7 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_request(self) -> Self:
-        if self.end_mileage is not None and self.end_mileage <= self.start_mileage:
-            raise ValueError("End mileage must be greater than start mileage.")
+        _validate_mileage(self.start_mileage, self.end_mileage)
         _validate_unique_clients(self.points)
         return self
 
@@ -80,13 +79,15 @@ class CreatePickupSheetReq(BaseSchema):
 
 class UpdateDeliveryRouteSheetReq(BasePatchSchema):
     __entity__ = DeliveryDocument
-    __composition_fields__ = {"points"}
+    __composition_fields__ = {"points", "car_change_confirmed", "previous_car_mileage"}
 
     planned_date: date | None = None
     driver_id: UUID | None = None
     car_id: UUID | None = None
     start_mileage: fields.Mileage | None = None
     end_mileage: fields.Mileage | None = None
+    car_change_confirmed: bool | None = None
+    previous_car_mileage: fields.Mileage | None = None
     points: list[UpdatePointReq] | None = None
 
     @model_validator(mode="after")
@@ -120,8 +121,8 @@ class UpdatePickupSheetReq(BasePatchSchema):
 
 
 def _validate_mileage(start: float | None, end: float | None) -> None:
-    if start is not None and end is not None and end <= start:
-        raise ValueError("End mileage must be greater than start mileage.")
+    if start is not None and end is not None and end < start:
+        raise ValueError("End mileage cannot be less than start mileage.")
 
 
 def _validate_unique_clients(points: list[CreatePointReq] | list[UpdatePointReq]) -> None:
