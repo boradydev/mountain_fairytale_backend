@@ -160,3 +160,55 @@ def test_invalid_delivery_location_is_rejected(override):
 
     with pytest.raises(ValidationError):
         DeliveryAddress.model_validate(delivery_address(**override))
+
+
+async def test_stavropol_address_can_be_saved_without_district(client, active_employee):
+    await ClientAPI.login(client, active_employee)
+    address = delivery_address(locality="г. Ставрополь", street="улица Ленина", house="120")
+    address.pop("district")
+    response = await client.post(
+        "/protected/clients/create",
+        json={
+            "name": "Клиент без района",
+            "phone": unique_phone(),
+            "sleepingThresholdDays": 7,
+            "deliveryAddress": address,
+        },
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()["data"]
+    assert created["address"] == "Ставропольский край, г. Ставрополь, улица Ленина, 120"
+    assert created["deliveryAddress"]["district"] == ""
+    fetched = await client.get(f"/protected/clients/{created['clientId']}")
+    assert fetched.json()["data"]["deliveryAddress"] == {**address, "district": ""}
+
+
+async def test_search_without_district_does_not_send_county_filter():
+    from src.feat.clients.api.address_schemas import AddressSearchReq
+
+    geo = Geoapify()
+    geo._json = AsyncMock(
+        return_value={
+            "features": [
+                {
+                    "properties": {
+                        "country_code": "ru",
+                        "state": "Ставропольский край",
+                        "city": "Ставрополь",
+                        "county": "городской округ Ставрополь",
+                        "formatted": "Ленина 120, Ставрополь",
+                        "lat": 45.0413802,
+                        "lon": 41.989106,
+                        "result_type": "building",
+                        "housenumber": "120",
+                        "rank": {"confidence": 1, "confidence_street_level": 1},
+                    }
+                }
+            ]
+        }
+    )
+    result = await geo.search(AddressSearchReq(locality="г. Ставрополь", street="улица Ленина", house="120"))
+    assert len(result.candidates) == 1
+    assert result.candidates[0].exact_house
+    assert "county" not in geo._json.call_args.args[1]
+    assert geo._json.await_count == 1

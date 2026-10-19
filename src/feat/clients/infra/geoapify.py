@@ -96,13 +96,14 @@ class Geoapify:
             "country": "Россия",
             "state": "Ставропольский край",
             "city": re.sub(r"^(г\.?|с\.?|п\.?|х\.?|ст-ца)\s+", "", address.locality, flags=re.IGNORECASE),
-            "county": address.district,
             "street": address.street,
             "housenumber": address.house,
             "filter": "countrycode:ru",
             "lang": "ru",
             "limit": "5",
         }
+        if address.district:
+            params["county"] = address.district
         data = await self._json("geocode/search", params)
         candidates = self._candidates(data, address)
         if not any(c.exact_house for c in candidates):
@@ -135,7 +136,7 @@ class Geoapify:
                 if normalized(locality) != normalized(address.locality):
                     continue
                 county = p.get("county", "")
-                if county and normalized(county) != normalized(address.district):
+                if address.district and county and normalized(county) != normalized(address.district):
                     continue
                 result.append(
                     AddressCandidate(

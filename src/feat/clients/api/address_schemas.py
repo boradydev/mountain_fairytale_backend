@@ -11,7 +11,7 @@ AddressPart = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 class AddressSearchReq(BaseSchema):
     model_config = ConfigDict(extra="forbid")
 
-    district: AddressPart
+    district: Annotated[str, StringConstraints(strip_whitespace=True, max_length=150)] = ""
     locality: AddressPart
     street: AddressPart
     house: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
@@ -24,7 +24,9 @@ class AddressSearchReq(BaseSchema):
 
     @property
     def formatted(self) -> str:
-        return f"Ставропольский край, {self.district}, {self.locality}, {self.street}, {self.house}"
+        return ", ".join(
+            part for part in ("Ставропольский край", self.district, self.locality, self.street, self.house) if part
+        )
 
 
 class DeliveryAddress(AddressSearchReq):
