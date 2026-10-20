@@ -162,7 +162,7 @@ class Point(BaseEntity):
 
     @property
     def address(self) -> str:
-        details = self.client.delivery_address.get("delivery_details", "")
+        details = self.client.delivery_details
         return self.client.address + (f" — {details}" if details else "")
 
     @property

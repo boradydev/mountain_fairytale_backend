@@ -16,11 +16,15 @@ class OptimizeRouteUseCase:
 
     async def execute(self, ids: list[UUID]) -> dict[str, Any]:
         locations = []
+        missing: list[dict[str, str]] = []
         async with self._uow as uow:
             for client_id in ids:
                 client = await uow.clients.get_by_id(client_id)
                 if client is None or not client.delivery_address or not client.delivery_address.get("confirmed"):
-                    raise MissingClientLocation
+                    missing.append({"clientId": str(client_id), "name": client.name if client else str(client_id)})
+                    continue
                 a = client.delivery_address
                 locations.append((str(client_id), a["latitude"], a["longitude"]))
+        if missing:
+            raise MissingClientLocation(missing)
         return await self._geo.optimize(locations)

@@ -14,4 +14,5 @@ class InvalidGeoResponse(BaseAppException):
 
 
 class MissingClientLocation(BaseAppException):
-    pass
+    def __init__(self, clients: list[dict[str, str]]) -> None:
+        self.clients = clients

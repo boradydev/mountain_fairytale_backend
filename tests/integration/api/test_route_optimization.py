@@ -8,11 +8,14 @@ from tests.helpers import delivery_address, unique_phone
 from tests.integration.api.test_client_routers import TestClientRouters as ClientAPI
 
 
-async def test_structured_address_required_and_persisted(client, active_employee):
+async def test_free_address_and_optional_confirmed_address_persisted(client, active_employee):
     await ClientAPI.login(client, active_employee)
     base = {"name": "Адресный клиент", "phone": unique_phone(), "sleepingThresholdDays": 7}
     legacy = await client.post("/protected/clients/create", json={**base, "address": "Старый адрес"})
-    assert legacy.status_code == 422
+    assert legacy.status_code == 201
+    assert legacy.json()["data"]["address"] == "Старый адрес"
+    assert legacy.json()["data"]["deliveryAddress"] is None
+    base["phone"] = unique_phone()
     invalid = delivery_address(confirmed=False)
     response = await client.post("/protected/clients/create", json={**base, "deliveryAddress": invalid})
     assert response.status_code == 422
@@ -78,6 +81,74 @@ async def test_location_endpoints_require_authentication(client):
     assert (await client.post("/protected/clients/geocode", json={})).status_code == 401
     assert (await client.get("/protected/locations/tiles/17/1/1")).status_code == 401
     assert (await client.post("/protected/delivery-route-sheets/optimize-order", json={})).status_code == 401
+
+
+async def test_address_confirmation_lifecycle_and_independent_details(client, active_employee):
+    await ClientAPI.login(client, active_employee)
+    created = await client.post(
+        "/protected/clients/create",
+        json={
+            "name": "Без карты",
+            "phone": unique_phone(),
+            "sleepingThresholdDays": 7,
+            "address": "  Михайловск, заезд Добрый, 17  ",
+            "deliveryDetails": "Вход со двора",
+        },
+    )
+    assert created.status_code == 201, created.text
+    data = created.json()["data"]
+    path = f"/protected/clients/{data['clientId']}"
+    assert data["address"] == "Михайловск, заезд Добрый, 17"
+    assert data["deliveryAddress"] is None
+    assert (await client.get(path)).json()["data"]["deliveryDetails"] == "Вход со двора"
+    confirmed = await client.patch(path, json={"deliveryAddress": delivery_address()})
+    assert confirmed.status_code == 200, confirmed.text
+    canonical = confirmed.json()["data"]["address"]
+    details = await client.patch(path, json={"deliveryDetails": "Вторые ворота"})
+    assert details.json()["data"]["deliveryAddress"]["confirmed"] is True
+    unchanged = await client.patch(path, json={"address": canonical})
+    assert unchanged.json()["data"]["deliveryAddress"]["confirmed"] is True
+    changed = await client.patch(path, json={"address": "Другой адрес, дом 12"})
+    assert changed.status_code == 200, changed.text
+    fetched = (await client.get(path)).json()["data"]
+    assert fetched["deliveryAddress"] is None
+    assert fetched["address"] == "Другой адрес, дом 12"
+    assert fetched["deliveryDetails"] == "Вторые ворота"
+    assert (await client.patch(path, json={"deliveryAddress": delivery_address()})).status_code == 200
+    cleared = await client.patch(path, json={"deliveryAddress": None})
+    assert cleared.status_code == 200
+    assert (await client.get(path)).json()["data"]["deliveryAddress"] is None
+    for body in ({"address": " "}, {"address": None}, {"deliveryDetails": None}):
+        assert (await client.patch(path, json=body)).status_code == 422
+
+
+async def test_all_unconfirmed_clients_reported_before_any_provider_request(client, active_employee):
+    await ClientAPI.login(client, active_employee)
+    ids = []
+    for name in ("Первый без координат", "Второй без координат"):
+        response = await client.post(
+            "/protected/clients/create",
+            json={
+                "name": name,
+                "phone": unique_phone(),
+                "sleepingThresholdDays": 7,
+                "address": "Ставрополь, произвольный адрес",
+            },
+        )
+        assert response.status_code == 201, response.text
+        ids.append(response.json()["data"]["clientId"])
+    geo = Geoapify()
+    geo.optimize = AsyncMock()
+    fastapi_app.dependency_overrides[get_geoapify] = lambda: geo
+    try:
+        response = await client.post("/protected/delivery-route-sheets/optimize-order", json={"orderedClientIds": ids})
+        assert response.status_code == 422, response.text
+        assert [item["clientId"] for item in response.json()["clients"]] == ids
+        assert "Первый без координат" in response.json()["detail"]
+        assert "Второй без координат" in response.json()["detail"]
+        geo.optimize.assert_not_awaited()
+    finally:
+        fastapi_app.dependency_overrides.pop(get_geoapify, None)
 
 
 @pytest.mark.parametrize("job_ids", [["a"], ["a", "a"], ["a", "foreign"]])

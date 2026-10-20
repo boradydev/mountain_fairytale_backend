@@ -34,7 +34,6 @@ class DeliveryAddress(AddressSearchReq):
     longitude: Annotated[float, Field(ge=40.8, le=45.9, allow_inf_nan=False)]
     confirmed: Literal[True]
     source: Literal["geoapify", "manual"]
-    delivery_details: Annotated[str, Field(max_length=500)] = ""
 
 
 class AddressCandidate(BaseSchema):

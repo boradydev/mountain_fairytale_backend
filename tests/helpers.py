@@ -38,7 +38,6 @@ def delivery_address(**overrides):
         "longitude": 41.9974531,
         "confirmed": True,
         "source": "manual",
-        "deliveryDetails": "",
     }
     value.update(overrides)
     return value
@@ -46,5 +45,4 @@ def delivery_address(**overrides):
 
 def delivery_address_entity():
     value = delivery_address()
-    value["delivery_details"] = value.pop("deliveryDetails")
     return value

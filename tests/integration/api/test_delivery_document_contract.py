@@ -79,6 +79,28 @@ def patch_points(document: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+async def test_free_address_details_and_manual_order_without_coordinates(client, document_case):
+    case = document_case
+    customer = case["customers"][0]
+    response = await client.patch(
+        f"/protected/clients/{customer['clientId']}",
+        json={
+            "address": "Произвольный адрес без карты",
+            "deliveryDetails": "Позвонить у ворот",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["deliveryAddress"] is None
+    document = (await client.get(case["path"])).json()["data"]
+    point = next(p for p in document["points"] if p["clientId"] == customer["clientId"])
+    assert point["address"] == "Произвольный адрес без карты — Позвонить у ворот"
+    reordered = patch_points(document)[::-1]
+    saved = await client.patch(case["path"], json={"points": reordered})
+    assert saved.status_code == 200, saved.text
+    fetched = (await client.get(case["path"])).json()["data"]
+    assert [p["clientId"] for p in fetched["points"]] == [p["clientId"] for p in reordered]
+
+
 async def read_events(postgres, document: dict[str, Any]) -> list[dict[str, Any]]:
     async with postgres.session_factory() as session:
         result = await session.execute(

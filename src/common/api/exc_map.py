@@ -122,7 +122,18 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         GeoUnavailable: Resp(status_code=503, detail="Геосервис недоступен. Повторите попытку позже."),
         GeoQuotaExceeded: Resp(status_code=429, detail="Лимит геосервиса исчерпан."),
         InvalidGeoResponse: Resp(status_code=502, detail="Геосервис вернул неполный или некорректный результат."),
-        MissingClientLocation: Resp(status_code=422, detail="У одного из клиентов нет подтверждённых координат."),
+        MissingClientLocation: Resp(
+            status_code=422,
+            detail="Не у всех клиентов подтверждено местоположение.",
+            extra_fields=lambda exc: {
+                "clients": exc.clients,
+                "detail": "Невозможно оптимизировать порядок. Не подтверждено местоположение: "
+                + ", ".join(item["name"] for item in exc.clients)
+                + ". Можно изменить порядок вручную.",
+            }
+            if isinstance(exc, MissingClientLocation)
+            else {},
+        ),
         ClientNotFoundException: Resp(status_code=404, detail="Client not found"),
         ClientDomainUpdateException: Resp(status_code=422, detail="Client domain update error"),
         ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),

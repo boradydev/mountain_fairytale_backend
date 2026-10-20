@@ -14,7 +14,7 @@ API CONTRACT — CLIENTS.
     6. Все эндпоинты защищены авторизацией, но доступны любому
        аутентифицированному пользователю независимо от его роли.
     7. Телефон клиента уникален. Дубликат телефона приводит к HTTP 409.
-    8. Для создания обязательны name, phone, deliveryAddress и
+    8. Для создания обязательны name, phone, address (или deliveryAddress) и
        sleeping_threshold_days.
     9. last_delivery_date и last_delivery_quantity nullable и возвращаются
        в ответах. Они не изменяются через API клиентов.
@@ -289,8 +289,9 @@ async def create_client(
             actor_id=UUID(access_token_payload.employee_id),
             name=body.name,
             phone=body.phone,
-            address=body.delivery_address.formatted,
-            delivery_address=body.delivery_address.model_dump(),
+            address=body.address,
+            delivery_address=body.delivery_address.model_dump() if body.delivery_address else None,
+            delivery_details=body.delivery_details,
             cooldown_until=body.cooldown_until,
             sleeping_threshold_days=body.sleeping_threshold_days,
             sales_representative_id=body.sales_representative_id,
@@ -320,8 +321,10 @@ async def create_client(
     Действие:
         Обновляются только переданные поля. Пустое тело запроса запрещено.
         Передача null разрешена для nullable-полей, в частности для
-        cooldown_until и ID связанных сущностей. Поля name, phone, deliveryAddress и
-        sleeping_threshold_days не могут быть null.
+        cooldown_until, delivery_address и ID связанных сущностей.
+        Поля name, phone, address, delivery_details и sleeping_threshold_days не могут быть null.
+        Изменение address сбрасывает старые координаты; новый delivery_address
+        формирует address. Изменение delivery_details сохраняет подтверждение.
         last_delivery_date и last_delivery_quantity через этот endpoint
         не изменяются. Для смены статуса используется is_active.
 
