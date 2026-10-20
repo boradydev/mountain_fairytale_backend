@@ -119,9 +119,11 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         InvalidRefreshTokenException: Resp(status_code=401, detail="Invalid credentials"),
         EmployeeDomainUpdateException: Resp(status_code=422, detail="Employee domain update error"),
         EmployeeUsernameAlreadyExistsException: Resp(status_code=409, detail="Employee username already exists"),
-        GeoUnavailable: Resp(status_code=503, detail="Геосервис недоступен. Повторите попытку позже."),
-        GeoQuotaExceeded: Resp(status_code=429, detail="Лимит геосервиса исчерпан."),
-        InvalidGeoResponse: Resp(status_code=502, detail="Геосервис вернул неполный или некорректный результат."),
+        GeoUnavailable: Resp(status_code=503, detail="Geolocation service is unavailable."),
+        GeoQuotaExceeded: Resp(status_code=429, detail="Geolocation service quota exceeded."),
+        InvalidGeoResponse: Resp(
+            status_code=502, detail="Geolocation service returned an invalid or incomplete response."
+        ),
         MissingClientLocation: Resp(
             status_code=422,
             detail="Some clients have no confirmed location.",
@@ -150,14 +152,6 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
             status_code=423,
             detail="Delivery document is locked by another employee",
             extra_fields=lambda exc: {"ownerName": exc.owner_name},
-            openapi_schema={
-                "type": "object",
-                "properties": {
-                    "detail": {"type": "string"},
-                    "ownerName": {"type": "string"},
-                },
-                "required": ["detail", "ownerName"],
-            },
         ),
         DeliveryDocumentEditLockNotFoundException: Resp(
             status_code=409,
