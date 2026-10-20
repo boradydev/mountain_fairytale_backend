@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from src.core.excs import BaseAppException
 
 
@@ -13,6 +15,6 @@ class InvalidGeoResponse(BaseAppException):
     pass
 
 
+@dataclass(slots=True)
 class MissingClientLocation(BaseAppException):
-    def __init__(self, clients: list[dict[str, str]]) -> None:
-        self.clients = clients
+    clients: list[dict[str, str]]

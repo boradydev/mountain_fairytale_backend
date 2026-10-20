@@ -143,9 +143,13 @@ async def test_all_unconfirmed_clients_reported_before_any_provider_request(clie
     try:
         response = await client.post("/protected/delivery-route-sheets/optimize-order", json={"orderedClientIds": ids})
         assert response.status_code == 422, response.text
-        assert [item["clientId"] for item in response.json()["clients"]] == ids
-        assert "Первый без координат" in response.json()["detail"]
-        assert "Второй без координат" in response.json()["detail"]
+        assert response.json() == {
+            "detail": "Some clients have no confirmed location.",
+            "clients": [
+                {"clientId": ids[0], "name": "Первый без координат"},
+                {"clientId": ids[1], "name": "Второй без координат"},
+            ]
+        }
         geo.optimize.assert_not_awaited()
     finally:
         fastapi_app.dependency_overrides.pop(get_geoapify, None)
