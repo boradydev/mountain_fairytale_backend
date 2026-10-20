@@ -24,9 +24,7 @@ class AddressSearchReq(BaseSchema):
 
     @property
     def formatted(self) -> str:
-        return ", ".join(
-            part for part in ("Ставропольский край", self.district, self.locality, self.street, self.house) if part
-        )
+        return ", ".join(part for part in (self.district, self.locality, self.street, self.house) if part)
 
 
 class DeliveryAddress(AddressSearchReq):

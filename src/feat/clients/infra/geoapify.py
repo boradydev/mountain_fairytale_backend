@@ -127,7 +127,12 @@ class Geoapify:
         if not any(c.exact_house for c in candidates):
             data = await self._json(
                 "geocode/search",
-                {"text": "Россия, " + address.formatted, "filter": "countrycode:ru", "lang": "ru", "limit": "5"},
+                {
+                    "text": "Россия, Ставропольский край, " + address.formatted,
+                    "filter": "countrycode:ru",
+                    "lang": "ru",
+                    "limit": "5",
+                },
             )
             candidates = self._candidates(data, address) or candidates
         return AddressSearchResp(candidates=candidates)

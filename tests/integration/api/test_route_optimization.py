@@ -148,7 +148,7 @@ async def test_all_unconfirmed_clients_reported_before_any_provider_request(clie
             "clients": [
                 {"clientId": ids[0], "name": "Первый без координат"},
                 {"clientId": ids[1], "name": "Второй без координат"},
-            ]
+            ],
         }
         geo.optimize.assert_not_awaited()
     finally:
@@ -252,7 +252,7 @@ async def test_stavropol_address_can_be_saved_without_district(client, active_em
     )
     assert response.status_code == 201, response.text
     created = response.json()["data"]
-    assert created["address"] == "Ставропольский край, г. Ставрополь, улица Ленина, 120"
+    assert created["address"] == "г. Ставрополь, улица Ленина, 120"
     assert created["deliveryAddress"]["district"] == ""
     fetched = await client.get(f"/protected/clients/{created['clientId']}")
     assert fetched.json()["data"]["deliveryAddress"] == {**address, "district": ""}
@@ -286,4 +286,5 @@ async def test_search_without_district_does_not_send_county_filter():
     assert len(result.candidates) == 1
     assert result.candidates[0].exact_house
     assert "county" not in geo._json.call_args.args[1]
+    assert geo._json.call_args.args[1]["state"] == "Ставропольский край"
     assert geo._json.await_count == 1
