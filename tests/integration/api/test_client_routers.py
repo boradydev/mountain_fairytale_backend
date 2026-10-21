@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.uuid7 import uuid7
+from tests.helpers import delivery_address
 from tests.integration.conftest import EmployeeTestData
 
 
@@ -24,9 +25,14 @@ class TestClientRouters:
         payload: dict[str, object] = {
             "name": f"Client {uuid7()}",
             "phone": uuid4().hex,
-            "address": "Client test address",
+            "deliveryAddress": delivery_address(),
             "sleepingThresholdDays": 30,
         }
+        address = overrides.get("address")
+        if isinstance(address, str) and 0 < len(address) <= 500:
+            overrides = dict(overrides)
+            overrides.pop("address")
+            payload["deliveryAddress"] = delivery_address(street=address)
         payload.update(overrides)
         return payload
 

@@ -3,6 +3,7 @@ from typing import Any, Self
 from uuid import UUID
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.common.domain.entities import BaseEntity
@@ -28,6 +29,8 @@ class Client(BaseEntity):
         "last_delivery_quantity",
         "sleeping_threshold_days",
         "address",
+        "delivery_address",
+        "delivery_details",
         "sales_representative_id",
         "last_delivery_date",
         "default_payment_method_id",
@@ -48,6 +51,8 @@ class Client(BaseEntity):
     name: Mapped[str] = mapped_column(Text)
     phone: Mapped[str] = mapped_column(Text)
     address: Mapped[str] = mapped_column(Text)
+    delivery_address: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    delivery_details: Mapped[str] = mapped_column(Text, default="")
     last_delivery_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_delivery_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -79,6 +84,8 @@ class Client(BaseEntity):
         "name",
         "phone",
         "address",
+        "delivery_address",
+        "delivery_details",
         "cooldown_until",
         "sleeping_threshold_days",
         "sales_representative_id",
@@ -108,6 +115,8 @@ class Client(BaseEntity):
         phone: str,
         address: str,
         sleeping_threshold_days: int,
+        delivery_address: dict[str, Any] | None = None,
+        delivery_details: str = "",
         cooldown_until: datetime | None = None,
         sales_representative_id: UUID | None = None,
         default_payment_method_id: UUID | None = None,
@@ -117,6 +126,8 @@ class Client(BaseEntity):
             name=name,
             phone=phone,
             address=address,
+            delivery_address=delivery_address,
+            delivery_details=delivery_details,
             last_delivery_date=None,
             last_delivery_quantity=None,
             cooldown_until=cooldown_until,

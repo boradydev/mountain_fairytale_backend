@@ -8,3 +8,4 @@ alembic.md
 AGENTS.md
 # Local Geoapify research responses (no credentials).
 tmp/geoapify_probe/
+.cache/geoapify-tiles/

@@ -5,6 +5,8 @@ CREATE TABLE clients (
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
     address TEXT NOT NULL,
+    delivery_address JSONB NULL,
+    delivery_details TEXT NOT NULL DEFAULT '',
     last_delivery_date TIMESTAMP NULL,
     last_delivery_quantity INTEGER NULL,
     cooldown_until TIMESTAMP NULL,

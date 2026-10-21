@@ -39,6 +39,12 @@ from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
+from src.feat.clients.domain.location_excs import (
+    GeoQuotaExceeded,
+    GeoUnavailable,
+    InvalidGeoResponse,
+    MissingClientLocation,
+)
 from src.feat.commissions.domain.commission_excs import (
     InactiveCommissionTargetException,
     SameCommissionTargetException,
@@ -113,6 +119,16 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         InvalidRefreshTokenException: Resp(status_code=401, detail="Invalid credentials"),
         EmployeeDomainUpdateException: Resp(status_code=422, detail="Employee domain update error"),
         EmployeeUsernameAlreadyExistsException: Resp(status_code=409, detail="Employee username already exists"),
+        GeoUnavailable: Resp(status_code=503, detail="Geolocation service is unavailable."),
+        GeoQuotaExceeded: Resp(status_code=429, detail="Geolocation service quota exceeded."),
+        InvalidGeoResponse: Resp(
+            status_code=502, detail="Geolocation service returned an invalid or incomplete response."
+        ),
+        MissingClientLocation: Resp(
+            status_code=422,
+            detail="Some clients have no confirmed location.",
+            extra_fields=lambda exc: {"clients": exc.clients},
+        ),
         ClientNotFoundException: Resp(status_code=404, detail="Client not found"),
         ClientDomainUpdateException: Resp(status_code=422, detail="Client domain update error"),
         ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),
@@ -136,14 +152,6 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
             status_code=423,
             detail="Delivery document is locked by another employee",
             extra_fields=lambda exc: {"ownerName": exc.owner_name},
-            openapi_schema={
-                "type": "object",
-                "properties": {
-                    "detail": {"type": "string"},
-                    "ownerName": {"type": "string"},
-                },
-                "required": ["detail", "ownerName"],
-            },
         ),
         DeliveryDocumentEditLockNotFoundException: Resp(
             status_code=409,

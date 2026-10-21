@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from src.common.infra.services.event_pud_service import EventPublisher
 from src.core.uuid7 import uuid7
-from tests.helpers import unique_car_number, unique_phone, unique_product_name
+from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
     PICKUP_BASE_PATH,
@@ -28,7 +28,7 @@ async def document_case(request, client, active_employee) -> dict[str, Any]:
             json={
                 "name": f"Contract client {uuid7()}",
                 "phone": unique_phone(),
-                "address": "Contract address",
+                "deliveryAddress": delivery_address(),
                 "sleepingThresholdDays": 10,
             },
         )
@@ -77,6 +77,28 @@ def patch_points(document: dict[str, Any]) -> list[dict[str, Any]]:
         }
         for point in document["points"]
     ]
+
+
+async def test_free_address_details_and_manual_order_without_coordinates(client, document_case):
+    case = document_case
+    customer = case["customers"][0]
+    response = await client.patch(
+        f"/protected/clients/{customer['clientId']}",
+        json={
+            "address": "Произвольный адрес без карты",
+            "deliveryDetails": "Позвонить у ворот",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["deliveryAddress"] is None
+    document = (await client.get(case["path"])).json()["data"]
+    point = next(p for p in document["points"] if p["clientId"] == customer["clientId"])
+    assert point["address"] == "Произвольный адрес без карты — Позвонить у ворот"
+    reordered = patch_points(document)[::-1]
+    saved = await client.patch(case["path"], json={"points": reordered})
+    assert saved.status_code == 200, saved.text
+    fetched = (await client.get(case["path"])).json()["data"]
+    assert [p["clientId"] for p in fetched["points"]] == [p["clientId"] for p in reordered]
 
 
 async def read_events(postgres, document: dict[str, Any]) -> list[dict[str, Any]]:

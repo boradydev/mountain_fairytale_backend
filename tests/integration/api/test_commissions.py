@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from src.common.infra.services.event_pud_service import EventPublisher
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
-from tests.helpers import unique_car_number, unique_phone, unique_product_name, unique_username
+from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name, unique_username
 from tests.integration.api.test_delivery_document_routers import TestDeliveryDocumentRouters as DeliveryAPI
 
 
@@ -29,7 +29,7 @@ async def create_customer(client, representative=None):
         json={
             "name": unique_username("client"),
             "phone": unique_phone(),
-            "address": "Адрес",
+            "deliveryAddress": delivery_address(),
             "sleepingThresholdDays": 7,
             "salesRepresentativeId": representative,
         },

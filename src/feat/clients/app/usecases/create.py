@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from src.feat.clients.app.abcs.client_uow_abcs import IClientsUOW
@@ -12,6 +13,8 @@ class CreateClientDTO:
     name: str
     phone: str
     address: str
+    delivery_address: dict[str, Any] | None = None
+    delivery_details: str = ""
     sleeping_threshold_days: int
     cooldown_until: datetime | None = None
     sales_representative_id: UUID | None = None
@@ -29,6 +32,8 @@ class CreateClientUseCase:
                 name=dto.name,
                 phone=dto.phone,
                 address=dto.address,
+                delivery_address=dto.delivery_address,
+                delivery_details=dto.delivery_details,
                 sleeping_threshold_days=dto.sleeping_threshold_days,
                 cooldown_until=dto.cooldown_until,
                 sales_representative_id=dto.sales_representative_id,

@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from tests.helpers import unique_phone, unique_product_name
+from tests.helpers import delivery_address, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
     PICKUP_BASE_PATH,
@@ -21,7 +21,7 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
             json={
                 "name": f"Last order {index}",
                 "phone": unique_phone(),
-                "address": "Адрес",
+                "deliveryAddress": delivery_address(),
                 "sleepingThresholdDays": 10,
             },
         )
@@ -106,7 +106,9 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     )
     assert response.status_code == 200
     assert response.json()["data"]["lastOrder"] == expected
-    response = await client.patch(f"/protected/clients/{customer_id}", json={"address": "Новый адрес"})
+    response = await client.patch(
+        f"/protected/clients/{customer_id}", json={"deliveryAddress": delivery_address(house="148")}
+    )
     assert response.status_code == 200
     assert response.json()["data"]["lastOrder"] == expected
 
