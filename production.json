@@ -1,10 +1,10 @@
 {
-  "ciRunId": 39775895289,
-  "commitSha": "3238e7b4bd8c10cb00d2416408f49c7013862c64",
-  "compatibleRollback": true,
+  "ciRunId": 39777748275,
+  "commitSha": "d67e1243d19a53086d4ecc333a30d7605e4f618b",
+  "compatibleRollback": false,
   "databaseRevision": "c8a2d91e470f",
-  "deploymentId": 5,
-  "image": "ghcr.io/boradydev/mountain_fairytale_backend@sha256:9846c0752d42e140fc6bd8b912fd85f3614991800dd14b44c8003e797d33a8f2",
+  "deploymentId": 6,
+  "image": "ghcr.io/boradydev/mountain_fairytale_backend@sha256:1bae288b3ed62a7b02970f7ec4fc11ebff9e5406709205e8a70010e0bfedbbaf",
   "migrations": {
     "059030d3d021": "0bceb6ee4e325fc87e816032f6a61210372de331dfd295cc0a4b36f8f6311058",
     "0f573dc84b1f": "f4732053f276c81fbc3f943544dde5f793659ec0d34b8141cca346451f065ebe",
@@ -17,8 +17,8 @@
     "e74dbe1c27eb": "88906a37079584f6038de0ed5fd80dda3eccccc2e9616e66d2f9b7c83adf8a2d",
     "f8031806307b": "52d9f849541ce44c6eaa3a523c9f13f399ba2efee59d2f8e33f5849248eca9f8"
   },
-  "operation": "rollback",
-  "requestedAt": "2026-10-22T12:25:06.876734+00:00",
+  "operation": "deploy",
+  "requestedAt": "2026-10-22T12:27:08.903366+00:00",
   "requestedBy": "boradydev",
   "version": "1.0.0"
 }
