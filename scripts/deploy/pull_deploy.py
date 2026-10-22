@@ -217,7 +217,7 @@ class Deployer:
             self.runtime.inspect_release(request)
             current_image = self.runtime.current_image()
             self.check_compatibility(request, state, current_image)
-            if state.get("current", {}).get("image") == request["image"]:
+            if state.get("current", {}).get("image") == request["image"] and not recover:
                 ready = self.runtime.ready(request["image"])
                 if (
                     ready.get("commitSha") != request["commitSha"]
