@@ -3,7 +3,7 @@
   "commitSha": "3238e7b4bd8c10cb00d2416408f49c7013862c64",
   "compatibleRollback": false,
   "databaseRevision": "c8a2d91e470f",
-  "deploymentId": 2,
+  "deploymentId": 3,
   "image": "ghcr.io/boradydev/mountain_fairytale_backend@sha256:9846c0752d42e140fc6bd8b912fd85f3614991800dd14b44c8003e797d33a8f2",
   "migrations": {
     "059030d3d021": "0bceb6ee4e325fc87e816032f6a61210372de331dfd295cc0a4b36f8f6311058",
@@ -18,7 +18,7 @@
     "f8031806307b": "52d9f849541ce44c6eaa3a523c9f13f399ba2efee59d2f8e33f5849248eca9f8"
   },
   "operation": "deploy",
-  "requestedAt": "2026-10-22T12:20:09.504352+00:00",
+  "requestedAt": "2026-10-22T12:20:18.370336+00:00",
   "requestedBy": "boradydev",
   "version": "1.0.0"
 }
