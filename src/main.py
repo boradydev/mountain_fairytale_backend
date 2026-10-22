@@ -1,5 +1,3 @@
-import logging
-
 import dotenv
 import uvicorn
 
@@ -16,6 +14,6 @@ if __name__ == "__main__":
         host=settings.APP_HOST,
         port=settings.APP_PORT,
         reload=False,
-        workers=None,
+        workers=1,
         factory=False,
     )

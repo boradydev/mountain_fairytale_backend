@@ -40,6 +40,11 @@ class Postgres:
         """Закрывает все активные соединения в пуле движка."""
         await self._engine.dispose()
 
+    async def check_connection(self) -> None:
+        """Проверяет доступность БД без изменения данных."""
+        async with self._engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+
     async def execute(
         self,
         sql: str,

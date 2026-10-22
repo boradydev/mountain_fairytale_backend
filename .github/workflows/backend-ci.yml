@@ -1,0 +1,87 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_DB: mountain_fairytale_api_test
+      POSTGRES_API_TEST_DB: mountain_fairytale_api_test
+      POSTGRES_REPO_TEST_DB: mountain_fairytale_repo_test
+      ADMIN_USERNAME: ci_admin
+      ADMIN_PASSWORD: ci-only-admin-password
+      JWT_SECRET_KEY: ci-only-jwt-key-not-for-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      REFRESH_TOKEN_EXPIRE_DAYS: "90"
+      CONFIG_DIR: .
+    services:
+      postgres:
+        image: postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: mountain_fairytale_api_test
+          POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres -d mountain_fairytale_api_test"
+          --health-interval=5s --health-timeout=3s --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: |
+          python -m pip install poetry==2.5.1
+          poetry check --lock
+          poetry install --no-root --no-interaction
+      - name: Check changed Python files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: poetry run python scripts/ci/lint_changes.py
+      - name: Create repository test database
+        run: |
+          poetry run python - <<'PY'
+          import os
+          import psycopg
+          with psycopg.connect(host=os.environ['POSTGRES_HOST'], user=os.environ['POSTGRES_USER'], password=os.environ['POSTGRES_PASSWORD'], dbname='postgres', autocommit=True) as connection:
+              connection.execute('CREATE DATABASE mountain_fairytale_repo_test TEMPLATE template0 ENCODING \'UTF8\' LC_COLLATE \'C.UTF-8\' LC_CTYPE \'C.UTF-8\'')
+          PY
+      - name: Run unit tests
+        run: poetry run pytest tests/unit tests/test_health.py
+      - name: Run API tests against disposable PostgreSQL
+        run: poetry run pytest tests/integration/api --cov-append
+      - name: Run repository tests against their own database
+        env:
+          POSTGRES_DB: mountain_fairytale_repo_test
+        run: poetry run pytest tests/integration/infra/repos --cov-append
+      - uses: docker/setup-buildx-action@v3
+      - name: Build runtime image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: false
+          build-args: VCS_REF=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

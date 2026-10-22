@@ -55,7 +55,7 @@ docstring-code-format = true
 
 [tool.poetry]
 name = "mountain_fairytale"
-version = "0.1.0"
+version = "1.0.0"
 description = "mountain_fairytale"
 authors = ["boradydev"]
 package-mode = false
@@ -63,8 +63,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "~3.13"
-ruff = "^0.14.14"
-pyright = "^1.1.408"
 dotenv = "^0.9.9"
 alembic = "^1.18.4"
 psycopg = {extras = ["binary"], version = "^3.3.4"}
@@ -85,6 +83,9 @@ build-backend = "poetry.core.masonry.api"
 
 [dependency-groups]
 dev = [
+    "ruff (>=0.14.14,<0.15.0)",
+    "pyright (>=1.1.408,<2.0.0)",
+    "httpx (>=0.28.1,<0.29.0)",
     "pytest (>=9.1.1,<10.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
     "pytest-asyncio (>=1.4.0,<2.0.0)",
