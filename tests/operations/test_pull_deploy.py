@@ -1,8 +1,11 @@
 import json
+import subprocess
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 
+from scripts.deploy import pull_deploy
 from scripts.deploy.pull_deploy import Deployer, DeploymentError, Runtime, read_json, save_json
 from scripts.deploy.release_manifest import IMAGE, Release, Request, schema_metadata, validate_request
 
@@ -257,3 +260,28 @@ def test_reviewed_recovery_reinstalls_recorded_image_and_clears_maintenance(depl
     assert not deployer.maintenance.exists()
     assert "run --rm --no-deps backup run --category predeploy" in runtime.events
     assert "start " + selected["image"] in runtime.events
+
+
+def test_request_uses_immutable_git_commit_instead_of_cached_branch_url(monkeypatch):
+    commit = "c" * 40
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=commit + "\trefs/heads/deployment\n",
+    ))
+    urls = []
+
+    def open_request(http_request, **_kwargs):
+        urls.append(http_request.full_url)
+        return BytesIO(json.dumps(request()).encode())
+
+    monkeypatch.setattr(pull_deploy, "urlopen", open_request)
+    selected = pull_deploy.fetch_request()
+    assert selected is not None
+    assert selected["deploymentId"] == 1
+    assert urls == [f"{pull_deploy.REQUEST_BASE}/{commit}/production.json"]
+
+
+def test_missing_deployment_branch_is_a_normal_initial_state(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(
+        args=[], returncode=2, stdout="",
+    ))
+    assert pull_deploy.fetch_request() is None

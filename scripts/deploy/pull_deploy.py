@@ -4,8 +4,8 @@ import argparse
 import json
 import logging
 import os
+import re
 import subprocess
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -15,7 +15,7 @@ from scripts.deploy.release_manifest import REPOSITORY, JsonObject, Release, Req
 
 
 logger = logging.getLogger("deploy")
-REQUEST_URL = f"https://raw.githubusercontent.com/{REPOSITORY}/deployment/production.json"
+REQUEST_BASE = f"https://raw.githubusercontent.com/{REPOSITORY}"
 ACTIVE_PHASES = {"backup", "migration", "starting", "checking", "committing"}
 
 
@@ -43,7 +43,24 @@ def read_json(path: Path) -> JsonObject:
 
 
 def fetch_request() -> Request | None:
-    request = HTTPRequest(REQUEST_URL + f"?check={int(time.time())}", headers={"Cache-Control": "no-cache"})
+    # Branch URLs on raw.githubusercontent.com may stay stale despite cache-busting query parameters.
+    # Resolve the public Git ref first, then read immutable content; no GitHub API quota/token is needed.
+    try:
+        pointer = subprocess.run(
+            ["git", "ls-remote", "--exit-code", f"https://github.com/{REPOSITORY}.git", "refs/heads/deployment"],
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}, capture_output=True, text=True, timeout=20,
+        )
+    except (subprocess.SubprocessError, OSError):
+        raise DeploymentError("Cannot resolve deployment branch; current application is unchanged") from None
+    if pointer.returncode == 2:
+        return None
+    pieces = pointer.stdout.split()
+    if (
+        pointer.returncode != 0 or len(pieces) != 2
+        or not re.fullmatch(r"[a-f0-9]{40}", pieces[0]) or pieces[1] != "refs/heads/deployment"
+    ):
+        raise DeploymentError("Invalid or unavailable deployment branch pointer")
+    request = HTTPRequest(f"{REQUEST_BASE}/{pieces[0]}/production.json", headers={"Cache-Control": "no-cache"})
     try:
         with urlopen(request, timeout=20) as response:
             body = response.read(65537)
