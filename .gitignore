@@ -5,6 +5,9 @@
 .env.*
 !.env.example
 deploy/*.env
+backup.env
+.deploy/
+.env.deploy-tmp
 tmp/operations/
 .pytest_cache/
 __pycache__/

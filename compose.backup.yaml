@@ -1,0 +1,37 @@
+services:
+  backup:
+    image: ${BACKUP_IMAGE:-ghcr.io/boradydev/postgres_s3_backup:0.1.0@sha256:5ad9268297245e100bc1dcd8cd83339b84035d4834fd6b4cf2f1d0ce4e266c87}
+    restart: unless-stopped
+    env_file:
+      - path: ./backup.env
+        format: raw
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-https://s3.twcstorage.ru}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-0865f0b6-5416-4bab-8573-2fca06751a80}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-ru-1}
+      BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-mountain-fairytale/production}
+      BACKUP_KEEP: ${BACKUP_KEEP:-30}
+      BACKUP_MANUAL_KEEP: ${BACKUP_MANUAL_KEEP:-30}
+      BACKUP_PREDEPLOY_KEEP: ${BACKUP_PREDEPLOY_KEEP:-30}
+      BACKUP_TIME: ${BACKUP_TIME:-17:00}
+      BACKUP_TIMEZONE: ${BACKUP_TIMEZONE:-Europe/Moscow}
+      BACKUP_STATE_DIR: /state
+    volumes:
+      - backup_state:/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  backup_state:

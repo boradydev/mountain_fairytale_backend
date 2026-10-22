@@ -1,0 +1,18 @@
+[Unit]
+Description=Mountain Fairytale daily PostgreSQL backups
+Requires=mountain-fairytale.service
+After=mountain-fairytale.service
+PartOf=mountain-fairytale.service
+ConditionPathExists=/opt/mountain-fairytale/backup.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/mountain-fairytale
+ExecStart=/usr/bin/docker compose -f compose.yaml -f compose.backup.yaml up -d backup
+ExecStop=/usr/bin/docker compose -f compose.yaml -f compose.backup.yaml stop backup
+TimeoutStartSec=120
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target mountain-fairytale.service

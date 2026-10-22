@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply the selected Mountain Fairytale backend image
+Requires=docker.service
+After=docker.service network-online.target mountain-fairytale.service
+Wants=network-online.target
+ConditionPathExists=/opt/mountain-fairytale/backup.env
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mountain-fairytale
+ExecStart=/usr/bin/python3 -m scripts.deploy.pull_deploy
+UMask=0077
+TimeoutStartSec=45min
+StandardOutput=journal
+StandardError=journal
