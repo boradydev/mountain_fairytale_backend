@@ -2,6 +2,7 @@
 # Install only the local, reviewed deployment service. No GitHub credentials are needed.
 set -eu
 test "$(id -u)" -eq 0
+command -v git >/dev/null
 project=/opt/mountain-fairytale
 test -f "$project/.env"
 test -f "$project/backup.env"
