@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/mountain-fairytale
+ExecStartPre=/usr/bin/test ! -f /opt/mountain-fairytale/.deploy/maintenance
 ExecStart=/usr/bin/docker compose up -d --wait --wait-timeout 120 api
 ExecStop=/usr/bin/docker compose stop
 TimeoutStartSec=180

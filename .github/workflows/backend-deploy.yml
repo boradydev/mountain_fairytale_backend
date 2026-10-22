@@ -1,0 +1,45 @@
+name: Select production backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character commit SHA from a successful master Backend CI
+        type: string
+        required: true
+      operation:
+        description: Deploy a build or return to a previously installed compatible build
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+      compatible_rollback:
+        description: I verified application/data compatibility for this rollback (schema must also match)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-image-selection
+  cancel-in-progress: false
+
+jobs:
+  select:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Select a verified build and write production.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SELECTED_COMMIT: ${{ inputs.commit_sha }}
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+          COMPATIBLE_ROLLBACK: ${{ inputs.compatible_rollback }}
+        run: python -m scripts.ci.release_catalog select

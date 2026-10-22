@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the selected Mountain Fairytale backend image every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=mountain-fairytale-deploy.service
+
+[Install]
+WantedBy=timers.target
