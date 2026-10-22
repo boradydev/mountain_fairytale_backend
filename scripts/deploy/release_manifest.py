@@ -47,7 +47,12 @@ def validate_release(value: object) -> Release:
     if not isinstance(migrations, dict) or value["databaseRevision"] not in migrations:
         raise ValueError("Missing migration checksums")
     for revision, checksum in migrations.items():
-        if not re.fullmatch(r"[a-zA-Z0-9_]+", revision) or not re.fullmatch(r"[a-f0-9]{64}", checksum):
+        if (
+            not isinstance(revision, str)
+            or not isinstance(checksum, str)
+            or not re.fullmatch(r"[a-zA-Z0-9_]+", revision)
+            or not re.fullmatch(r"[a-f0-9]{64}", checksum)
+        ):
             raise ValueError("Invalid migration checksum")
     if type(value.get("ciRunId")) is not int or value["ciRunId"] < 1:
         raise ValueError("Invalid CI run ID")

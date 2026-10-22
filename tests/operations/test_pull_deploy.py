@@ -221,3 +221,24 @@ def test_status_never_contains_server_environment_values(deployment, monkeypatch
     monkeypatch.setenv("POSTGRES_PASSWORD", "do-not-publish-this")
     deployer.apply_locked(request())
     assert "do-not-publish-this" not in json.dumps(read_json(deployer.state_path))
+
+
+def test_persist_image_preserves_other_secrets_and_file_owner(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text("API_IMAGE=old\nPOSTGRES_PASSWORD=do-not-change\nJWT_SECRET_KEY=also-keep\n")
+    original = path.stat()
+    Runtime(tmp_path).persist_image(release()["image"])
+    values = path.read_text().splitlines()
+    assert "POSTGRES_PASSWORD=do-not-change" in values
+    assert "JWT_SECRET_KEY=also-keep" in values
+    assert "API_IMAGE=old" not in values
+    assert "API_IMAGE=" + release()["image"] in values
+    assert path.stat().st_uid == original.st_uid
+    assert not (tmp_path / ".env.deploy-tmp").exists()
+
+
+def test_invalid_migration_checksum_type_is_rejected():
+    selected = dict(request())
+    selected["migrations"] = {"rev1": 123}
+    with pytest.raises(ValueError, match="Invalid migration checksum"):
+        validate_request(selected)

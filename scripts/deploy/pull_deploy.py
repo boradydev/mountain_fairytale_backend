@@ -130,6 +130,7 @@ class Runtime:
 
     def persist_image(self, image: str) -> None:
         path = self.project / ".env"
+        original = path.stat()
         lines = path.read_text(encoding="utf-8").splitlines()
         lines = [line for line in lines if not line.startswith("API_IMAGE=")]
         lines.append("API_IMAGE=" + image)
@@ -140,6 +141,8 @@ class Runtime:
                 stream.write("\n".join(lines) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
+            if os.name == "posix":
+                os.chown(temporary, original.st_uid, original.st_gid)
             temporary.replace(path)
         finally:
             temporary.unlink(missing_ok=True)
