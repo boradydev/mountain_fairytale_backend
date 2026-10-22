@@ -4,6 +4,8 @@ FastAPI API локального Windows-приложения для служб�
 Python 3.13, PostgreSQL, SQLAlchemy, Alembic, Poetry.
 
 - [Первичная установка Ubuntu VM и запуск Docker Compose](docs/operations/first-install.md).
+- [Резервные копии PostgreSQL в Timeweb S3](docs/operations/backups.md).
+- [Разрешение деплоя в GitHub, установка на VM и откат](docs/operations/backend-deploy.md).
 - [Контракт эксплуатации и выпусков](docs/contracts/operations-deployment-updates.md).
 - [План внедрения](docs/contracts/operations-implementation-plan.md).
 
