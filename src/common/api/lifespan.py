@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Fastapi application...")
 
     postgres = Postgres()
+    app.state.postgres = postgres
     dashboard_changes = DashboardChanges()
     token_settings = JwtSettings()
     token_service = JwtTokenService(settings=token_settings)

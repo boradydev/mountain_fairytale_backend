@@ -1,0 +1,7 @@
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+      args:
+        VCS_REF: ${APP_COMMIT_SHA:-unknown}

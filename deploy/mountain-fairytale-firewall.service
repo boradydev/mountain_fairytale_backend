@@ -1,0 +1,14 @@
+[Unit]
+Description=Restrict Mountain Fairytale published API to its LAN
+Requires=docker.service
+After=docker.service network-online.target
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/opt/mountain-fairytale/.env
+ExecStart=/bin/sh /opt/mountain-fairytale/scripts/deploy/lan_firewall.sh
+
+[Install]
+WantedBy=multi-user.target

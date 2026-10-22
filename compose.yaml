@@ -1,0 +1,76 @@
+name: mountain-fairytale
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-application: &application
+  image: ${API_IMAGE:?Set API_IMAGE to a tested image}
+  environment:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+    JWT_ALGORITHM: HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+    REFRESH_TOKEN_EXPIRE_DAYS: "90"
+    ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+    APP_HOST: 0.0.0.0
+    APP_PORT: "8000"
+    GEOAPIFY_API_KEY: ${GEOAPIFY_API_KEY:-}
+    GEOAPIFY_TILE_CACHE_DIR: /data/geoapify
+    GEOAPIFY_TILE_CACHE_MAX_BYTES: ${GEOAPIFY_TILE_CACHE_MAX_BYTES:-2147483648}
+  depends_on:
+    postgres:
+      condition: service_healthy
+  logging: *logging
+
+services:
+  postgres:
+    image: postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 60s
+    logging: *logging
+
+  api:
+    <<: *application
+    restart: unless-stopped
+    ports:
+      - "${API_BIND_HOST:?Set the LAN address or 127.0.0.1}:${API_PORT:-8000}:8000"
+    volumes:
+      - geoapify_cache:/data/geoapify
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 40s
+
+  migrate:
+    <<: *application
+    profiles: [tools]
+    restart: "no"
+    command: ["python", "-m", "alembic", "-c", "src/common/infra/db/postgres/alembic/alembic.ini", "upgrade", "head"]
+
+volumes:
+  postgres_data:
+  geoapify_cache:
