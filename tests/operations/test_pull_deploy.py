@@ -242,3 +242,18 @@ def test_invalid_migration_checksum_type_is_rejected():
     selected["migrations"] = {"rev1": 123}
     with pytest.raises(ValueError, match="Invalid migration checksum"):
         validate_request(selected)
+
+
+def test_reviewed_recovery_reinstalls_recorded_image_and_clears_maintenance(deployment):
+    deployer, runtime = deployment
+    selected = release()
+    runtime.current = selected["image"]
+    save_json(deployer.state_path, {
+        "phase": "interrupted", "lastAttemptedId": 1, "current": selected, "history": [selected],
+    })
+    deployer.maintenance.touch()
+    state = deployer.apply_locked(request(number=2), recover=True)
+    assert state["phase"] == "succeeded"
+    assert not deployer.maintenance.exists()
+    assert "run --rm --no-deps backup run --category predeploy" in runtime.events
+    assert "start " + selected["image"] in runtime.events
