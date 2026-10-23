@@ -3,7 +3,7 @@ Description=Mountain Fairytale daily PostgreSQL backups
 Requires=mountain-fairytale.service
 After=mountain-fairytale.service
 PartOf=mountain-fairytale.service
-ConditionPathExists=/opt/mountain-fairytale/backup.env
+ConditionPathExists=/opt/mountain-fairytale/.env
 
 [Service]
 Type=oneshot

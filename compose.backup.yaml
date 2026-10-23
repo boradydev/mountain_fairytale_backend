@@ -2,10 +2,9 @@ services:
   backup:
     image: ${BACKUP_IMAGE:-ghcr.io/boradydev/postgres_s3_backup:0.1.0@sha256:5ad9268297245e100bc1dcd8cd83339b84035d4834fd6b4cf2f1d0ce4e266c87}
     restart: unless-stopped
-    env_file:
-      - path: ./backup.env
-        format: raw
     environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
