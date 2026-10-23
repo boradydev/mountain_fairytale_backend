@@ -3,9 +3,15 @@
 FastAPI API локального Windows-приложения для службы доставки воды.
 Python 3.13, PostgreSQL, SQLAlchemy, Alembic, Poetry.
 
-- [Первичная установка Ubuntu VM и запуск Docker Compose](docs/operations/first-install.md).
+- Начните с [первой установки с нуля](docs/operations/first-install.md): чистая
+  Ubuntu VM → готовый образ GHCR → новая БД/API → S3 → доставка обновлений.
+- [Навигация по эксплуатации](docs/operations/README.md): установка,
+  настройки, backup/restore, обновление и типовые неполадки.
+- [Все серверные ENV и применение изменений](docs/operations/server-env.md).
 - [Резервные копии PostgreSQL в Timeweb S3](docs/operations/backups.md).
+- [Пробное восстановление и перенос на новую VM](docs/operations/restore.md).
 - [Разрешение деплоя в GitHub, установка на VM и откат](docs/operations/backend-deploy.md).
+- [Обслуживание, остановка/запуск и диагностика](docs/operations/maintenance.md).
 - [Контракт эксплуатации и выпусков](docs/contracts/operations-deployment-updates.md).
 - [План внедрения](docs/contracts/operations-implementation-plan.md).
 

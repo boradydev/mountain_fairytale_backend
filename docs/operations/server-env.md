@@ -1,0 +1,115 @@
+# Серверные ENV: где хранятся и как менять
+
+Рабочий каталог Ubuntu — `/opt/mountain-fairytale`. Все команды выполняются там.
+`.env` и `backup.env` принадлежат владельцу установки, права 0600, каталог 0700.
+Они не копируются из окружения разработки и не коммитятся. Не запускайте
+`source .env` и не публикуйте вывод полного `docker compose config`.
+
+## Файл `.env`
+
+Создаётся `python3 scripts/deploy/init_env.py .env --image ОБРАЗ --bind-host IP ...`.
+Скрипт генерирует секреты и отказывается перезаписывать существующий файл.
+Перед первым запуском выбирается реальный опубликованный образ; значение
+`mountain-fairytale-api:1.0.0` по умолчанию в генераторе/шаблоне осталось для
+исторической локальной сборки и без такой сборки не существует.
+
+| Переменная | Значение/обязательность | Назначение |
+| --- | --- | --- |
+| `API_IMAGE` | Обязательна; `ghcr.io/boradydev/mountain_fairytale_backend@sha256:...` | Точный runtime-образ. После первого запуска меняется pull-deployer-ом |
+| `API_BIND_HOST` | Обязательна; IPv4 VM | Привязка API, например `192.168.0.25`. Не `0.0.0.0` для этой схемы |
+| `API_PORT` | Генератор: `8000`; для firewall обязательна | Опубликованный порт API; такое же значение нужно firewall |
+| `LAN_SUBNET` | Генератор: `192.168.0.0/24` | Разрешённая IPv4-сеть клиентов; передать свою |
+| `LAN_INTERFACE` | Генератор: `eth0` | Интерфейс VM; проверить через `ip -br -4 address` |
+| `POSTGRES_DB` | Обязательна; генератор: `mountain_fairytale` | Имя БД, также часть S3-префикса |
+| `POSTGRES_USER` | Обязательна; генератор: `mountain_fairytale` | Роль PostgreSQL |
+| `POSTGRES_PASSWORD` | Обязательна; случайная строка | Пароль роли, не передавать клиенту |
+| `JWT_SECRET_KEY` | Обязательна; случайная строка | Подпись токенов; хранить в защищённой резервной копии |
+| `ADMIN_USERNAME` | Обязательна; генератор: `admin` | Имя bootstrap-администратора новой БД |
+| `ADMIN_PASSWORD` | Обязательна; случайная строка | Только первоначальное создание администратора |
+| `GEOAPIFY_API_KEY` | Необязательна; пусто | Без неё недоступны карты, геокодирование и оптимизация |
+| `GEOAPIFY_TILE_CACHE_MAX_BYTES` | `2147483648` | Лимит кэша карт (2 ГБ), отдельный Docker volume |
+| `BACKUP_IMAGE` | По умолчанию 0.1.0 с digest из `compose.backup.yaml` | Независимый образ backup, обычный API deploy его не обновляет |
+| `BACKUP_S3_ENDPOINT` | `https://s3.twcstorage.ru` | Endpoint хранилища |
+| `BACKUP_S3_BUCKET` | Бакет текущей установки из Compose | При новой установке явно указать свой существующий бакет |
+| `BACKUP_S3_REGION` | `ru-1` | Регион S3-подписи |
+| `BACKUP_S3_PREFIX` | `mountain-fairytale/production` | Имя БД добавляется автоматически; независимым БД нужны разные префиксы |
+| `BACKUP_TIME` | `17:00` | Плановое время |
+| `BACKUP_TIMEZONE` | `Europe/Moscow` | Часовой пояс расписания, имена архивов остаются UTC |
+| `BACKUP_KEEP` | `30` | Лимит daily-копий |
+| `BACKUP_MANUAL_KEEP` | `30` | Независимый лимит manual |
+| `BACKUP_PREDEPLOY_KEEP` | `30` | Независимый лимит predeploy |
+
+Это параметры, реально передаваемые текущими Compose-файлами. Константы
+`POSTGRES_HOST=postgres`, `POSTGRES_PORT=5432`, `JWT_ALGORITHM=HS256`, время
+access/refresh токенов 15 минут/90 дней и внутренний порт API 8000 задаёт Compose.
+Добавление одноимённой строки в `.env` само по себе эти константы не изменит.
+
+## Файл `backup.env`
+
+Создаётся скрытым вводом: `python3 scripts/deploy/init_backup_env.py backup.env`.
+
+| Переменная | Назначение |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID` | Обязательный Access Key отдельного S3-пользователя |
+| `AWS_SECRET_ACCESS_KEY` | Обязательный Secret Key |
+
+Файл читается как raw env_file **только backup-контейнером**; кавычки и `$`
+в ключах не должны интерпретироваться shell-ом. API/PostgreSQL ключей не получают.
+Нужны права list/get/put/delete в выделенном бакете/префиксе. Дополнительные
+необязательные настройки самого сервиса (таймауты, интервалы повторов) описаны
+в [его README](https://github.com/boradydev/postgres_s3_backup#настройки).
+Если их нет в `environment` Compose, их можно явно передать через `backup.env`;
+параметры, уже заданные секцией `environment`, имеют приоритет над env_file.
+
+## Изменить настройки работающего приложения
+
+Открыть `nano .env` или `nano backup.env` в собственном SSH-терминале.
+Сохранить права и проверить Compose, не раскрывая значения:
+
+```sh
+cd /opt/mountain-fairytale
+chmod 0600 .env backup.env
+sudo docker compose -f compose.yaml -f compose.backup.yaml config --quiet
+```
+
+Обычные настройки API, например Geoapify, применить пересозданием API:
+
+```sh
+sudo docker compose up -d --no-deps --force-recreate --wait api
+```
+
+S3-ключи, расписание и лимиты — пересозданием backup:
+
+```sh
+sudo docker compose -f compose.yaml -f compose.backup.yaml up -d --no-deps --force-recreate backup
+sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm --no-deps backup status
+```
+
+Обычный `docker restart` передаёт прежнее окружение контейнера.
+Операции обслуживания выполняются вне текущей миграции/деплоя: при необходимости
+отключите timer по [инструкции обслуживания](maintenance.md).
+
+Особые случаи:
+
+- `POSTGRES_PASSWORD`, `POSTGRES_USER`, `POSTGRES_DB` не переинициализируют
+  существующий том. Смена пароля требует согласованного изменения роли в БД
+  и клиентов; произвольное редактирование этих полей ломает подключение.
+- `ADMIN_PASSWORD` не меняет пароль существующей учётной записи. Используйте
+  `sudo docker compose exec api python -m src.common.cli.main admin change-password`.
+- Смена `JWT_SECRET_KEY` делает текущие токены недействительными — потребуется вход.
+- Новый IP/порт/подсеть требуют обновления firewall и адреса в Flutter. Скрипт
+  не удаляет старые правила DOCKER-USER автоматически; проверьте их до смены.
+- Endpoint/бакет/префикс backup связаны с состоянием тома. Для другого места
+  хранения сервису нужен отдельный том состояния; не удаляйте рабочий
+  `backup_state`, чтобы обходить ошибку scope. Это отдельная миграция хранилища.
+
+## Что хранить отдельно для восстановления
+
+В защищённой копии вне Windows-ПК: `.env`, `backup.env`, перечень нужных
+Compose/systemd/скриптов и версия конфигурации, данные установленного API-образа
+и его миграций (из `.deploy/state.json`/каталога выпуска), доступы к S3 и SSH.
+Секреты не кладутся рядом с публичными manifest/release-файлами в GitHub.
+Дамп одной БД не содержит пароли/роли всего PostgreSQL-кластера или ENV.
+
+При переносе сохраните имена БД/бакет/префикс для чтения выбранного manifest,
+но замените сетевые параметры на адрес новой VM. Подробности: [restore.md](restore.md).

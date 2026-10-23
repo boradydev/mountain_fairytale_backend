@@ -3,6 +3,11 @@
 GlitchTip временно отложен. Репозиторий и backend-образ публичные;
 на VM нет self-hosted runner, GitHub-токена, входящего webhook или нового порта.
 
+На новой пустой VM сначала пройдите [первую установку](first-install.md).
+Сам deploy-скрипт требует уже созданных БД/API-контейнера и рабочих S3-настроек;
+он не заменяет bootstrap. ENV описаны в [server-env.md](server-env.md),
+логи и типовые ошибки — в [maintenance.md](maintenance.md).
+
 ## Сборка и разрешение установки
 
 1. PR в `master`: тесты, Ruff для изменённых Python-файлов, сборка без публикации.
