@@ -4,8 +4,8 @@ import argparse
 import getpass
 import json
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 KEYS = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
@@ -18,7 +18,7 @@ def save_credentials(path: Path, access: str, secret: str) -> None:
     # Quote for Compose dotenv, escaping interpolation as well as special characters.
     additions = "".join(
         key + "=" + json.dumps(value, ensure_ascii=False).replace("$", "$$") + "\n"
-        for key, value in zip(KEYS, values)
+        for key, value in zip(KEYS, values, strict=True)
     )
     with path.open("r+", encoding="utf-8", newline="") as stream:
         original = stream.read()
@@ -34,7 +34,9 @@ def save_credentials(path: Path, access: str, secret: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path, help="Existing server .env")
-    parser.add_argument("--from-legacy", type=Path, help="Import raw keys from an old backup.env without displaying them")
+    parser.add_argument(
+        "--from-legacy", type=Path, help="Import raw keys from an old backup.env without displaying them"
+    )
     args = parser.parse_args()
     if not args.path.is_file():
         parser.error("Create the server .env with init_env.py first")

@@ -30,6 +30,6 @@ def test_existing_keys_are_not_overwritten(tmp_path: Path, line: str):
 def test_invalid_keys_do_not_modify_env(tmp_path: Path, value: str):
     path = tmp_path / ".env"
     path.write_text("API_IMAGE=unchanged\n", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Keys must be nonempty single-line values"):
         save_credentials(path, "access", value)
     assert path.read_text(encoding="utf-8") == "API_IMAGE=unchanged\n"
