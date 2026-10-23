@@ -91,6 +91,9 @@ sudo systemctl start mountain-fairytale-deploy.timer
 
 ## Изменить настройки работающего приложения
 
+Смена `API_BIND_HOST` требует также применения firewall и проверки доступа с Windows.
+Полный порядок: [смена IP-адреса VM](maintenance.md#сменить-ip-адрес-vm).
+
 Открыть `nano .env` в собственном SSH-терминале.
 Сохранить права и проверить Compose, не раскрывая значения:
 

@@ -70,6 +70,119 @@ sudo systemctl start mountain-fairytale-deploy.timer
 отключение enabled-служб планируется отдельно; контрольный reboot не выполняют
 во время миграции.
 
+## Сменить IP-адрес VM
+
+Смена адреса не требует нового образа API, миграций или изменений PostgreSQL/S3.
+Нужно обновить серверный `.env`, применить firewall и пересоздать только API
+из того же образа. Обычный `docker restart` сохраняет старую привязку порта.
+
+### 1. Подготовить обслуживание
+
+Выберите время без работающих пользователей. Сохраните старые значения
+`API_BIND_HOST`, `API_PORT`, `LAN_INTERFACE`, `LAN_SUBNET`: они понадобятся
+для удаления прежнего правила firewall. Не выводите весь `.env` в консоль.
+Откройте консоль VM в Hyper-V: при смене IP текущий SSH-сеанс может оборваться.
+
+```sh
+cd /opt/mountain-fairytale
+sudo systemctl stop mountain-fairytale-deploy.timer
+sudo systemctl show mountain-fairytale-deploy.service --property=ActiveState --property=SubState
+```
+
+Если deploy ещё выполняется (`activating`), дождитесь его окончания. Не меняйте
+сеть во время миграции или активного бэкапа. При незавершённом deploy/maintenance
+сначала выполните [восстановление доставки](backend-deploy.md#ошибки-и-прерванные-операции).
+Не меняйте выбранный SHA и не запускайте новый deploy ради смены IP.
+
+### 2. Изменить сеть и `.env`
+
+Назначьте VM новый IPv4-адрес средствами Ubuntu/роутера и проверьте его:
+
+```sh
+ip -br -4 address
+ip -4 route show default
+cd /opt/mountain-fairytale
+nano .env
+```
+
+В `.env` измените `API_BIND_HOST` на новый адрес VM. Если изменилась сеть клиентов
+или имя сетевого интерфейса, обновите также `LAN_SUBNET` и `LAN_INTERFACE`.
+`API_PORT` оставьте прежним, если менять порт не требуется. Не меняйте `API_IMAGE`,
+параметры БД, секреты или S3-префикс. Не выполняйте `source .env`.
+
+### 3. Применить firewall и пересоздать API
+
+```sh
+cd /opt/mountain-fairytale
+chmod 0600 .env
+sudo docker compose config --quiet
+sudo systemctl restart mountain-fairytale-firewall.service
+sudo systemctl is-active mountain-fairytale-firewall.service
+sudo docker compose up -d --no-deps --force-recreate --wait api
+sudo docker compose ps api
+```
+
+Firewall unit заново читает `/opt/mountain-fairytale/.env` и добавляет правило
+для нового адреса. Ожидаемый статус unit — `active`; при ошибке сначала проверьте
+его journal, не продолжайте запуск с неприменённым ограничением доступа.
+Пересоздание вызывает короткий простой API; PostgreSQL и backup-контейнер остаются
+на месте. Пересборка/публикация образа и `systemctl daemon-reload` не нужны.
+
+### 4. Проверить доступ и убрать старое правило
+
+Например, если новый адрес — `192.168.0.26`, порт — `8000`:
+
+```sh
+curl --fail --max-time 10 http://192.168.0.26:8000/health/ready
+```
+
+Подставьте свой адрес. Ожидаются `data.status=ready`, прежние версия и commitSha.
+Откройте тот же URL с Windows-ПК пользователя; проверка только из самой VM
+не подтверждает сетевой доступ и правила `DOCKER-USER`.
+
+Скрипт добавляет новое правило, но не удаляет старое автоматически. После успешной
+проверки удалите **только прежнее правило приложения**. В следующем примере
+все четыре значения должны быть **старыми**, сохранёнными до редактирования `.env`:
+
+```sh
+OLD_IP=192.168.0.25
+OLD_PORT=8000
+OLD_INTERFACE=eth0
+OLD_SUBNET=192.168.0.0/24
+sudo iptables -w -S DOCKER-USER
+if sudo iptables -w -C DOCKER-USER -i "$OLD_INTERFACE" -p tcp \
+  -m conntrack --ctorigdst "$OLD_IP" --ctorigdstport "$OLD_PORT" \
+  ! -s "$OLD_SUBNET" -j DROP 2>/dev/null; then
+  sudo iptables -w -D DOCKER-USER -i "$OLD_INTERFACE" -p tcp \
+    -m conntrack --ctorigdst "$OLD_IP" --ctorigdstport "$OLD_PORT" \
+    ! -s "$OLD_SUBNET" -j DROP
+fi
+```
+
+Эта команда рассчитана на смену IP: старый и новый адреса должны различаться.
+Не удаляйте правило для нового адреса, не очищайте всю цепочку `DOCKER-USER`.
+Если для приложения дополнительно настраивали UFW/роутер/Windows firewall,
+обновите адрес и там. Наша инструкция не меняет эти внешние правила.
+
+После проверки верните доставку:
+
+```sh
+sudo systemctl start mountain-fairytale-deploy.timer
+sudo systemctl list-timers mountain-fairytale-deploy.timer
+```
+
+При ошибке оставьте таймер остановленным и проверьте IP, `.env`, journal firewall
+и логи API. Для возврата восстановите прежний адрес VM и значения `.env`, затем
+повторите применение firewall, пересоздание API и проверку. Данные БД не откатывайте.
+
+### 5. Обновить адрес в клиенте
+
+Сейчас Flutter получает `API_BASE_URL` при сборке: изменение `.env` на сервере
+не меняет URL в установленном exe. Обновите Variable `API_BASE_URL` во Flutter
+GitHub Actions и выпустите клиент по [инструкции](https://github.com/boradydev/mountain_fairytale/blob/master/docs/windows-updates.md).
+Настройка URL внутри приложения запланирована, но ещё не реализована; после её
+появления этот шаг можно будет выполнить без новой сборки.
+
 ## Частые ситуации
 
 | Симптом | Что проверить/сделать |
