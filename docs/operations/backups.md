@@ -18,8 +18,8 @@ Dockerfile, poetry.lock, тесты и CI. Backend использует гото
   только для этого бакета.
 - Префикс: `mountain-fairytale/production/mountain_fairytale/`.
 
-Реальные ключи не записываются в Git или GitHub Secrets. Файл `backup.env`
-находится только на VM, читается Docker и передаётся только backup-контейнеру.
+Реальные ключи не записываются в Git или GitHub Secrets. Серверный `.env`
+находится только на VM, читается Compose; S3-ключи передаются только backup-контейнеру.
 API и PostgreSQL S3-ключей не получают. Пример без значений:
 `deploy/backup.env.example`.
 
@@ -42,12 +42,13 @@ sudo docker pull ghcr.io/boradydev/postgres_s3_backup:0.1.0@sha256:5ad9268297245
 В личном терминале владельца на Windows:
 
 ```powershell
-ssh -t ma4etea@192.168.0.25 "cd /opt/mountain-fairytale && python3 scripts/deploy/init_backup_env.py backup.env"
+ssh -t ma4etea@192.168.0.25 "cd /opt/mountain-fairytale && python3 scripts/deploy/init_backup_env.py .env"
 ```
 
 По очереди ввести S3 Access Key и Secret Key. Ввод скрыт, в shell history
-значения не попадают. Файл создаётся с правами 0600, существующий файл
-скрипт не перезаписывает. Не присылать ключи в чат.
+значения не попадают. Ключи добавляются в существующий серверный `.env` с правами
+0600. Остальные параметры сохраняются, уже заданные ключи скрипт не заменяет.
+Не присылать ключи в чат. Переход старой установки описан в [server-env.md](server-env.md#переход-с-отдельного-backupenv).
 
 Далее на VM (после ввода ключей):
 
@@ -130,7 +131,8 @@ sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm backup downl
 PostgreSQL и S3-эмуляторе, восстановленная запись прочитана обратно.
 Реальная загрузка в Timeweb и восстановление из него выполнены 22 октября 2026:
 
-- `backup.env` принадлежит `ma4etea`, права `0600`; значения не выводились.
+- При первоначальной проверке использовался отдельный `backup.env` с правами `0600`;
+  текущая конфигурация хранит ключи в общем `.env`. Значения не выводились.
 - Ежедневный архив 38 613 байт загружен в согласованный префикс бакета,
   прочитан обратно, проверены размер/SHA-256 и JSON-manifest.
 - Архив повторно скачан из Timeweb и восстановлен с `pg_restore --exit-on-error`

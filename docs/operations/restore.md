@@ -126,7 +126,7 @@ sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm --no-deps -T
 ревизией/миграциями, и исправьте API_IMAGE. Для последующего upgrade нужен
 отдельный проверенный план; эта процедура стартует с образа восстановленной схемы.
 
-Вернуть `.env`/`backup.env` из защищённого хранилища (права 0600), поправить
+Вернуть `.env` из защищённого хранилища (права 0600), поправить
 сетевые параметры и `API_IMAGE`. При отсутствии файлов создать их генераторами
 из [справочника ENV](server-env.md), указав **исходное имя БД и S3-параметры**
 для чтения manifest. Старый пароль роли не нужен для восстановления с
@@ -145,7 +145,7 @@ VM. Он полезен как справка о версиях, но истор
 ```sh
 set -euo pipefail
 cd /opt/mountain-fairytale
-chmod 0600 .env backup.env
+chmod 0600 .env
 sudo docker compose -f compose.yaml -f compose.backup.yaml config --quiet
 sudo docker compose -f compose.yaml -f compose.backup.yaml pull backup
 ```

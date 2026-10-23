@@ -28,7 +28,7 @@ GlitchTip временно отложен. Репозиторий и backend-о�
 
 При первой публикации GitHub создаёт пакет приватным. В GitHub Packages открыть
 `mountain_fairytale_backend` → Package settings → Change visibility → Public.
-После этого скачивание на VM не требует авторизации. Секреты .env/backup.env
+После этого скачивание на VM не требует авторизации. Секреты серверного .env
 не передаются в сборку, каталог выпусков или файл production.json.
 
 ## Что делает VM

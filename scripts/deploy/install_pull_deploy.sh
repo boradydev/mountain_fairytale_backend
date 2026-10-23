@@ -5,7 +5,6 @@ test "$(id -u)" -eq 0
 command -v git >/dev/null
 project=/opt/mountain-fairytale
 test -f "$project/.env"
-test -f "$project/backup.env"
 test -f "$project/scripts/deploy/pull_deploy.py"
 test -f "$project/scripts/deploy/release_manifest.py"
 install -d -m 0700 "$project/.deploy"

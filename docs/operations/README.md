@@ -18,7 +18,7 @@
 | Установить/выпустить Windows-клиент | [Flutter Windows](https://github.com/boradydev/mountain_fairytale/blob/master/docs/windows-updates.md) |
 
 Минимальный комплект восстановления вне Windows-ПК: пригодная S3-копия с
-manifest, доступы к бакету, защищённые `.env`/`backup.env`, сведения об образе
+manifest, доступы к бакету, защищённый `.env`, сведения об образе
 и схеме БД, проверенная версия Compose/systemd/скриптов. Одного Docker volume
 или снимка Hyper-V недостаточно. Дампы и секреты не публикуются в GitHub.
 

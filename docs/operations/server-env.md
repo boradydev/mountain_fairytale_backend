@@ -1,7 +1,7 @@
 # Серверные ENV: где хранятся и как менять
 
 Рабочий каталог Ubuntu — `/opt/mountain-fairytale`. Все команды выполняются там.
-`.env` и `backup.env` принадлежат владельцу установки, права 0600, каталог 0700.
+Серверный `.env` принадлежит владельцу установки, права 0600, каталог 0700.
 Они не копируются из окружения разработки и не коммитятся. Не запускайте
 `source .env` и не публикуйте вывод полного `docker compose config`.
 
@@ -44,31 +44,59 @@
 access/refresh токенов 15 минут/90 дней и внутренний порт API 8000 задаёт Compose.
 Добавление одноимённой строки в `.env` само по себе эти константы не изменит.
 
-## Файл `backup.env`
+## S3-ключи в общем `.env`
 
-Создаётся скрытым вводом: `python3 scripts/deploy/init_backup_env.py backup.env`.
+Добавляются скрытым вводом: `python3 scripts/deploy/init_backup_env.py .env`.
 
 | Переменная | Назначение |
 | --- | --- |
 | `AWS_ACCESS_KEY_ID` | Обязательный Access Key отдельного S3-пользователя |
 | `AWS_SECRET_ACCESS_KEY` | Обязательный Secret Key |
 
-Файл читается как raw env_file **только backup-контейнером**; кавычки и `$`
-в ключах не должны интерпретироваться shell-ом. API/PostgreSQL ключей не получают.
+Все настройки хранятся в одном серверном `.env`. Compose передаёт контейнерам
+только перечисленные в их `environment` переменные. API/PostgreSQL ключей не получают.
+Не подключайте весь `.env` через `env_file`. Генератор экранирует ключи для dotenv;
+при ручном редактировании учитывайте синтаксис Docker Compose, особенно `$` и кавычки.
 Нужны права list/get/put/delete в выделенном бакете/префиксе. Дополнительные
 необязательные настройки самого сервиса (таймауты, интервалы повторов) описаны
 в [его README](https://github.com/boradydev/postgres_s3_backup#настройки).
-Если их нет в `environment` Compose, их можно явно передать через `backup.env`;
-параметры, уже заданные секцией `environment`, имеют приоритет над env_file.
+Если параметра нет в `environment` Compose, сначала добавьте туда явное сопоставление
+с переменной `.env`. Произвольные переменные `.env` автоматически в контейнер не попадают.
+
+## Переход с отдельного `backup.env`
+
+API deploy не обновляет локальную инфраструктуру. В рабочий каталог VM нужно передать
+новые `compose.backup.yaml`, `scripts/deploy/init_backup_env.py`, оба systemd unit
+`mountain-fairytale-backup.service` и `mountain-fairytale-deploy.service`, а также
+`scripts/deploy/install_pull_deploy.sh`.
+Перед заменой остановите `mountain-fairytale-deploy.timer`, дождитесь завершения
+активного деплоя и бэкапа, сохраните защищённую копию конфигурации.
+Затем в `/opt/mountain-fairytale`:
+
+```sh
+python3 scripts/deploy/init_backup_env.py .env --from-legacy backup.env
+sudo docker compose -f compose.yaml -f compose.backup.yaml config --quiet
+sudo install -m 0644 deploy/mountain-fairytale-backup.service /etc/systemd/system/
+sudo install -m 0644 deploy/mountain-fairytale-deploy.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo docker compose -f compose.yaml -f compose.backup.yaml up -d --no-deps --force-recreate backup
+sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm --no-deps backup status
+sudo systemctl start mountain-fairytale-deploy.timer
+```
+
+После успешной проверки удалите старый `backup.env` из рабочего каталога.
+Перенос не выводит значения и не удаляет исходный файл. Если старый файл содержит
+дополнительные настройки, скрипт остановится: сначала перенесите их явно в `.env`
+и `environment` Compose. Повторный импорт не заменяет уже существующие ключи.
 
 ## Изменить настройки работающего приложения
 
-Открыть `nano .env` или `nano backup.env` в собственном SSH-терминале.
+Открыть `nano .env` в собственном SSH-терминале.
 Сохранить права и проверить Compose, не раскрывая значения:
 
 ```sh
 cd /opt/mountain-fairytale
-chmod 0600 .env backup.env
+chmod 0600 .env
 sudo docker compose -f compose.yaml -f compose.backup.yaml config --quiet
 ```
 
@@ -105,7 +133,7 @@ sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm --no-deps ba
 
 ## Что хранить отдельно для восстановления
 
-В защищённой копии вне Windows-ПК: `.env`, `backup.env`, перечень нужных
+В защищённой копии вне Windows-ПК: `.env`, перечень нужных
 Compose/systemd/скриптов и версия конфигурации, данные установленного API-образа
 и его миграций (из `.deploy/state.json`/каталога выпуска), доступы к S3 и SSH.
 Секреты не кладутся рядом с публичными manifest/release-файлами в GitHub.

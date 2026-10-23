@@ -3,7 +3,7 @@ Description=Apply the selected Mountain Fairytale backend image
 Requires=docker.service
 After=docker.service network-online.target mountain-fairytale.service
 Wants=network-online.target
-ConditionPathExists=/opt/mountain-fairytale/backup.env
+ConditionPathExists=/opt/mountain-fairytale/.env
 
 [Service]
 Type=oneshot
