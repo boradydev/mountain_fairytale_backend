@@ -41,9 +41,14 @@ def main() -> None:
                 for name in (
                     "init_monitoring_env.py", "setup_monitoring.py", "check_monitoring_firewall.py",
                     "export_monitoring_config.py", "network_firewall.py", "lan_firewall.sh",
+                    "ensure_monitoring_network.py", "configure_monitoring_events.py", "operations_check.py",
+                    "pull_deploy.py",
                 ):
                     archive.add(args.project / "scripts/deploy" / name, arcname="scripts/deploy/" + name)
-                for name in ("mountain-fairytale-monitoring.service", "mountain-fairytale-firewall.service"):
+                for name in (
+                    "mountain-fairytale-monitoring.service", "mountain-fairytale-firewall.service",
+                    "mountain-fairytale-operations.service", "mountain-fairytale-operations.timer",
+                ):
                     archive.add(args.project / "deploy" / name, arcname="deploy/" + name)
                 for name in ("monitoring-projects.json",):
                     path = args.project / ".deploy" / name

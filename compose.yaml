@@ -22,6 +22,12 @@ x-application: &application
     ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
     APP_HOST: 0.0.0.0
     APP_PORT: "8000"
+    SENTRY_DSN: ${SENTRY_DSN:-}
+    SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+    FLUTTER_MONITORING_ENABLED: ${FLUTTER_MONITORING_ENABLED:-false}
+    FLUTTER_SENTRY_PUBLIC_KEY: ${FLUTTER_SENTRY_PUBLIC_KEY:-}
+    FLUTTER_SENTRY_PROJECT_ID: ${FLUTTER_SENTRY_PROJECT_ID:-}
+    GLITCHTIP_PORT: ${GLITCHTIP_PORT:-8080}
     GEOAPIFY_API_KEY: ${GEOAPIFY_API_KEY:-}
     GEOAPIFY_TILE_CACHE_DIR: /data/geoapify
     GEOAPIFY_TILE_CACHE_MAX_BYTES: ${GEOAPIFY_TILE_CACHE_MAX_BYTES:-2147483648}
@@ -52,6 +58,9 @@ services:
 
   api:
     <<: *application
+    networks:
+      - default
+      - observability
     restart: unless-stopped
     ports:
       - "${API_BIND_HOST:?Set the bind IPv4; use 0.0.0.0 only with the firewall}:${API_PORT:-8000}:8000"
@@ -74,3 +83,8 @@ services:
 volumes:
   postgres_data:
   geoapify_cache:
+
+networks:
+  observability:
+    external: true
+    name: mountain-fairytale-observability

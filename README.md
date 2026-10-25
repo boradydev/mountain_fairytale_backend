@@ -12,6 +12,7 @@ Python 3.13, PostgreSQL, SQLAlchemy, Alembic, Poetry.
 - [Пробное восстановление и перенос на новую VM](docs/operations/restore.md).
 - [Разрешение деплоя в GitHub, установка на VM и откат](docs/operations/backend-deploy.md).
 - [Обслуживание, остановка/запуск и диагностика](docs/operations/maintenance.md).
+- [GlitchTip, SDK, проверка диска/бэкапов и активация мониторинга](docs/operations/monitoring.md).
 - [Контракт эксплуатации и выпусков](docs/contracts/operations-deployment-updates.md).
 - [План внедрения](docs/contracts/operations-implementation-plan.md).
 

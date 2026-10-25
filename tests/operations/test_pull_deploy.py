@@ -92,6 +92,7 @@ def test_success_backs_up_before_migration_and_does_not_repeat_request(deploymen
     deployer, runtime = deployment
     state = deployer.apply_locked(request())
     assert state["phase"] == "succeeded"
+    assert state["backupError"] is False
     assert state["current"]["image"] == release()["image"]
     backup = runtime.events.index("run --rm --no-deps backup run --category predeploy")
     migrate = next(index for index, event in enumerate(runtime.events) if "migrate" in event)
@@ -111,6 +112,7 @@ def test_backup_failure_restarts_previous_api_without_migration_or_retries(deplo
     assert not any("migrate" in event for event in runtime.events)
     assert not deployer.maintenance.exists()
     assert read_json(deployer.state_path)["phase"] == "failed"
+    assert read_json(deployer.state_path)["backupError"] is True
     events = list(runtime.events)
     deployer.apply_locked(request())
     assert runtime.events == events

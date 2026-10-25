@@ -1,8 +1,10 @@
 # GlitchTip: установка, обслуживание и восстановление
 
-Этап 3А — работающий приёмник и дашборд. Sentry SDK в FastAPI/Flutter,
-автоматическая выдача клиентской конфигурации, события ошибок рабочего backup
-и контроль диска VM относятся к следующему этапу 3Б и пока не подключены.
+Этап 3А — работающий приёмник и дашборд. Код этапа 3Б (SDK FastAPI/Flutter
+и выдача клиентской конфигурации) подготовлен и проверен реальными событиями.
+Проверка диска/статусов бэкапов включена на VM. Активация SDK в рабочих
+приложениях выполняется обычными выпуском backend и обновлением Flutter;
+разработческая сборка не заменяет разрешённый production deploy.
 
 ## Состав и адреса
 
@@ -36,6 +38,9 @@ HTTP принят для LAN/VPN. На роутере порт не пробра
 - `scripts/deploy/network_firewall.py` и `lan_firewall.sh`;
 - `init_monitoring_env.py`, `check_monitoring_firewall.py`, `setup_monitoring.py`,
   `export_monitoring_config.py` в `scripts/deploy/`;
+- `ensure_monitoring_network.py` для общей внутренней сети Docker;
+- для этапа 3Б — `configure_monitoring_events.py`, `operations_check.py` и
+  unit/timer `mountain-fairytale-operations.*`;
 - `deploy/monitoring/compose.yaml`, `deploy/mountain-fairytale-monitoring.service`.
 
 Перед заменой файлов сохранить защищённую копию конфигурации, остановить
@@ -53,6 +58,7 @@ sudo install -m 0644 deploy/mountain-fairytale-monitoring.service /etc/systemd/s
 sudo docker compose --project-directory /opt/mountain-fairytale-monitoring \
   --env-file /opt/mountain-fairytale/.env config --quiet
 sudo systemctl daemon-reload
+sudo python3 -m scripts.deploy.ensure_monitoring_network
 sudo systemctl reload mountain-fairytale-firewall.service
 sudo docker compose --project-directory /opt/mountain-fairytale-monitoring \
   --env-file /opt/mountain-fairytale/.env pull
@@ -245,4 +251,141 @@ dc run --rm --no-deps --entrypoint rm backup "/state/$RESTORE_FILE"
 
 Осталось владельцу сохранить recovery bundle вне клиентского ПК и принять
 автозапуск GlitchTip при следующей согласованной перезагрузке Ubuntu.
-SDK и диск-мониторинг начинаются только на этапе 3Б.
+Результаты этапа 3Б и порядок активации описаны ниже.
+
+## Этап 3Б: SDK и эксплуатационные события
+
+Python использует `sentry-sdk` 2.73.0 с FastAPI/Starlette; Flutter —
+`sentry_flutter` 10.2.0. Сохраняются версия приложения, окружение, тип исключения
+и стек (файл/функция/строка). Значения исключений заменяются общим текстом;
+request body, headers, query, user, extras, breadcrumbs и локальные переменные
+не отправляются. Это сознательно ограничивает подробности ради защиты данных.
+Сессии, скриншоты, native crash capture, performance/profiling и поток INFO-логов
+в эту интеграцию не входят. Flutter native crash capture выключен; проверены
+именно Dart/Flutter исключения Windows. Уже перехваченные бизнес-кодом ошибки
+требуют явного capture, если они должны считаться неожиданной диагностикой.
+
+Ожидаемые бизнес-ошибки backend не считаются авариями. Flutter не отправляет
+ApiException и обычные ошибки соединения/таймауты; HTTP 5xx диагностируется
+backend. Неожиданные ошибки JSON-декодирования явно захватываются клиентом.
+Также явно захватываются ошибки формирования PDF и отправки на печать в
+существующих обработчиках; отмена пользователем не считается аварией.
+`X-Request-ID` генерируется сервером для каждого HTTP-запроса и возвращается
+также при 500. Его можно сопоставить с серверным логом/тегом GlitchTip;
+Flutter сохраняет ID в ответе/ApiException и диагностике некорректного JSON.
+Одинаковый тип/стек ограничивается одним событием в минуту, кеш дедупликации
+ограничен 128 сигнатурами. Очередь SDK ограничена 30 событиями в памяти;
+собственного долговременного хранилища/гарантированной досылки нет.
+
+### Конфигурация и выпуск
+
+Все ключи остаются в общем `/opt/mountain-fairytale/.env`:
+
+| Переменная | Назначение |
+| --- | --- |
+| `SENTRY_DSN` | Backend DSN: внутреннее имя `glitchtip:8000`; пусто отключает SDK |
+| `SENTRY_ENVIRONMENT` | `production` по умолчанию; тестовые события используют отдельные окружения |
+| `FLUTTER_MONITORING_ENABLED` | `true` для выдачи активной конфигурации; по умолчанию `false` |
+| `FLUTTER_SENTRY_PUBLIC_KEY` | Только публичный hex-ключ Flutter-проекта, 32 символа |
+| `FLUTTER_SENTRY_PROJECT_ID` | Идентификатор Flutter-проекта |
+| `GLITCHTIP_PORT` | Внешний порт для Flutter, по умолчанию 8080 |
+| `OPERATIONS_SENTRY_DSN` | Для хостового проверяющего скрипта: `127.0.0.1:8080`, проект operations |
+
+`configure_monitoring_events.py` заполняет отсутствующие/пустые SDK-поля из
+root-only `.deploy/monitoring-projects.json`, не печатает ключи. Если проекты
+или ключи менялись в UI, сначала актуализировать метаданные повторным
+`setup_monitoring --email ...` либо ввести актуальные DSN/публичные поля вручную.
+Существующие непустые SDK-поля сохраняются. Административный пароль не выдаётся
+API и не используется для приёма событий.
+
+API подключается к GlitchTip через общую внешнюю Docker-сеть
+`mountain-fairytale-observability`, alias `glitchtip`. Сеть создаётся отдельным
+idempotent скриптом до запуска обоих unit; её существование не требует
+работающего GlitchTip. PostgreSQL и backup не включаются в общую сеть.
+Остановка monitoring Compose не удаляет эту сеть и не мешает API.
+
+На существующей VM перед выпуском передать актуальные Compose, unit и скрипты
+с сохранением защищённой копии конфигурации и паузой deploy timer по
+[обслуживанию](maintenance.md), затем:
+
+```sh
+cd /opt/mountain-fairytale
+sudo python3 -m scripts.deploy.ensure_monitoring_network
+sudo python3 -m scripts.deploy.configure_monitoring_events
+sudo install -m 0644 deploy/monitoring/compose.yaml /opt/mountain-fairytale-monitoring/compose.yaml
+sudo install -m 0644 deploy/mountain-fairytale.service /etc/systemd/system/
+sudo install -m 0644 deploy/mountain-fairytale-monitoring.service /etc/systemd/system/
+sudo install -m 0644 deploy/mountain-fairytale-operations.service /etc/systemd/system/
+sudo install -m 0644 deploy/mountain-fairytale-operations.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+dc up -d --no-deps --wait web
+sudo systemctl enable --now mountain-fairytale-operations.timer
+sudo systemctl start mountain-fairytale-operations.service
+sudo systemctl start mountain-fairytale-deploy.timer
+```
+
+Этот подготовительный шаг на текущей VM уже выполнен, API не пересоздавался.
+После пользовательских commit/PR/CI выбрать новый backend SHA штатным workflow,
+дождаться deploy/ready и проверить `GET /public/monitoring/config`. Затем выпустить
+Flutter обычным путём. Никаких ручных правок Python внутри рабочего API-контейнера.
+Старая версия backend возвращает 404: новый Flutter продолжает работать и
+повторяет загрузку конфигурации через минуту.
+
+Endpoint публичный, чтобы мониторинг мог настроиться до входа пользователя.
+Ответ — обычный `StdResponse`, в `data` только `enabled`, `publicKey`, `projectId`,
+`port`, `environment`. При отключении/некорректных полях возвращается
+`enabled=false`, ключ/проект — null. Host и backend DSN не выдаются.
+Flutter формирует HTTP DSN для хоста выбранного API на порту мониторинга.
+При смене сервера старый HTTP-клиент закрывается, устаревшие ответы конфигурации
+отбрасываются; до получения новой конфигурации SDK не отправляет события.
+
+### Проверка диска и бэкапов
+
+`mountain-fairytale-operations.timer`: первый запуск через 3 минуты после boot,
+дальше через 5 минут после окончания проверки. Только Ubuntu `/`: warning
+при свободном месте меньше 20%, critical меньше 10%. Windows не проверяется.
+У обоих постоянных backup-контейнеров читается `/state/status.json`:
+`lastError` → backup_failed, `cleanupRequired` → cleanup_failed,
+ошибка чтения отмечается только в journal и не превращается в uptime-алерт.
+Давность/пропуск расписания не вызывает алерт. Для преддеплойной копии читается
+булево `backupError` из `.deploy/state.json`: оно ставится при сбое этапа backup
+и снимается после успешного преддеплойного backup. Ни текст ошибки, ни ENV
+из deploy state не отправляются. Ручные CLI-копии проверяются по результату
+команды; гарантии регистрации краткого ручного сбоя этим observer нет.
+
+Проверка отправляет смену состояния и восстановление через совместимый
+протокол GlitchTip в operations. Готовый backup-образ не меняется, S3-ключи
+не копируются в GlitchTip. Повтор неизменного состояния подавляется в root-only
+`.deploy/operations-status.json` (это состояние проверки, не очередь событий).
+При сбое отправки текущее проблемное состояние проверяется заново в следующий
+раз. Короткий сбой, исчезнувший между проверками, может не попасть в GlitchTip.
+Recovery — отдельное info-событие в той же группе; issue автоматически не
+помечается resolved через административный API.
+
+```sh
+sudo systemctl list-timers mountain-fairytale-operations.timer
+sudo journalctl -u mountain-fairytale-operations.service -n 40 --no-pager
+```
+
+### Проверки 3Б от 25 октября
+
+- Python SDK через изолированный FastAPI/TestClient отправил одну неожиданную
+  ошибку со стеком/версией; ожидаемая бизнес-ошибка и дубль не отправлены.
+- Flutter SDK через opt-in HTTP-приёмку отправил событие в реальный GlitchTip,
+  после смены конфигурации на отключённую отправка прекратилась. Тестовый
+  приватный маркер удалён, событие сохранено в БД со стеком.
+- Проверены warning → critical → recovery и ошибки обоих backup на подставных
+  состояниях, без заполнения диска или повреждения рабочей копии. Приняты
+  тестовые события `acceptance-operations`, повтор того же состояния подавлен.
+  Дополнительно проверены сбой/восстановление преддеплойной копии; отсутствие
+  работающего контейнера не создаёт uptime-алерт.
+- Внутренний маршрут Docker `glitchtip:8000` проверен. API/backup/PG продолжают
+  работать на прежних контейнерах, operations timer включён.
+- Рабочие приложения ещё требуют обычного выпуска; приёмочные события SDK
+  не означают, что старый production-образ уже содержит новый код.
+
+После окончательного ввода и проверки выпусков заново сформировать recovery
+bundle и **один раз** положить его в приватный S3 в зашифрованном виде; ключ
+восстановления сохранить отдельно. Это оставленная владельцем мини-задача,
+сейчас она не выполнена. Старый `monitoring-recovery-final-20261025.tar.gz`
+не объявляется актуальным комплектом после изменения инфраструктуры.

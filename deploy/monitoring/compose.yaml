@@ -28,6 +28,10 @@ services:
   web:
     image: glitchtip/glitchtip:6.2.6@sha256:a3d8eb1b36c1e1603d55ab32711ea3dd8115874742a781a57391a62a16e0dff6
     restart: unless-stopped
+    networks:
+      default:
+      observability:
+        aliases: [glitchtip]
     environment:
       DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?Set GLITCHTIP_POSTGRES_PASSWORD}@postgres:5432/glitchtip
       SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?Set GLITCHTIP_SECRET_KEY}
@@ -100,3 +104,8 @@ volumes:
   postgres_data:
   uploads:
   backup_state:
+
+networks:
+  observability:
+    external: true
+    name: mountain-fairytale-observability

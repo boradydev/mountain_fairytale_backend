@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from src.common.api.deps import get_access_token_pyload, verify_admin_access
+from src.common.api.monitoring_routers import monitoring_router
 from src.feat.audit_event.api.audit_routers import events_router
 from src.feat.auth.api.auth_routers import auth_router
 from src.feat.cars.api.car_routers import cars_router
@@ -23,6 +24,7 @@ from src.feat.sales_rep.api.sales_rep_routers import sales_representatives_route
 
 public = APIRouter(prefix="/public")
 public.include_router(auth_router)
+public.include_router(monitoring_router)
 
 
 protected = APIRouter(
