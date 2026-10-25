@@ -1,0 +1,10 @@
+[Unit]
+Description=Report VM disk and backup state to local GlitchTip
+After=docker.service mountain-fairytale-monitoring.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mountain-fairytale
+ExecStart=/usr/bin/python3 -m scripts.deploy.operations_check
+TimeoutStartSec=90
+UMask=0077

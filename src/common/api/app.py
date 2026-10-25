@@ -10,16 +10,20 @@ from src.common.api.excs_handlers import (
 )
 from src.common.api.health_routers import health_router
 from src.common.api.lifespan import lifespan
+from src.common.api.request_ids import install_request_ids
 from src.common.api.settings import FastapiSettings
 from src.core.build_info import APP_VERSION
 from src.core.excs import BaseAppException
+from src.core.monitoring import initialize_monitoring
 
 
 logger = logging.getLogger(__name__)
 
 settings = FastapiSettings()
+initialize_monitoring()
 fastapi_app = FastAPI(lifespan=lifespan, version=APP_VERSION)
 fastapi_app.root_path = settings.ROOT_PATH
+install_request_ids(fastapi_app)
 
 fastapi_app.add_exception_handler(
     BaseAppException,

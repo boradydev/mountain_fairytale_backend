@@ -6,8 +6,9 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.core.excs import BaseAppException
 from src.common.api.exc_map import APP_EXCEPTION_MAP, Resp
+from src.core.excs import BaseAppException
+from src.core.monitoring import capture_error
 
 
 def get_business_exception_handler(
@@ -15,7 +16,7 @@ def get_business_exception_handler(
     logger: Logger,
 ) -> Callable[..., Coroutine[Any, Any, JSONResponse]]:
     async def handler(
-        _: Request,
+        request: Request,
         exc: Exception,
     ) -> JSONResponse:
         if not isinstance(exc, BaseAppException):
@@ -24,10 +25,13 @@ def get_business_exception_handler(
         resp = exception_map.get(type(exc))
 
         if resp is None:
+            identifier = getattr(request.state, "request_id", "-")
+            capture_error(exc, identifier)
             logger.error(
                 "Unmapped application exception: %s",
                 type(exc).__name__,
                 exc_info=exc,
+                extra={"request_id": identifier},
             )
 
             return JSONResponse(
@@ -51,12 +55,15 @@ def get_unknown_exception_handler(
     debug: bool = False,
 ) -> Callable[..., Coroutine[Any, Any, JSONResponse]]:
     async def handler(
-        _: Request,
+        request: Request,
         exc: Exception,
     ) -> JSONResponse:
+        identifier = getattr(request.state, "request_id", "-")
+        capture_error(exc, identifier)
         logger.error(
             exc,
             exc_info=True,
+            extra={"request_id": identifier},
         )
 
         content = {
@@ -74,6 +81,7 @@ def get_unknown_exception_handler(
         return JSONResponse(
             status_code=500,
             content=content,
+            headers={"X-Request-ID": identifier},
         )
 
     return handler

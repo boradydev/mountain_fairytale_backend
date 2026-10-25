@@ -199,6 +199,7 @@ sudo docker compose --profile tools run --rm --no-deps migrate
 sudo install -m 0644 deploy/mountain-fairytale-firewall.service /etc/systemd/system/
 sudo install -m 0644 deploy/mountain-fairytale.service /etc/systemd/system/
 sudo systemctl daemon-reload
+sudo python3 -m scripts.deploy.ensure_monitoring_network
 sudo systemctl enable --now mountain-fairytale-firewall.service
 sudo systemctl enable --now mountain-fairytale.service
 sudo docker compose ps

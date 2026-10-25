@@ -253,6 +253,7 @@ class Deployer:
             self.runtime.compose("stop", "api")
             stopped = True
             self.runtime.compose("run", "--rm", "--no-deps", "backup", "run", "--category", "predeploy")
+            state["backupError"] = False
             if request["operation"] != "rollback":
                 self.phase(state, "migration")
                 migration_started = True
@@ -283,6 +284,8 @@ class Deployer:
             self.phase(state, "succeeded")
             return state
         except Exception as exc:
+            if state.get("phase") == "backup":
+                state["backupError"] = True
             state["lastError"] = str(exc) if isinstance(exc, DeploymentError) else type(exc).__name__
             state["phase"] = "failed-migration" if migration_started else "failed"
             if stopped and not migration_started and not starting:

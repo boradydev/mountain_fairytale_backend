@@ -75,6 +75,7 @@ pyjwt = "2.13.0"
 inflection = "^0.5.1"
 pwdlib = { version = "^0.3.0", extras = ["argon2"] }
 sqlparse = "^0.6.0"
+sentry-sdk = {version = ">=2,<3", extras = ["fastapi"]}
 
 
 [build-system]

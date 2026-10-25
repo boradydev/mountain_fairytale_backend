@@ -1,0 +1,10 @@
+[Unit]
+Description=Check VM disk and backups every five minutes while running
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+Unit=mountain-fairytale-operations.service
+
+[Install]
+WantedBy=timers.target
