@@ -54,7 +54,7 @@ services:
     <<: *application
     restart: unless-stopped
     ports:
-      - "${API_BIND_HOST:?Set the LAN address or 127.0.0.1}:${API_PORT:-8000}:8000"
+      - "${API_BIND_HOST:?Set the bind IPv4; use 0.0.0.0 only with the firewall}:${API_PORT:-8000}:8000"
     volumes:
       - geoapify_cache:/data/geoapify
     healthcheck:

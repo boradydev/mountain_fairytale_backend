@@ -1,0 +1,21 @@
+[Unit]
+Description=Mountain Fairytale support SSTP tunnel
+Wants=network-online.target
+After=network-online.target mountain-fairytale-firewall.service
+Requires=mountain-fairytale-firewall.service
+PartOf=docker.service mountain-fairytale-firewall.service
+StartLimitIntervalSec=0
+ConditionPathExists=/etc/ppp/peers/mountain-fairytale-support
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/pppd call mountain-fairytale-support nodetach
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+RuntimeDirectory=sstpc
+RuntimeDirectoryMode=0700
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
