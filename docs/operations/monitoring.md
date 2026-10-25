@@ -1,0 +1,248 @@
+# GlitchTip: установка, обслуживание и восстановление
+
+Этап 3А — работающий приёмник и дашборд. Sentry SDK в FastAPI/Flutter,
+автоматическая выдача клиентской конфигурации, события ошибок рабочего backup
+и контроль диска VM относятся к следующему этапу 3Б и пока не подключены.
+
+## Состав и адреса
+
+Отдельный Compose-проект `mountain-fairytale-monitoring` в
+`/opt/mountain-fairytale-monitoring`: GlitchTip **6.2.6** (digest закреплён),
+своя PostgreSQL 17 и готовый backup-сервис. Valkey не используется; фоновые задачи
+выполняются all-in-one сервисом с очередью PostgreSQL. Рабочая БД API отделена.
+Включены только ошибки: uptime, OTLP logs, MCP, cold storage и публичная
+регистрация отключены. Docker stdout ротируется, 3 файла по 10 МБ на контейнер.
+
+- Дашборд по VPN: `http://10.77.50.11:8080`.
+- Дашборд по текущей LAN: `http://192.168.0.25:8080`.
+- Организация `Mountain Fairytale`, проекты `backend`, `flutter`, `operations`.
+- Firewall пропускает порт 8080 только из `LAN_INTERFACE` + `LAN_SUBNET`
+  и с VPN-IP разработчика `/32`, как и API. Порты обеих PostgreSQL не публикуются.
+
+HTTP принят для LAN/VPN. На роутере порт не пробрасывается. Доступ в дашборд
+требует входа; публичный ключ DSN позволяет приём событий, но не администрирование.
+`GLITCHTIP_PUBLIC_URL` определяет канонические ссылки/DSN в интерфейсе. Доступ
+через второй адрес разрешён отдельно через allowed hosts и trusted origins.
+Будущая интеграция Flutter будет формировать DSN для выбранного LAN/VPN-адреса.
+
+## Установка
+
+Сначала настроить [backend](first-install.md) и [VPN](support-vpn.md).
+Все команды ниже — в Bash Ubuntu. Получить проверенную версию эксплуатационных
+файлов из репозитория; обычный backend deploy их не доставляет.
+
+В `/opt/mountain-fairytale` должны находиться актуальные:
+
+- `scripts/deploy/network_firewall.py` и `lan_firewall.sh`;
+- `init_monitoring_env.py`, `check_monitoring_firewall.py`, `setup_monitoring.py`,
+  `export_monitoring_config.py` в `scripts/deploy/`;
+- `deploy/monitoring/compose.yaml`, `deploy/mountain-fairytale-monitoring.service`.
+
+Перед заменой файлов сохранить защищённую копию конфигурации, остановить
+deploy timer и дождаться текущей операции по [обслуживанию](maintenance.md).
+Далее, подставив свой LAN-IP и VPN-IP:
+
+```sh
+set -euo pipefail
+cd /opt/mountain-fairytale
+sudo python3 -m scripts.deploy.init_monitoring_env .env \
+  --lan-host 192.168.0.25 --vpn-host 10.77.50.11
+sudo install -d -m 0700 /opt/mountain-fairytale-monitoring
+sudo install -m 0644 deploy/monitoring/compose.yaml /opt/mountain-fairytale-monitoring/compose.yaml
+sudo install -m 0644 deploy/mountain-fairytale-monitoring.service /etc/systemd/system/
+sudo docker compose --project-directory /opt/mountain-fairytale-monitoring \
+  --env-file /opt/mountain-fairytale/.env config --quiet
+sudo systemctl daemon-reload
+sudo systemctl reload mountain-fairytale-firewall.service
+sudo docker compose --project-directory /opt/mountain-fairytale-monitoring \
+  --env-file /opt/mountain-fairytale/.env pull
+sudo systemctl enable --now mountain-fairytale-monitoring.service
+sudo systemctl start mountain-fairytale-deploy.timer
+```
+
+Генератор дописывает отсутствующие ключи, не заменяет существующие секреты и
+не читает локальный development `.env`. Все значения остаются в **общем**
+серверном `/opt/mountain-fairytale/.env` (0600). Полный `compose config` и
+`config --environment` в консоль не выводить: они содержат секреты.
+Если ключи уже были, проверить их в собственном приватном редакторе;
+`GLITCHTIP_ENABLED` должен быть `true` перед reload и запуском.
+
+Unit перед запуском проверяет наличие Docker firewall для порта мониторинга.
+`GLITCHTIP_ENABLED` управляет разрешением в firewall, а не systemd: для отключения
+сначала выполнить `systemctl disable --now mountain-fairytale-monitoring.service`,
+затем изменить `.env` и reload firewall. Одна правка флага не останавливает контейнеры.
+
+Создать администратора (подставить свой email; пароль в команду не передаётся):
+
+```sh
+cd /opt/mountain-fairytale
+sudo python3 -m scripts.deploy.setup_monitoring --email admin@example.com
+sudo cat .deploy/monitoring-admin-initial.password
+```
+
+Последнюю команду выполнять только в своём терминале, не отправлять результат
+в чат/логи. Скрипт создаёт организацию, команду и 3 проекта, при повторном запуске
+не меняет существующий пароль. Войти в дашборд и сменить начальный пароль;
+после сохранения нового пароля начальный файл можно удалить.
+Метаданные проектов находятся в root-only `.deploy/monitoring-projects.json`.
+Это снимок первоначальной настройки, не источник истины при дальнейших изменениях
+через UI; актуальные ключи хранятся в БД и видны в настройках проектов.
+
+## Переменные общего `.env`
+
+| Переменная | Значение генератора / назначение |
+| --- | --- |
+| `GLITCHTIP_ENABLED` | `true`; включить защиту порта в firewall |
+| `GLITCHTIP_PORT` | `8080`, отличается от порта API |
+| `GLITCHTIP_PUBLIC_URL` | `http://VPN_IP:8080`, канонический адрес интерфейса |
+| `GLITCHTIP_ALLOWED_HOSTS` | LAN/VPN IPv4, `127.0.0.1`, `localhost`, `web` |
+| `GLITCHTIP_TRUSTED_ORIGINS` | HTTP origins LAN/VPN с портом |
+| `GLITCHTIP_POSTGRES_PASSWORD` | Случайная hex-строка; для подключения через DATABASE_URL сохранять URL-безопасный формат |
+| `GLITCHTIP_SECRET_KEY` | Случайный секрет GlitchTip, обязателен для восстановления |
+| `GLITCHTIP_RETENTION_DAYS` | `30`, события/файлы/releases и автоматическая очистка |
+| `GLITCHTIP_BACKUP_KEEP` | `3` успешные daily-копии |
+| `GLITCHTIP_BACKUP_TIME` | `17:15`, Europe/Moscow; отдельно от рабочего backup в 17:00 |
+| `GLITCHTIP_BACKUP_S3_PREFIX` | `mountain-fairytale/monitoring`; имя БД `glitchtip` добавляет backup-сервис |
+
+Общие S3 endpoint/bucket/region и AWS-ключи используются из того же `.env`.
+Они передаются только backup-контейнеру; GlitchTip и его PostgreSQL их не получают.
+Каждый сервис получает явный список ENV, весь `.env` в контейнеры не подключается.
+Изменение секрета/пароля БД существующего тома — отдельная согласованная операция,
+не способ переинициализации через `.env`. Поведение рабочего backup не меняется.
+
+При смене LAN-IP обновить allowed hosts/trusted origins; при необходимости также
+public URL. Применить firewall и пересоздать `web`/`backup` с нужным окружением.
+Если меняется порт, одновременно обновить origins/public URL, firewall и публикацию.
+Compose-проект и имя БД не менять, рабочие тома не удалять.
+
+## Проверки, логи и резервные копии
+
+Удобная функция для текущего Bash-сеанса:
+
+```sh
+dc() { sudo docker compose --project-directory /opt/mountain-fairytale-monitoring \
+  --env-file /opt/mountain-fairytale/.env "$@"; }
+dc ps
+sudo systemctl is-active mountain-fairytale-monitoring.service
+sudo systemctl is-enabled mountain-fairytale-monitoring.service
+curl --fail http://10.77.50.11:8080/_health/
+dc logs --tail 80 web
+dc logs --tail 50 backup
+dc run --rm --no-deps backup status
+```
+
+Для ручной актуальной копии использовать ту же категорию `daily`:
+
+```sh
+dc run --rm --no-deps backup run --category daily
+```
+
+Так все штатные копии мониторинга используют единый лимит 3. Категории manual/
+predeploy в этом процессе не используются: они имеют независимые лимиты и
+создали бы дополнительные копии. Расписание и catch-up обслуживает постоянный
+backup-контейнер; не cron хоста. После пропуска создаётся одна догоняющая копия.
+Архив читается обратно из S3 и сверяется по SHA-256 до публикации manifest/ротации.
+
+Отдельно экспортировать конфигурацию и используемые uploads после изменений:
+
+```sh
+cd /opt/mountain-fairytale
+sudo python3 -m scripts.deploy.export_monitoring_config \
+  ".deploy/monitoring-recovery-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+```
+
+Комплект включает **весь общий server.env с секретами**, закреплённый Compose,
+метаданные и `uploads.tar`. Это не дамп БД. Файл root-only 0600, имена не
+перезаписываются. Скопировать комплект в защищённое хранилище разработчика вне
+клиентского ПК, не коммитить и не публиковать. Пока он лежит только в VM,
+от потери клиентского ПК он не защищает. При активной загрузке символов перед
+экспортом согласовать паузу загрузок; новые файлы требуют обновления комплекта.
+Еженедельный экспорт VM выполняет владелец и дополняет эту процедуру.
+
+## Пробное восстановление БД
+
+Применяется к изолированному временному контейнеру, не к рабочим томам.
+Сначала `dc run --rm --no-deps backup status`, выбрать полный
+`lastSuccess.manifestKey`. В том же Bash-сеансе:
+
+```sh
+MANIFEST_KEY='ПОЛНЫЙ_КЛЮЧ_JSON_MANIFEST'
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+RESTORE_FILE="monitoring-restore-$STAMP.dump"
+CHECK_CONTAINER="mf-monitoring-restore-$STAMP"
+dc run --rm --no-deps backup download --manifest "$MANIFEST_KEY" --output "/state/$RESTORE_FILE"
+sudo docker run -d --name "$CHECK_CONTAINER" --network none \
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=restore_check \
+  postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+until sudo docker exec "$CHECK_CONTAINER" pg_isready -h 127.0.0.1 -U postgres -d restore_check; do sleep 1; done
+dc run --rm --no-deps -T --entrypoint cat backup "/state/$RESTORE_FILE" \
+  | sudo docker exec -i "$CHECK_CONTAINER" pg_restore \
+    -U postgres -d restore_check --exit-on-error --no-owner --no-acl
+sudo docker exec "$CHECK_CONTAINER" psql -U postgres -d restore_check -X -v ON_ERROR_STOP=1 \
+  -c 'SELECT count(*) FROM users_user' \
+  -c 'SELECT name, slug FROM projects_project' \
+  -c 'SELECT count(*) FROM projects_projectkey' \
+  -c 'SELECT count(*) FROM issue_events_issueevent'
+```
+
+Запускать с `set -euo pipefail`. `trust` разрешён только этому контейнеру без
+сети/портов. Сверить проекты, пользователей, ключи и контрольные события с копией.
+После успешной проверки удалить только созданные тестовые ресурсы:
+
+```sh
+sudo docker rm -f -v "$CHECK_CONTAINER"
+dc run --rm --no-deps --entrypoint rm backup "/state/$RESTORE_FILE"
+```
+
+## Восстановление самого GlitchTip после потери
+
+1. Сохранить уцелевшие диски/тома для диагностики. Подготовить новую установку
+   с **пустыми отдельными томами мониторинга**, прежнюю не затирать.
+2. Вернуть проверенные эксплуатационные файлы и конфигурацию из recovery bundle.
+   При восстановлении только мониторинга не заменять весь рабочий `.env` API:
+   перенести нужные GLITCHTIP-поля и проверить S3-доступ в приватном редакторе.
+   Сохранить прежний `SECRET_KEY` и версию Compose/образа, заменить сетевые адреса.
+3. Не включать monitoring unit и не запускать `web`/`backup`: они могут создать
+   новую схему/копию пустой БД. Запустить только `dc up -d --wait postgres`.
+   Убедиться, что в целевой БД нет прикладных таблиц.
+4. Скачать нужную пару manifest/dump через одноразовый `backup download`
+   (`--no-deps`). Восстановить в **новую пустую** БД `glitchtip` через
+   `dc exec -T postgres pg_restore -U glitchtip -d glitchtip --exit-on-error --no-owner --no-acl`,
+   подав бинарный поток так же, как в пробном восстановлении.
+5. Вернуть `uploads.tar` в новый том uploads, сохранив числовые UID/GID и права.
+   Не распаковывать непроверенные архивы поверх работающего приложения.
+6. Применить firewall, запустить `web` на прежней версии и проверить вход,
+   проекты, DSN и тестовое событие. Затем включить unit/backup. Обновлять
+   GlitchTip до новой версии только отдельным шагом после успешного восстановления.
+
+Восстанавливается состояние на момент выбранных копий. Свежие события после
+дампа не восстанавливаются; новые/удалённые файлы могут требовать подходящего
+по времени recovery bundle. Восстановление всего приложения из экспорта VM —
+отдельная операция владельца, возвращающая назад также рабочую БД API.
+
+## Обновление и приёмка
+
+Перед обновлением: актуальная проверенная daily-копия БД и recovery bundle,
+прочитанные release notes, согласованное окно. Заменить закреплённые версию/digest
+в Compose, выполнить `dc pull`, `dc up -d --wait`, проверить UI/события/backup.
+Миграции GlitchTip выполняются при старте; произвольный откат образа после них
+не гарантирован. Не выполнять глобальные `down -v`/`volume prune`.
+
+25 октября 2026 проверено на VM:
+
+- Владелец вошёл в дашборд; созданы три проекта и администратор.
+- UI и тестовые события по LAN/VPN; два события сохранены в БД.
+- Посторонний тестовый интерфейс заблокирован firewall.
+- Daily-копия загружена/проверена в Timeweb S3; из неё в изолированной PostgreSQL
+  восстановлены 1 пользователь, 1 организация, 3 проекта, 3 ключа, 2 события,
+  170 миграций; отпечатки ключей совпали.
+- На восстановленной копии событие возрастом 40 дней удалено штатной очисткой
+  с retention 30; свежие события сохранены. Рабочие события не удалялись.
+- Весь monitoring unit остановлен/запущен, API в это время оставался ready.
+  Автозапуск включён; после добавления GlitchTip полная VM ещё не перезагружалась.
+- В спокойном состоянии web использует около 165–175 МиБ, его PostgreSQL около
+  40–75 МиБ; это замер без рабочей нагрузки, не лимит и не гарантия пиков.
+
+Осталось владельцу сохранить recovery bundle вне клиентского ПК и принять
+автозапуск GlitchTip при следующей согласованной перезагрузке Ubuntu.
+SDK и диск-мониторинг начинаются только на этапе 3Б.

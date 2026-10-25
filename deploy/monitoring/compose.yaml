@@ -1,0 +1,102 @@
+name: mountain-fairytale-monitoring
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+    command: ["postgres", "-c", "max_locks_per_transaction=512"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?Set GLITCHTIP_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "glitchtip", "-d", "glitchtip"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    stop_grace_period: 60s
+    logging: *logging
+
+  web:
+    image: glitchtip/glitchtip:6.2.6@sha256:a3d8eb1b36c1e1603d55ab32711ea3dd8115874742a781a57391a62a16e0dff6
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_POSTGRES_PASSWORD:?Set GLITCHTIP_POSTGRES_PASSWORD}@postgres:5432/glitchtip
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?Set GLITCHTIP_SECRET_KEY}
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_PUBLIC_URL:?Set GLITCHTIP_PUBLIC_URL}
+      ALLOWED_HOSTS: ${GLITCHTIP_ALLOWED_HOSTS:?Set GLITCHTIP_ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${GLITCHTIP_TRUSTED_ORIGINS:?Set GLITCHTIP_TRUSTED_ORIGINS}
+      SERVER_ROLE: all_in_one
+      VALKEY_URL: ""
+      EMAIL_URL: consolemail://
+      ENABLE_USER_REGISTRATION: "false"
+      ENABLE_ORGANIZATION_CREATION: "false"
+      ENABLE_ADMIN: "false"
+      GLITCHTIP_ENABLE_UPTIME: "false"
+      GLITCHTIP_ENABLE_LOGS: "false"
+      GLITCHTIP_ENABLE_MCP: "false"
+      GLITCHTIP_ENABLE_DUCKDB: "false"
+      GLITCHTIP_RETENTION_DAYS: ${GLITCHTIP_RETENTION_DAYS:-30}
+      GLITCHTIP_EVENT_RETENTION_DAYS: ${GLITCHTIP_RETENTION_DAYS:-30}
+      GLITCHTIP_FILE_RETENTION_DAYS: ${GLITCHTIP_RETENTION_DAYS:-30}
+      GLITCHTIP_RELEASE_RETENTION_DAYS: ${GLITCHTIP_RETENTION_DAYS:-30}
+      VTASKS_CONCURRENCY: "2"
+      DATABASE_POOL_MAX_SIZE: "5"
+      GRANIAN_WORKERS: "1"
+    ports:
+      - "0.0.0.0:${GLITCHTIP_PORT:-8080}:8000"
+    volumes:
+      - uploads:/code/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_health/', timeout=5).read()"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+      start_period: 180s
+    stop_grace_period: 60s
+    logging: *logging
+
+  backup:
+    image: ghcr.io/boradydev/postgres_s3_backup:0.1.0@sha256:5ad9268297245e100bc1dcd8cd83339b84035d4834fd6b4cf2f1d0ce4e266c87
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: glitchtip
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD:?Set GLITCHTIP_POSTGRES_PASSWORD}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-https://s3.twcstorage.ru}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-0865f0b6-5416-4bab-8573-2fca06751a80}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-ru-1}
+      BACKUP_S3_PREFIX: ${GLITCHTIP_BACKUP_S3_PREFIX:-mountain-fairytale/monitoring}
+      BACKUP_KEEP: ${GLITCHTIP_BACKUP_KEEP:-3}
+      BACKUP_MANUAL_KEEP: ${GLITCHTIP_BACKUP_KEEP:-3}
+      BACKUP_PREDEPLOY_KEEP: ${GLITCHTIP_BACKUP_KEEP:-3}
+      BACKUP_TIME: ${GLITCHTIP_BACKUP_TIME:-17:15}
+      BACKUP_TIMEZONE: Europe/Moscow
+      BACKUP_STATE_DIR: /state
+    volumes:
+      - backup_state:/state
+    depends_on:
+      web:
+        condition: service_healthy
+    stop_grace_period: 60s
+    logging: *logging
+
+volumes:
+  postgres_data:
+  uploads:
+  backup_state:

@@ -1,0 +1,19 @@
+[Unit]
+Description=Mountain Fairytale local GlitchTip and monitoring backups
+Requires=docker.service mountain-fairytale-firewall.service
+After=docker.service network-online.target mountain-fairytale-firewall.service
+PartOf=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/mountain-fairytale-monitoring
+ExecStartPre=/usr/bin/python3 /opt/mountain-fairytale/scripts/deploy/check_monitoring_firewall.py
+ExecStart=/usr/bin/docker compose --env-file /opt/mountain-fairytale/.env up -d --wait --wait-timeout 600
+ExecStop=/usr/bin/docker compose --env-file /opt/mountain-fairytale/.env stop
+TimeoutStartSec=900
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target

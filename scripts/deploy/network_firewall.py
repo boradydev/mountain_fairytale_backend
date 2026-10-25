@@ -19,6 +19,12 @@ def rules(environment: Mapping[str, str]) -> str:
     port = int(environment["API_PORT"])
     if not 1 <= port <= 65535:
         raise ValueError("Invalid API port")
+    ports = [port]
+    if environment.get("GLITCHTIP_ENABLED", "false").lower() == "true":
+        monitoring_port = int(environment.get("GLITCHTIP_PORT", "8080"))
+        if not 1 <= monitoring_port <= 65535 or monitoring_port == port:
+            raise ValueError("Invalid or conflicting GlitchTip port")
+        ports.append(monitoring_port)
     vpn = interface(environment.get("SUPPORT_VPN_INTERFACE", "support0"))
     enabled = environment.get("SUPPORT_VPN_ENABLED", "false").lower() == "true"
     admin = str(ipaddress.IPv4Address(environment["SUPPORT_VPN_ADMIN_IP"])) if enabled else None
@@ -28,7 +34,10 @@ def rules(environment: Mapping[str, str]) -> str:
         "*filter", ":MF_FORWARD - [0:0]", ":MF_API - [0:0]", ":MF_VPN_INPUT - [0:0]",
         "-F MF_FORWARD", "-F MF_API", "-F MF_VPN_INPUT",
         "-A MF_FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN",
-        f"-A MF_FORWARD -p tcp -m conntrack --ctstate DNAT --ctdir ORIGINAL --ctorigdstport {port} -j MF_API",
+        *[
+            f"-A MF_FORWARD -p tcp -m conntrack --ctstate DNAT --ctdir ORIGINAL --ctorigdstport {item} -j MF_API"
+            for item in ports
+        ],
         f"-A MF_FORWARD -i {vpn} -j DROP",
         "-A MF_FORWARD -j RETURN",
         f"-A MF_API -i {lan} -s {subnet} -j ACCEPT",
