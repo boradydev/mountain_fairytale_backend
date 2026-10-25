@@ -33,7 +33,8 @@ sudo journalctl -u mountain-fairytale-deploy.service -n 80 --no-pager
 sudo journalctl -u mountain-fairytale-firewall.service -n 40 --no-pager
 ```
 
-Docker-логи ротируются, 3 файла по 10 МБ на сервис. GlitchTip пока не подключён.
+Docker-логи ротируются, 3 файла по 10 МБ на сервис. [GlitchTip](monitoring.md)
+запущен отдельно; SDK приложений пока не подключены.
 На машине владельца можно просматривать приватные логи; перед передачей отчёта
 уберите чувствительные данные. Обычное выключение ПК не является аварией.
 

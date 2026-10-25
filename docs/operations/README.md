@@ -16,6 +16,7 @@
 | Выпустить API, выбрать SHA, вернуть совместимый образ | [Доставка backend](backend-deploy.md) |
 | Логи, штатная остановка/запуск, неполадки | [Обслуживание](maintenance.md) |
 | Удалённые SSH и API через Keenetic SSTP | [VPN поддержки](support-vpn.md) |
+| Дашборд GlitchTip, его S3-копии и восстановление | [Мониторинг](monitoring.md) |
 | Согласованные границы и оставшиеся этапы | [Контракт](../contracts/operations-deployment-updates.md), [план](../contracts/operations-implementation-plan.md) |
 | Установить/выпустить Windows-клиент | [Flutter Windows](https://github.com/boradydev/mountain_fairytale/blob/master/docs/windows-updates.md) |
 
@@ -24,7 +25,8 @@ manifest, доступы к бакету, защищённый `.env`, свед�
 и схеме БД, проверенная версия Compose/systemd/скриптов. Одного Docker volume
 или снимка Hyper-V недостаточно. Дампы и секреты не публикуются в GitHub.
 
-GlitchTip пока отложен. Диагностика доступна в Docker/systemd и health.
+GlitchTip развёрнут, дашборд доступен по LAN/VPN; SDK приложений ещё не подключены.
+Текущая диагностика приложений доступна в Docker/systemd и health.
 Windows/VM могут штатно выключаться; алертов за отсутствие работающего ПК нет.
 Обычный deploy не удаляет данные и не обновляет конфигурацию сервера;
 GitHub Select workflow подтверждает указание, фактический результат — на VM.
