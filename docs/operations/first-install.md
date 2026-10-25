@@ -146,7 +146,7 @@ PY
 cd /opt/mountain-fairytale
 python3 scripts/deploy/init_env.py .env \
   --image "$API_IMAGE" \
-  --bind-host 192.168.0.25 \
+  --bind-host 0.0.0.0 \
   --lan-subnet 192.168.0.0/24 \
   --lan-interface eth0
 python3 scripts/deploy/init_backup_env.py .env
@@ -211,7 +211,9 @@ curl --fail http://192.168.0.25:8000/health/ready
 `/health/live` проверяет процесс, `/health/ready` — ещё и связь с БД (503 при сбое).
 Порт PostgreSQL на хост не публикуется. Firewall unit ограничивает API через
 DOCKER-USER; обычный UFW сам по себе не заменяет это правило. SSH не затрагивается.
-При изменении адреса/подсети старые правила автоматически не удаляются.
+При reload firewall собственные цепочки MF_* заменяются. Старые IP-правила
+прежней версии удаляются отдельно только при миграции существующей установки.
+VPN подключается по [отдельной инструкции](support-vpn.md) после проверки LAN.
 
 Задать известный только владельцу пароль администратора:
 

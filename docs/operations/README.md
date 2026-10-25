@@ -15,6 +15,7 @@
 | Вернуть данные после потери сервера | [Восстановление на новой VM](restore.md#восстановление-на-новой-vm) |
 | Выпустить API, выбрать SHA, вернуть совместимый образ | [Доставка backend](backend-deploy.md) |
 | Логи, штатная остановка/запуск, неполадки | [Обслуживание](maintenance.md) |
+| Удалённые SSH и API через Keenetic SSTP | [VPN поддержки](support-vpn.md) |
 | Согласованные границы и оставшиеся этапы | [Контракт](../contracts/operations-deployment-updates.md), [план](../contracts/operations-implementation-plan.md) |
 | Установить/выпустить Windows-клиент | [Flutter Windows](https://github.com/boradydev/mountain_fairytale/blob/master/docs/windows-updates.md) |
 
