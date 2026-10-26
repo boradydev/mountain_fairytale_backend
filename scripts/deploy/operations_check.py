@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
+from scripts.deploy.information_events import observe
 from scripts.deploy.install_support_vpn import environment
 
 
@@ -27,13 +28,24 @@ def backup_condition(state: dict) -> str:
     return "ok"
 
 
-def report(dsn: str, source: str, condition: str, environment_name: str) -> bool:
+def send_event(dsn: str, event: dict) -> bool:
     parts = urlsplit(dsn)
     project = parts.path.strip("/")
     if parts.scheme not in {"http", "https"} or not parts.username or not project.isdigit():
         return False
     host = parts.netloc.rsplit("@", 1)[-1]
     target = urlunsplit((parts.scheme, host, f"/api/{project}/store/", "", ""))
+    request = Request(target, data=json.dumps(event).encode(), headers={
+        "Content-Type": "application/json", "X-Sentry-Auth": f"Sentry sentry_version=7,sentry_key={parts.username}",
+    })
+    try:
+        with build_opener(ProxyHandler({})).open(request, timeout=3) as response:
+            return response.status == 200
+    except (OSError, ValueError):
+        return False
+
+
+def report(dsn: str, source: str, condition: str, environment_name: str) -> bool:
     level = "info" if condition == "ok" else "warning" if condition == "warning" else "error"
     event = {
         "event_id": uuid.uuid4().hex, "timestamp": datetime.now(UTC).isoformat(),
@@ -43,14 +55,22 @@ def report(dsn: str, source: str, condition: str, environment_name: str) -> bool
         "fingerprint": ["operations", environment_name, source],
         "tags": {"component": source, "condition": condition},
     }
-    request = Request(target, data=json.dumps(event).encode(), headers={
-        "Content-Type": "application/json", "X-Sentry-Auth": f"Sentry sentry_version=7,sentry_key={parts.username}",
-    })
+    return send_event(dsn, event)
+
+
+def api_snapshot() -> dict:
+    template = '{"id":{{json .Id}},"startedAt":{{json .State.StartedAt}},"health":{{json .State.Health.Status}},' \
+        '"version":{{json (index .Config.Labels "org.opencontainers.image.version")}},' \
+        '"commitSha":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
     try:
-        with build_opener(ProxyHandler({})).open(request, timeout=3) as response:
-            return response.status == 200
-    except (OSError, ValueError):
-        return False
+        result = subprocess.run(
+            ["docker", "inspect", "--format", template, "mountain-fairytale-api-1"],
+            capture_output=True, text=True, timeout=5,
+        )
+        data = json.loads(result.stdout) if result.returncode == 0 else {}
+        return data if isinstance(data, dict) else {}
+    except (ValueError, subprocess.TimeoutExpired):
+        return {}
 
 
 def check(root: Path) -> None:
@@ -67,8 +87,12 @@ def check(root: Path) -> None:
         sent = {}
     usage = shutil.disk_usage("/")
     conditions = {"vm_disk": disk_condition(usage.free, usage.total)}
+    deployment = {}
+    backups = {}
     try:
         deployment = json.loads((root / ".deploy/state.json").read_text())
+        if not isinstance(deployment, dict):
+            deployment = {}
         if "backupError" in deployment:
             conditions["predeploy_backup"] = "backup_failed" if deployment["backupError"] else "ok"
     except (FileNotFoundError, ValueError):
@@ -85,6 +109,7 @@ def check(root: Path) -> None:
             data = json.loads(result.stdout) if result.returncode == 0 else None
             if isinstance(data, dict):
                 conditions[source] = backup_condition(data)
+                backups[source] = data
             else:
                 print(f"Backup state unreadable, check skipped: {source}")
         except (ValueError, subprocess.TimeoutExpired):
@@ -98,6 +123,8 @@ def check(root: Path) -> None:
             print(f"Operations event accepted: {source} {condition}")
         else:
             print(f"Operations event delivery unavailable: {source}; retry current state at next check")
+    observe(sent, api_snapshot(), deployment, backups,
+            lambda event: send_event(dsn, event), values.get("SENTRY_ENVIRONMENT", "production"))
     descriptor, temporary = tempfile.mkstemp(prefix=".operations-", dir=state_path.parent)
     with os.fdopen(descriptor, "w") as stream:
         json.dump(sent, stream)
