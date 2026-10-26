@@ -43,6 +43,7 @@ def main() -> None:
                     "export_monitoring_config.py", "network_firewall.py", "lan_firewall.sh",
                     "ensure_monitoring_network.py", "configure_monitoring_events.py", "operations_check.py",
                     "pull_deploy.py",
+                    "information_events.py",
                 ):
                     archive.add(args.project / "scripts/deploy" / name, arcname="scripts/deploy/" + name)
                 for name in (

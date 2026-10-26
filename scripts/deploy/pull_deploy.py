@@ -281,9 +281,24 @@ class Deployer:
             state["history"] = [*history, state["current"]][-20:]
             state.pop("lastError", None)
             self.maintenance.unlink(missing_ok=True)
+            state["lastLifecycle"] = {
+                "event": "api_deployed", "deploymentId": request["deploymentId"],
+                "version": request["version"], "commitSha": request["commitSha"],
+                "previousVersion": (state.get("previous") or {}).get("version"),
+                "previousCommitSha": (state.get("previous") or {}).get("commitSha"),
+                "operation": request["operation"], "at": datetime.now(UTC).isoformat(),
+            }
             self.phase(state, "succeeded")
             return state
         except Exception as exc:
+            state["lastLifecycle"] = {
+                "event": "api_deploy_failed", "deploymentId": request["deploymentId"],
+                "version": request["version"], "commitSha": request["commitSha"],
+                "previousVersion": (state.get("current") or {}).get("version"),
+                "previousCommitSha": (state.get("current") or {}).get("commitSha"),
+                "operation": request["operation"], "phase": state.get("phase"),
+                "at": datetime.now(UTC).isoformat(),
+            }
             if state.get("phase") == "backup":
                 state["backupError"] = True
             state["lastError"] = str(exc) if isinstance(exc, DeploymentError) else type(exc).__name__
