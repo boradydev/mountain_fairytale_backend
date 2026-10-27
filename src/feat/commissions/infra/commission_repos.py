@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select, text
@@ -77,6 +78,27 @@ class CommissionsRepository(ICommissionsRepository):
         return list(
             (await self._session.scalars(select(Employee).order_by(Employee.username, Employee.employee_id))).all()
         )
+
+    async def employee_turnover(self, start: date, end: date) -> Decimal:
+        # EXISTS includes a document once, regardless of the number of recipients.
+        # Snapshot presence includes an explicitly assigned 0% rate.
+        has_employee = (
+            select(DocumentEmployeeCommission.delivery_document_id)
+            .where(DocumentEmployeeCommission.delivery_document_id == DeliveryDocument.delivery_document_id)
+            .exists()
+        )
+        value = await self._session.scalar(
+            select(func.sum(PointCommission.turnover))
+            .join(Point, Point.point_id == PointCommission.point_id)
+            .join(DeliveryDocument, DeliveryDocument.delivery_document_id == Point.delivery_document_id)
+            .where(
+                DeliveryDocument.is_active.is_(True),
+                DeliveryDocument.planned_date >= start,
+                DeliveryDocument.planned_date < end,
+                has_employee,
+            )
+        )
+        return value if value is not None else Decimal(0)
 
     async def clients(self) -> list[Client]:
         return list(

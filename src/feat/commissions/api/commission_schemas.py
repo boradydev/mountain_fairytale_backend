@@ -57,6 +57,7 @@ class CommissionPeriodResp(BaseSchema):
 
 class CommissionSummaryResp(BaseSchema):
     total_turnover: Decimal
+    employee_turnover: Decimal
     represented_turnover: Decimal
     unassigned_turnover: Decimal
     sales_representative_commission: Decimal

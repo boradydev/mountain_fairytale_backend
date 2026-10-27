@@ -142,6 +142,7 @@ class GetCommissionsUseCase:
                 employees=employees,
                 summary=CommissionSummaryResp(
                     total_turnover=total,
+                    employee_turnover=await repo.employee_turnover(period.date_from, period.date_to),
                     represented_turnover=sum_amounts([total, unassigned.copy_negate()]),
                     unassigned_turnover=unassigned,
                     sales_representative_commission=rep_commission,

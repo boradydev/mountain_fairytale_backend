@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from src.feat.clients.domain.client_entities import Client
@@ -17,6 +18,9 @@ class ICommissionsRepository(ABC):
 
     @abstractmethod
     async def employee_accruals(self, start: date, end: date) -> list[EmployeeAccrual]: ...
+
+    @abstractmethod
+    async def employee_turnover(self, start: date, end: date) -> Decimal: ...
 
     @abstractmethod
     async def representatives(self) -> list[SalesRepresentative]: ...
