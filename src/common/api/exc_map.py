@@ -58,6 +58,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentPointClientAlreadyExistsException,
     DeliveryDocumentPointProductAlreadyExistsException,
     DeliveryDocumentRelatedEntityNotFoundException,
+    DeliveryDocumentRevisionConflictException,
     DeliveryDocumentUpdateException,
 )
 from src.feat.drivers.domain.driver_excs import (
@@ -134,6 +135,11 @@ APP_EXCEPTION_MAP: Mapping[type[BaseAppException], Resp] = MappingProxyType(
         ClientPhoneAlreadyExistsException: Resp(status_code=409, detail="Client phone already exists"),
         ClientRelatedEntityNotFoundException: Resp(status_code=422, detail="Client related entity not found"),
         DeliveryDocumentNotFoundException: Resp(status_code=404, detail="Delivery document not found"),
+        DeliveryDocumentRevisionConflictException: Resp(
+            status_code=409,
+            detail="Delivery document has changed",
+            extra_fields=lambda exc: {"code": "document_revision_conflict", "currentRevision": exc.current_revision},
+        ),
         DeliveryDocumentCancelledException: Resp(status_code=409, detail="Delivery document is cancelled"),
         DeliveryDocumentUpdateException: Resp(status_code=422, detail="Delivery document update error"),
         DeliveryDocumentRelatedEntityNotFoundException: Resp(

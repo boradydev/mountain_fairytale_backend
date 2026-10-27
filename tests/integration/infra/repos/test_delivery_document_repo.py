@@ -632,14 +632,14 @@ async def test_delivery_mileage_validation_on_update(
 
         document.update(
             actor_id=uuid7(),
-            request=UpdateDeliveryRouteSheetReq(end_mileage=None),
+            request=UpdateDeliveryRouteSheetReq(expected_revision=1, end_mileage=None),
         )
         await repository.update(document)
         await session.commit()
 
         document.update(
             actor_id=uuid7(),
-            request=UpdateDeliveryRouteSheetReq(end_mileage=200.0),
+            request=UpdateDeliveryRouteSheetReq(expected_revision=1, end_mileage=200.0),
         )
         await repository.update(document)
         await session.commit()
@@ -654,7 +654,7 @@ async def test_delivery_mileage_validation_on_update(
         with pytest.raises(DeliveryDocumentUpdateException) as exc_info:
             document.update(
                 actor_id=uuid7(),
-                request=UpdateDeliveryRouteSheetReq(end_mileage=invalid_end_mileage),
+                request=UpdateDeliveryRouteSheetReq(expected_revision=1, end_mileage=invalid_end_mileage),
             )
 
         assert exc_info.value.field == "end_mileage"
@@ -782,7 +782,7 @@ async def test_cascade_delete_points_and_items(postgres) -> None:
 
         document.update(
             actor_id=uuid7(),
-            request=UpdatePickupSheetReq(points=[]),
+            request=UpdatePickupSheetReq(expected_revision=1, points=[]),
         )
         await repository.update(document)
         await session.commit()

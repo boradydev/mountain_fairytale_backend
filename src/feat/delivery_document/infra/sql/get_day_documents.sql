@@ -1,4 +1,5 @@
 SELECT d.delivery_document_id, d.created_at, d.planned_date, d.is_active,
+       d.revision, d.last_operation_id,
        CASE d.document_type
            WHEN 'delivery_route_sheet' THEN 'deliveryRouteSheet'
            WHEN 'pickup_sheet' THEN 'pickupSheet'

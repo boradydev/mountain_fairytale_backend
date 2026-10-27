@@ -53,6 +53,7 @@ pickup_sheets_router = APIRouter(
 
 
 _DOCUMENT_EXCEPTIONS = (
+    delivery_document_excs.DeliveryDocumentRevisionConflictException,
     delivery_document_excs.DeliveryDocumentNotFoundException,
     delivery_document_excs.DeliveryDocumentUpdateException,
     delivery_document_excs.DeliveryDocumentRelatedEntityNotFoundException,
@@ -62,6 +63,34 @@ _DOCUMENT_EXCEPTIONS = (
     delivery_document_excs.DeliveryDocumentEditLockNotFoundException,
     delivery_document_excs.DeliveryDocumentEditLockNotOwnedException,
 )
+
+
+@delivery_route_sheets_router.get(
+    "/creation-requests/{request_id:uuid}",
+    response_model=StdResponse[DeliveryRouteSheetResp],
+    responses=map_exceptions_to_responses(delivery_document_excs.DeliveryDocumentNotFoundException),
+)
+async def find_created_delivery(request_id: UUID, ctx: Context) -> StdResponse[DeliveryRouteSheetResp]:
+    document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
+        GetDeliveryDocumentDTO(
+            delivery_document_id=request_id, document_type=DocumentType.DELIVERY, by_creation_request=True
+        )
+    )
+    return StdResponse(data=DeliveryRouteSheetResp.model_validate(document))
+
+
+@pickup_sheets_router.get(
+    "/creation-requests/{request_id:uuid}",
+    response_model=StdResponse[PickupSheetResp],
+    responses=map_exceptions_to_responses(delivery_document_excs.DeliveryDocumentNotFoundException),
+)
+async def find_created_pickup(request_id: UUID, ctx: Context) -> StdResponse[PickupSheetResp]:
+    document = await ctx.delivery_documents_use_cases.get_delivery_document().execute(
+        GetDeliveryDocumentDTO(
+            delivery_document_id=request_id, document_type=DocumentType.PICKUP, by_creation_request=True
+        )
+    )
+    return StdResponse(data=PickupSheetResp.model_validate(document))
 
 
 @delivery_route_sheets_router.get(
@@ -137,6 +166,7 @@ async def create_delivery_route_sheet(
 ) -> StdResponse[DeliveryRouteSheetResp]:
     document = await ctx.delivery_documents_use_cases.create_delivery_document().execute(
         CreateDeliveryDocumentDTO(
+            creation_request_id=body.creation_request_id,
             actor_id=UUID(access_token_payload.employee_id),
             document_type=DocumentType.DELIVERY,
             planned_date=body.planned_date,
@@ -381,6 +411,7 @@ async def create_pickup_sheet(
 ) -> StdResponse[PickupSheetResp]:
     document = await ctx.delivery_documents_use_cases.create_delivery_document().execute(
         CreateDeliveryDocumentDTO(
+            creation_request_id=body.creation_request_id,
             actor_id=UUID(access_token_payload.employee_id),
             document_type=DocumentType.PICKUP,
             planned_date=body.planned_date,
