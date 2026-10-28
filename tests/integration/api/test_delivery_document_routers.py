@@ -4,6 +4,7 @@ from typing import Any
 from httpx import AsyncClient
 
 from src.core.uuid7 import uuid7
+from tests.document_requests import patch_with_revision
 from tests.helpers import unique_phone, unique_product_name
 from tests.integration.conftest import EmployeeTestData
 
@@ -366,13 +367,15 @@ class TestDeliveryDocumentRouters:
         document_id = create_response.json()["data"]["deliveryDocumentId"]
         point_id = create_response.json()["data"]["points"][0]["pointId"]
 
-        empty_patch = await client.patch(
+        empty_patch = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={},
         )
         assert empty_patch.status_code == 422
 
-        null_required_field = await client.patch(
+        null_required_field = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": None},
         )
@@ -380,7 +383,8 @@ class TestDeliveryDocumentRouters:
 
         lock_response = await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock")
         assert lock_response.status_code == 200
-        empty_patch_items = await client.patch(
+        empty_patch_items = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={
                 "points": [
@@ -395,7 +399,8 @@ class TestDeliveryDocumentRouters:
         assert empty_patch_items.status_code == 200
         assert empty_patch_items.json()["data"]["points"][0]["items"] == []
 
-        repeated_point_id = await client.patch(
+        repeated_point_id = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={
                 "points": [
@@ -488,7 +493,8 @@ class TestDeliveryDocumentRouters:
         )
         assert lock_response.status_code == 200
 
-        field_only_patch = await client.patch(
+        field_only_patch = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": date(2025, 3, 16).isoformat()},
         )
@@ -498,7 +504,8 @@ class TestDeliveryDocumentRouters:
             str(second_client.client_id),
         ]
 
-        replace_points = await client.patch(
+        replace_points = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={
                 "points": [
@@ -542,20 +549,23 @@ class TestDeliveryDocumentRouters:
         assert replaced["points"][1]["items"][0]["productId"] == first_product["productId"]
         assert first_point_id not in {point["pointId"] for point in replaced["points"]}
 
-        delete_all_points = await client.patch(
+        delete_all_points = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"points": []},
         )
         assert delete_all_points.status_code == 200
         assert delete_all_points.json()["data"]["points"] == []
 
-        unknown_document = await client.patch(
+        unknown_document = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{uuid7()}",
             json={"plannedDate": date(2025, 3, 17).isoformat()},
         )
         assert unknown_document.status_code == 404
 
-        foreign_point = await client.patch(
+        foreign_point = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={
                 "points": [
@@ -604,7 +614,8 @@ class TestDeliveryDocumentRouters:
         assert create_response.status_code == 201
         document_id = create_response.json()["data"]["deliveryDocumentId"]
 
-        update_response = await client.patch(
+        update_response = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": date(2025, 3, 16).isoformat()},
         )
@@ -724,7 +735,8 @@ class TestDeliveryDocumentRouters:
         )
         assert second_acquire.status_code == 423
 
-        foreign_renew = await client.patch(
+        foreign_renew = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
         assert foreign_renew.status_code == 403
@@ -735,7 +747,8 @@ class TestDeliveryDocumentRouters:
         assert foreign_release.status_code == 403
 
         await self.login(client, active_employee)
-        renew_response = await client.patch(
+        renew_response = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
         assert renew_response.status_code == 200
@@ -746,7 +759,8 @@ class TestDeliveryDocumentRouters:
         )
         assert release_response.status_code == 200
 
-        missing_renew = await client.patch(
+        missing_renew = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}/edit-lock",
         )
         assert missing_renew.status_code == 409
@@ -790,7 +804,8 @@ class TestDeliveryDocumentRouters:
         await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/cancel")
 
         # 3. Пытаемся отредактировать отмененный документ
-        bad_patch = await client.patch(
+        bad_patch = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": date(2025, 3, 16).isoformat()},
         )
@@ -829,7 +844,8 @@ class TestDeliveryDocumentRouters:
         await self.login(client, other_employee)
 
         # 3. ВТОРОЙ пытается сделать PATCH заблокированного документа
-        bad_patch = await client.patch(
+        bad_patch = await patch_with_revision(
+            client,
             f"{DELIVERY_BASE_PATH}/{document_id}",
             json={"plannedDate": date(2025, 3, 16).isoformat()},
         )

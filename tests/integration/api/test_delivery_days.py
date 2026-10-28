@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 
 from src.core.uuid7 import uuid7
+from tests.document_requests import patch_with_revision
 from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
@@ -164,7 +165,7 @@ async def test_today_extends_past_documents_and_future_only_starts_in_future(cas
     path = case.path(document)
     assert (await case.client.post(f"{path}/edit-lock")).status_code == 200
     earliest = case.today - timedelta(days=2)
-    assert (await case.client.patch(path, json={"plannedDate": earliest.isoformat()})).status_code == 200
+    assert (await patch_with_revision(case.client, path, json={"plannedDate": earliest.isoformat()})).status_code == 200
     body = await case.days()
     assert body["total"] == 3
     assert body["data"]["deliveryDays"] == [empty_card(case.today - timedelta(days=i)) for i in range(3)]
@@ -194,8 +195,10 @@ async def test_aggregates_use_points_saved_prices_and_unique_historical_names(ca
     assert (await case.client.post(f"{case.path(cancelled)}/cancel")).status_code == 200
     await case.create(day)  # Empty active draft is not a visit.
     for product_id in case.product_ids:
-        response = await case.client.patch(
-            f"/protected/products/{product_id}", json={"isActive": False, "name": unique_product_name("renamed")}
+        response = await patch_with_revision(
+            case.client,
+            f"/protected/products/{product_id}",
+            json={"isActive": False, "name": unique_product_name("renamed")},
         )
         assert response.status_code == 200
     body = await case.days()
@@ -297,7 +300,7 @@ async def test_saved_cancelled_restored_and_moved_documents_refresh_days(case):
             }
         ]
     }
-    assert (await case.client.patch(path, json=payload)).status_code == 200
+    assert (await patch_with_revision(case.client, path, json=payload)).status_code == 200
     assert (await case.days())["data"]["deliveryDays"][0]["totalAmount"] == 3.02
     assert (await case.client.post(f"{path}/cancel")).status_code == 200
     assert (await case.days())["data"]["deliveryDays"] == [empty_card(case.today)]
@@ -306,7 +309,7 @@ async def test_saved_cancelled_restored_and_moved_documents_refresh_days(case):
     assert (await case.documents(case.today))["total"] == 1
     assert (await case.client.post(f"{path}/edit-lock")).status_code == 200
     earlier = case.today - timedelta(days=3)
-    assert (await case.client.patch(path, json={"plannedDate": earlier.isoformat()})).status_code == 200
+    assert (await patch_with_revision(case.client, path, json={"plannedDate": earlier.isoformat()})).status_code == 200
     body = await case.days()
     assert body["total"] == 4
     assert body["data"]["deliveryDays"][:3] == [empty_card(case.today - timedelta(days=i)) for i in range(3)]
@@ -314,7 +317,7 @@ async def test_saved_cancelled_restored_and_moved_documents_refresh_days(case):
     assert (await case.documents(case.today))["total"] == 0
     assert (await case.documents(earlier))["total"] == 1
     later = case.today + timedelta(days=2)
-    assert (await case.client.patch(path, json={"plannedDate": later.isoformat()})).status_code == 200
+    assert (await patch_with_revision(case.client, path, json={"plannedDate": later.isoformat()})).status_code == 200
     body = await case.days()
     assert body["total"] == 1
     assert body["data"]["deliveryDays"][0]["plannedDate"] == later.isoformat()
@@ -334,7 +337,8 @@ async def test_document_client_fields_match_direct_api_after_catalog_changes(cas
     )
     assert response.status_code == 201
     representative = response.json()["data"]
-    response = await case.client.patch(
+    response = await patch_with_revision(
+        case.client,
         f"/protected/clients/{case.customer_ids[0]}",
         json={
             "defaultPaymentMethodId": payment["paymentMethodId"],
@@ -352,10 +356,11 @@ async def test_document_client_fields_match_direct_api_after_catalog_changes(cas
         ("sales-representatives", representative["salesRepresentativeId"]),
     ):
         assert (
-            await case.client.patch(f"/protected/{resource}/{identifier}", json={"isActive": False})
+            await patch_with_revision(case.client, f"/protected/{resource}/{identifier}", json={"isActive": False})
         ).status_code == 200
     assert (
-        await case.client.patch(
+        await patch_with_revision(
+            case.client,
             f"/protected/clients/{case.customer_ids[0]}",
             json={"name": "Новое имя клиента", "deliveryAddress": delivery_address(house="148")},
         )

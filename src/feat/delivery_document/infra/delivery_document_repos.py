@@ -41,6 +41,24 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None:
+        # Serialize retries and recovery reads, including the first in-flight create.
+        await self._session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {"key": str(request_id)},
+        )
+        document = await self._session.scalar(
+            select(DeliveryDocument)
+            .where(
+                DeliveryDocument.creation_request_id == request_id,
+            )
+            .options(*self._document_options())
+            .execution_options(populate_existing=True)
+        )
+        if document is not None and document.document_type != document_type:
+            raise DeliveryDocumentUpdateException(field="creation_request_id", message="Creation request type differs.")
+        return document
+
     async def sync_car_mileage(
         self,
         document: DeliveryDocument,

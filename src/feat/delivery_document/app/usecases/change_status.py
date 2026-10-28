@@ -32,6 +32,7 @@ class ChangeDeliveryDocumentStatusUseCase:
                 raise DeliveryDocumentLockedException(
                     delivery_document_id=dto.delivery_document_id, owner_name=lock.owner_name
                 )
+            changed = document.is_active != self._restore
             if self._restore:
                 document.restore(actor_id=dto.actor_id)
             else:
@@ -41,6 +42,9 @@ class ChangeDeliveryDocumentStatusUseCase:
                         delivery_document_id=dto.delivery_document_id,
                         employee_id=dto.actor_id,
                     )
+            if changed:
+                document.revision += 1
+                document.last_operation_id = None
             await repo.update(document)
             await uow.commit(events=document.pull_aggregate_events())
             return document

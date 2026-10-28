@@ -8,6 +8,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentEditLockNotFoundException,
     DeliveryDocumentLockedException,
     DeliveryDocumentNotFoundException,
+    DeliveryDocumentRevisionConflictException,
     DeliveryDocumentUpdateException,
 )
 
@@ -34,6 +35,8 @@ class UpdateDeliveryDocumentUseCase:
             )
             if document is None:
                 raise DeliveryDocumentNotFoundException(delivery_document_id=dto.delivery_document_id)
+            if dto.payload.expected_revision != document.revision:
+                raise DeliveryDocumentRevisionConflictException(current_revision=document.revision)
             if not document.is_active:
                 raise DeliveryDocumentUpdateException(
                     field="is_active", message="Restore the document before editing it."
@@ -69,7 +72,11 @@ class UpdateDeliveryDocumentUseCase:
                     field="previous_car_mileage",
                     message="Mileage correction requires a confirmed recorded car replacement.",
                 )
+            before = document.snapshot()
             document.update(actor_id=dto.actor_id, request=dto.payload)
+            if document.snapshot() != before:
+                document.revision += 1
+            document.last_operation_id = dto.payload.operation_id
             if previous_assignment != (document.planned_date, document.driver_id, document.car_id):
                 await repo.validate_active_assignments(
                     document_type=document.document_type,

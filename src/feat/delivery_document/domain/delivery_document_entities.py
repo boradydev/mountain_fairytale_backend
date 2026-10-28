@@ -334,6 +334,8 @@ class DeliveryDocument(BaseEntity):
 
     __tablename__ = "delivery_documents"
     __table_args__ = (
+        CheckConstraint("revision >= 1", name="delivery_documents_revision_check"),
+        UniqueConstraint("creation_request_id", name="uq_delivery_documents_creation_request_id"),
         Index("ix_delivery_documents_planned_date", "planned_date"),
         CheckConstraint(
             "(start_mileage IS NULL OR start_mileage >= 0) AND "
@@ -349,6 +351,10 @@ class DeliveryDocument(BaseEntity):
     created_at: Mapped[datetime] = mapped_column(DateTime)
     planned_date: Mapped[date] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(default=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    last_operation_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    creation_request_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    creation_request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     driver_id: Mapped[UUID | None] = mapped_column(ForeignKey("drivers.driver_id"), nullable=True)
     car_id: Mapped[UUID | None] = mapped_column(ForeignKey("cars.car_id"), nullable=True)
     start_mileage: Mapped[float | None] = mapped_column(Float, nullable=True)

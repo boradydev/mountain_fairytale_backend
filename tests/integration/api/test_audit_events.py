@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import text
 
 from src.common.infra.services.event_pud_service import EventPublisher
+from tests.document_requests import patch_with_revision
 from tests.helpers import unique_product_name
 from tests.integration.api.test_delivery_document_contract import document_case as _document_case
 
@@ -30,11 +31,15 @@ async def test_history_current_actor_and_changed_fields(client, admin_employee):
     name = unique_product_name("audit")
     product = await create_product(client, name)
     path = f"/protected/products/{product['productId']}"
-    assert (await client.patch(path, json={"name": name + " renamed", "basePrice": 120})).status_code == 200
-    assert (await client.patch(path, json={"basePrice": 120})).status_code == 200
-    assert (await client.patch(path, json={"isActive": False})).status_code == 200
+    assert (
+        await patch_with_revision(client, path, json={"name": name + " renamed", "basePrice": 120})
+    ).status_code == 200
+    assert (await patch_with_revision(client, path, json={"basePrice": 120})).status_code == 200
+    assert (await patch_with_revision(client, path, json={"isActive": False})).status_code == 200
     renamed_actor = admin_employee.username + "_new"
-    response = await client.patch(f"/admin/employees/{admin_employee.employee_id}", json={"username": renamed_actor})
+    response = await patch_with_revision(
+        client, f"/admin/employees/{admin_employee.employee_id}", json={"username": renamed_actor}
+    )
     assert response.status_code == 200
     response = await client.get("/protected/events", params={"search": name})
     assert response.status_code == 200
@@ -141,7 +146,7 @@ async def test_document_operation_and_lock_exclusion(client, document_case, post
     entry = next(event for event in response.json()["data"]["events"] if event["subject"]["id"] == document_id)
     expected_type = "pickup_sheet" if document_case["base"].endswith("pickup-sheets") else "delivery_route_sheet"
     assert entry["subject"]["documentType"] == expected_type
-    assert (await client.patch(document_case["path"] + "/edit-lock")).status_code == 200
+    assert (await patch_with_revision(client, document_case["path"] + "/edit-lock")).status_code == 200
     assert (await client.delete(document_case["path"] + "/edit-lock")).status_code == 200
     async with postgres.session_factory() as session:
         after = await session.scalar(text("SELECT count(*) FROM events"))

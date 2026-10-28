@@ -51,6 +51,7 @@ class UpdatePointReq(BaseSchema):
 
 
 class CreateDeliveryRouteSheetReq(BaseSchema):
+    creation_request_id: UUID | None = None
     planned_date: date
     driver_id: UUID
     car_id: UUID
@@ -68,6 +69,8 @@ class CreateDeliveryRouteSheetReq(BaseSchema):
 class CreatePickupSheetReq(BaseSchema):
     model_config = ConfigDict(extra="forbid")
 
+    creation_request_id: UUID | None = None
+
     planned_date: date
     points: list[CreatePointReq]
 
@@ -79,7 +82,16 @@ class CreatePickupSheetReq(BaseSchema):
 
 class UpdateDeliveryRouteSheetReq(BasePatchSchema):
     __entity__ = DeliveryDocument
-    __composition_fields__ = {"points", "car_change_confirmed", "previous_car_mileage"}
+    __composition_fields__ = {
+        "points",
+        "car_change_confirmed",
+        "previous_car_mileage",
+        "expected_revision",
+        "operation_id",
+    }
+
+    expected_revision: Annotated[int | None, Field(ge=1)]
+    operation_id: UUID | None = None
 
     planned_date: date | None = None
     driver_id: UUID | None = None
@@ -92,6 +104,8 @@ class UpdateDeliveryRouteSheetReq(BasePatchSchema):
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
+        if self.expected_revision is None:
+            raise ValueError("expectedRevision is required.")
         for name in ("planned_date", "driver_id", "car_id", "start_mileage", "points"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"Field '{name}' cannot be null.")
@@ -105,13 +119,18 @@ class UpdatePickupSheetReq(BasePatchSchema):
     model_config = ConfigDict(extra="forbid")
 
     __entity__ = DeliveryDocument
-    __composition_fields__ = {"points"}
+    __composition_fields__ = {"points", "expected_revision", "operation_id"}
+
+    expected_revision: Annotated[int | None, Field(ge=1)]
+    operation_id: UUID | None = None
 
     planned_date: date | None = None
     points: list[UpdatePointReq] | None = None
 
     @model_validator(mode="after")
     def validate_patch(self) -> Self:
+        if self.expected_revision is None:
+            raise ValueError("expectedRevision is required.")
         for name in ("planned_date", "points"):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"Field '{name}' cannot be null.")
@@ -160,6 +179,8 @@ class PointResp(BaseSchema):
 
 
 class DeliveryRouteSheetResp(BaseSchema):
+    revision: int
+    last_operation_id: UUID | None
     delivery_document_id: UUID
     created_at: datetime
     planned_date: date
@@ -174,6 +195,8 @@ class DeliveryRouteSheetResp(BaseSchema):
 
 
 class PickupSheetResp(BaseSchema):
+    revision: int
+    last_operation_id: UUID | None
     delivery_document_id: UUID
     created_at: datetime
     planned_date: date

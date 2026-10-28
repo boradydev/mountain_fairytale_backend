@@ -9,6 +9,9 @@ from src.feat.delivery_document.domain.delivery_document_entities import Deliver
 
 class IDeliveryDocumentsRepository(ABC):
     @abstractmethod
+    async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None: ...
+
+    @abstractmethod
     async def sync_car_mileage(
         self,
         document: DeliveryDocument,

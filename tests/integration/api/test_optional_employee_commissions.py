@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission
 from src.feat.employees.domain.employee_entities import Employee
+from tests.document_requests import patch_with_revision
 from tests.helpers import unique_product_name, unique_username
 from tests.integration.api.test_commissions import create_customer
 from tests.integration.api.test_delivery_document_routers import TestDeliveryDocumentRouters as DeliveryAPI
@@ -31,20 +32,20 @@ async def test_patch_rate_distinguishes_omitted_null_and_zero(client, admin_empl
     target = await employee_factory(role=role, commission_percent=5)
     await DeliveryAPI.login(client, admin_employee)
     path = f"/admin/employees/{target.employee_id}"
-    response = await client.patch(path, json={"username": unique_username("renamed_rate")})
+    response = await patch_with_revision(client, path, json={"username": unique_username("renamed_rate")})
     assert response.status_code == 200
     assert response.json()["data"]["commissionPercent"] == 5
     for percent in (None, 0, 2, None):
-        response = await client.patch(path, json={"commissionPercent": percent})
+        response = await patch_with_revision(client, path, json={"commissionPercent": percent})
         assert response.status_code == 200
         assert response.json()["data"]["commissionPercent"] == percent
         saved = await client.get(path)
         assert saved.status_code == 200
         assert saved.json()["data"]["commissionPercent"] == percent
     for field in ("username", "isActive"):
-        assert (await client.patch(path, json={field: None})).status_code == 422
+        assert (await patch_with_revision(client, path, json={field: None})).status_code == 422
     if role == "admin":
-        assert (await client.patch(path, json={"isActive": False})).status_code == 403
+        assert (await patch_with_revision(client, path, json={"isActive": False})).status_code == 403
 
 
 async def test_report_and_snapshots_follow_rate_not_role(client, admin_employee, employee_factory, postgres):
@@ -109,7 +110,7 @@ async def test_report_and_snapshots_follow_rate_not_role(client, admin_employee,
         payload = {"commissionPercent": None}
         if role == "employee":
             payload["isActive"] = False
-        response = await client.patch(f"/admin/employees/{target_id}", json=payload)
+        response = await patch_with_revision(client, f"/admin/employees/{target_id}", json=payload)
         assert response.status_code == 200
         saved = await client.get(f"/admin/employees/{target_id}")
         assert saved.json()["data"]["commissionPercent"] is None
@@ -128,8 +129,8 @@ async def test_report_and_snapshots_follow_rate_not_role(client, admin_employee,
     assert (await client.post(f"{path}/edit-lock")).status_code == 200
     old_point = document["points"][0]
     old_point["items"][0]["quantity"] = 2
-    response = await client.patch(
-        path, json={"points": [{"pointId": old_point["pointId"], **point, "items": old_point["items"]}]}
+    response = await patch_with_revision(
+        client, path, json={"points": [{"pointId": old_point["pointId"], **point, "items": old_point["items"]}]}
     )
     assert response.status_code == 200
     current = await rows()
@@ -179,12 +180,14 @@ async def test_assigning_rate_never_backfills_document_with_empty_snapshots(
                     )
                 )
             ).all()
-        response = await client.patch(f"/admin/employees/{target.employee_id}", json={"commissionPercent": 2})
+        response = await patch_with_revision(
+            client, f"/admin/employees/{target.employee_id}", json={"commissionPercent": 2}
+        )
         assert response.status_code == 200
         saved = await client.get(f"/admin/employees/{target.employee_id}")
         assert saved.json()["data"]["commissionPercent"] == 2
         assert (await client.post(f"{path}/edit-lock")).status_code == 200
-        assert (await client.patch(path, json={"plannedDate": "2191-02-01"})).status_code == 200
+        assert (await patch_with_revision(client, path, json={"plannedDate": "2191-02-01"})).status_code == 200
         assert (await client.post(f"{path}/cancel")).status_code == 200
         assert (await client.post(f"{path}/restore")).status_code == 200
         async with postgres.session_factory() as session:

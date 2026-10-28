@@ -50,6 +50,8 @@ class DayDocument:
     created_at: datetime
     planned_date: date
     is_active: bool
+    revision: int
+    last_operation_id: UUID | None
     points: list[DayDocumentPoint]
 
 

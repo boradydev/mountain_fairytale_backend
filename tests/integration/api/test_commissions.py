@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from src.common.infra.services.event_pud_service import EventPublisher
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
+from tests.document_requests import patch_with_revision
 from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name, unique_username
 from tests.integration.api.test_delivery_document_routers import TestDeliveryDocumentRouters as DeliveryAPI
 
@@ -120,7 +121,8 @@ async def test_historical_snapshots_edit_restore_and_rates(
 
     await DeliveryAPI.login(client, admin_employee)
     assert (
-        await client.patch(
+        await patch_with_revision(
+            client,
             f"/admin/employees/{case['manager']}",
             json={
                 "commissionPercent": "10",
@@ -130,7 +132,8 @@ async def test_historical_snapshots_edit_restore_and_rates(
     ).status_code == 200
     await DeliveryAPI.login(client, active_employee)
     assert (
-        await client.patch(
+        await patch_with_revision(
+            client,
             f"/protected/sales-representatives/{case['rep']}",
             json={
                 "commissionPercent": "5",
@@ -138,7 +141,8 @@ async def test_historical_snapshots_edit_restore_and_rates(
         )
     ).status_code == 200
     assert (
-        await client.patch(
+        await patch_with_revision(
+            client,
             f"/protected/clients/{case['first']}",
             json={
                 "salesRepresentativeId": case["target"],
@@ -161,7 +165,7 @@ async def test_historical_snapshots_edit_restore_and_rates(
     ]
     points[0]["items"][0]["quantity"] = 2
     points.append(case["point"](case["third"], "10"))
-    response = await client.patch(case["path"], json={"points": points})
+    response = await patch_with_revision(client, case["path"], json={"points": points})
     assert response.status_code == 200, response.text
     changed = await report(client)
     row = find(changed["salesRepresentatives"], "salesRepresentativeId", case["rep"])
@@ -183,7 +187,7 @@ async def test_historical_snapshots_edit_restore_and_rates(
     assert (await client.post(f"{case['path']}/restore")).status_code == 200
     assert await report(client) == changed
     assert (await client.post(f"{case['path']}/edit-lock")).status_code == 200
-    assert (await client.patch(case["path"], json={"plannedDate": "2180-05-01"})).status_code == 200
+    assert (await patch_with_revision(client, case["path"], json={"plannedDate": "2180-05-01"})).status_code == 200
     assert Decimal((await report(client))["summary"]["totalTurnover"]) == 0
     assert Decimal((await report(client, 5))["summary"]["totalTurnover"]) == Decimal("260.20")
     response = await client.post(
@@ -211,7 +215,7 @@ async def test_include_deactivated_employees_preserves_accruals_and_summary(
     assert response.status_code == 201, response.text
     employee_id = response.json()["data"]["employeeId"]
     for target_id in (employee_id, case["manager"]):
-        response = await client.patch(f"/admin/employees/{target_id}", json={"isActive": False})
+        response = await patch_with_revision(client, f"/admin/employees/{target_id}", json={"isActive": False})
         assert response.status_code == 200, response.text
     await DeliveryAPI.login(client, active_employee)
 
@@ -235,9 +239,11 @@ async def test_include_deactivated_employees_preserves_accruals_and_summary(
 
 async def test_reassign_inactive_clients_source_and_visibility(client, commission_case):
     case = commission_case
-    assert (await client.patch(f"/protected/clients/{case['third']}", json={"isActive": False})).status_code == 200
     assert (
-        await client.patch(f"/protected/sales-representatives/{case['rep']}", json={"isActive": False})
+        await patch_with_revision(client, f"/protected/clients/{case['third']}", json={"isActive": False})
+    ).status_code == 200
+    assert (
+        await patch_with_revision(client, f"/protected/sales-representatives/{case['rep']}", json={"isActive": False})
     ).status_code == 200
     # A fired representative remains accessible even in a month without accruals while clients are assigned.
     assert case["rep"] in [row["salesRepresentativeId"] for row in (await report(client, 12))["salesRepresentatives"]]
@@ -282,7 +288,7 @@ async def test_deactivated_representative_stops_new_accruals_but_preserves_exist
 ):
     case = commission_case
     rep_path = f"/protected/sales-representatives/{case['rep']}"
-    assert (await client.patch(rep_path, json={"isActive": False})).status_code == 200
+    assert (await patch_with_revision(client, rep_path, json={"isActive": False})).status_code == 200
 
     response = await client.post(
         "/protected/pickup-sheets/create",
@@ -323,7 +329,7 @@ async def test_deactivated_representative_stops_new_accruals_but_preserves_exist
     ]
     points[0]["items"][0]["quantity"] = 3
     points.append(case["point"](case["third"], "10"))
-    updated_response = await client.patch(case["path"], json={"points": points})
+    updated_response = await patch_with_revision(client, case["path"], json={"points": points})
     assert updated_response.status_code == 200, updated_response.text
     updated = updated_response.json()["data"]
     async with postgres.session_factory() as session:
@@ -340,10 +346,11 @@ async def test_deactivated_representative_stops_new_accruals_but_preserves_exist
     assert await report(client) == before_cancel
 
     # Reactivation applies to new points only; editing an earlier unassigned snapshot cannot backfill commission.
-    assert (await client.patch(rep_path, json={"isActive": True})).status_code == 200
+    assert (await patch_with_revision(client, rep_path, json={"isActive": True})).status_code == 200
     assert (await client.post(f"{path}/edit-lock")).status_code == 200
     old_point = created["points"][0]
-    response = await client.patch(
+    response = await patch_with_revision(
+        client,
         path,
         json={
             "points": [
@@ -440,7 +447,7 @@ async def test_snapshot_update_and_transfer_roll_back_with_audit_failure(
     with monkeypatch.context() as patch:
         patch.setattr(EventPublisher, "publish_many", fail_publish)
         with pytest.raises(RuntimeError, match="Audit persistence failed"):
-            await client.patch(case["path"], json={"points": points})
+            await patch_with_revision(client, case["path"], json={"points": points})
         with pytest.raises(RuntimeError, match="Audit persistence failed"):
             await client.put(
                 f"/protected/sales-representatives/{case['rep']}/clients/assignment",
@@ -453,6 +460,6 @@ async def test_snapshot_update_and_transfer_roll_back_with_audit_failure(
     async with postgres.session_factory() as session:
         snapshot = await session.get(PointCommission, UUID(case["document"]["points"][0]["pointId"]))
         assert snapshot.commission_payable == Decimal("2.5025")
-    assert (await client.patch(case["path"], json={"points": []})).status_code == 200
+    assert (await patch_with_revision(client, case["path"], json={"points": []})).status_code == 200
     async with postgres.session_factory() as session:
         assert await session.get(PointCommission, UUID(case["document"]["points"][0]["pointId"])) is None

@@ -4,6 +4,7 @@ import pytest
 
 from src.common.api.app import fastapi_app
 from src.feat.clients.infra.geoapify import Geoapify, get_geoapify
+from tests.document_requests import patch_with_revision
 from tests.helpers import delivery_address, unique_phone
 from tests.integration.api.test_client_routers import TestClientRouters as ClientAPI
 
@@ -29,7 +30,9 @@ async def test_free_address_and_optional_confirmed_address_persisted(client, act
     assert fetched.json()["data"]["deliveryAddress"] == address
     before = fetched.json()["data"]
     assert (
-        await client.patch(f"/protected/clients/{created['clientId']}", json={"deliveryAddress": {"house": "23"}})
+        await patch_with_revision(
+            client, f"/protected/clients/{created['clientId']}", json={"deliveryAddress": {"house": "23"}}
+        )
     ).status_code == 422
     assert (await client.get(f"/protected/clients/{created['clientId']}")).json()["data"] == before
 
@@ -101,25 +104,25 @@ async def test_address_confirmation_lifecycle_and_independent_details(client, ac
     assert data["address"] == "Михайловск, заезд Добрый, 17"
     assert data["deliveryAddress"] is None
     assert (await client.get(path)).json()["data"]["deliveryDetails"] == "Вход со двора"
-    confirmed = await client.patch(path, json={"deliveryAddress": delivery_address()})
+    confirmed = await patch_with_revision(client, path, json={"deliveryAddress": delivery_address()})
     assert confirmed.status_code == 200, confirmed.text
     canonical = confirmed.json()["data"]["address"]
-    details = await client.patch(path, json={"deliveryDetails": "Вторые ворота"})
+    details = await patch_with_revision(client, path, json={"deliveryDetails": "Вторые ворота"})
     assert details.json()["data"]["deliveryAddress"]["confirmed"] is True
-    unchanged = await client.patch(path, json={"address": canonical})
+    unchanged = await patch_with_revision(client, path, json={"address": canonical})
     assert unchanged.json()["data"]["deliveryAddress"]["confirmed"] is True
-    changed = await client.patch(path, json={"address": "Другой адрес, дом 12"})
+    changed = await patch_with_revision(client, path, json={"address": "Другой адрес, дом 12"})
     assert changed.status_code == 200, changed.text
     fetched = (await client.get(path)).json()["data"]
     assert fetched["deliveryAddress"] is None
     assert fetched["address"] == "Другой адрес, дом 12"
     assert fetched["deliveryDetails"] == "Вторые ворота"
-    assert (await client.patch(path, json={"deliveryAddress": delivery_address()})).status_code == 200
-    cleared = await client.patch(path, json={"deliveryAddress": None})
+    assert (await patch_with_revision(client, path, json={"deliveryAddress": delivery_address()})).status_code == 200
+    cleared = await patch_with_revision(client, path, json={"deliveryAddress": None})
     assert cleared.status_code == 200
     assert (await client.get(path)).json()["data"]["deliveryAddress"] is None
     for body in ({"address": " "}, {"address": None}, {"deliveryDetails": None}):
-        assert (await client.patch(path, json=body)).status_code == 422
+        assert (await patch_with_revision(client, path, json=body)).status_code == 422
 
 
 async def test_all_unconfirmed_clients_reported_before_any_provider_request(client, active_employee):

@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from tests.document_requests import patch_with_revision
 from tests.helpers import delivery_address, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
@@ -49,7 +50,7 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
 
     async def patch(path, payload):
         assert (await client.post(f"{path}/edit-lock")).status_code == 200
-        response = await client.patch(path, json=payload)
+        response = await patch_with_revision(client, path, json=payload)
         assert response.status_code == 200, response.text
         assert (await client.delete(f"{path}/edit-lock")).status_code == 200
         return response.json()["data"]
@@ -93,8 +94,8 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     assert (await read())["lastOrder"] == expected
     assert (await read())["lastDeliveryQuantity"] == 9
     # Renaming/deactivating a product never rewrites historical order names.
-    response = await client.patch(
-        f"/protected/products/{product_id}", json={"name": unique_product_name("renamed"), "isActive": False}
+    response = await patch_with_revision(
+        client, f"/protected/products/{product_id}", json={"name": unique_product_name("renamed"), "isActive": False}
     )
     assert response.status_code == 200, response.text
     assert (await read())["lastOrder"] == expected
@@ -106,8 +107,8 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     )
     assert response.status_code == 200
     assert response.json()["data"]["lastOrder"] == expected
-    response = await client.patch(
-        f"/protected/clients/{customer_id}", json={"deliveryAddress": delivery_address(house="148")}
+    response = await patch_with_revision(
+        client, f"/protected/clients/{customer_id}", json={"deliveryAddress": delivery_address(house="148")}
     )
     assert response.status_code == 200
     assert response.json()["data"]["lastOrder"] == expected
@@ -126,7 +127,9 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     )
     assert (await read())["lastDeliveryQuantity"] == 2
     # Removing a client point must remove it from the original client's summary.
-    assert (await client.patch(f"/protected/products/{product_id}", json={"isActive": True})).status_code == 200
+    assert (
+        await patch_with_revision(client, f"/protected/products/{product_id}", json={"isActive": True})
+    ).status_code == 200
     delivery_path = f"{DELIVERY_BASE_PATH}/{delivery['deliveryDocumentId']}"
     await patch(delivery_path, {"points": [point(quantity=4, customer=customers[1]["clientId"])]})
     assert (await read())["lastOrder"]["date"] == (day - timedelta(days=1)).isoformat()
