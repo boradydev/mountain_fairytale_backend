@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from src.common.api import routers
+from src.common.api.client_compatibility import ClientCompatibility, install_client_compatibility
 from src.common.api.exc_map import APP_EXCEPTION_MAP
 from src.common.api.excs_handlers import (
     get_business_exception_handler,
@@ -23,6 +24,7 @@ settings = FastapiSettings()
 initialize_monitoring()
 fastapi_app = FastAPI(lifespan=lifespan, version=APP_VERSION)
 fastapi_app.root_path = settings.ROOT_PATH
+install_client_compatibility(fastapi_app, ClientCompatibility.load())
 install_request_ids(fastapi_app)
 
 fastapi_app.add_exception_handler(
