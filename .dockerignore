@@ -1,5 +1,6 @@
 **
 !pyproject.toml
+!client_compatibility.toml
 !poetry.lock
 !README.md
 !src/

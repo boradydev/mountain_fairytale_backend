@@ -14,6 +14,7 @@ RUN poetry install --with dev --no-root --no-ansi
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 COPY src ./src
 COPY tests ./tests
+COPY client_compatibility.toml ./
 COPY scripts ./scripts
 CMD ["python", "-m", "pytest"]
 
@@ -29,7 +30,7 @@ WORKDIR /app
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app \
     && mkdir -p /data/geoapify && chown app:app /data/geoapify
 COPY --from=builder /app/.venv ./.venv
-COPY pyproject.toml ./
+COPY pyproject.toml client_compatibility.toml ./
 COPY src ./src
 USER app
 EXPOSE 8000

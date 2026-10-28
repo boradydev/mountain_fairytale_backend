@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from src.common.api.client_compatibility import app_info_router, require_client_version
 from src.common.api.deps import get_access_token_pyload, verify_admin_access
 from src.common.api.monitoring_routers import monitoring_router
 from src.feat.audit_event.api.audit_routers import events_router
@@ -23,13 +24,14 @@ from src.feat.sales_rep.api.sales_rep_routers import sales_representatives_route
 
 
 public = APIRouter(prefix="/public")
-public.include_router(auth_router)
+public.include_router(auth_router, dependencies=[Depends(require_client_version)])
+public.include_router(app_info_router)
 public.include_router(monitoring_router)
 
 
 protected = APIRouter(
     prefix="/protected",
-    dependencies=[Depends(get_access_token_pyload)],
+    dependencies=[Depends(require_client_version), Depends(get_access_token_pyload)],
 )
 protected.include_router(location_router)
 protected.include_router(me_router)
@@ -49,6 +51,6 @@ protected.include_router(sales_representatives_router)
 
 admin = APIRouter(
     prefix="/admin",
-    dependencies=[Depends(verify_admin_access)],
+    dependencies=[Depends(require_client_version), Depends(verify_admin_access)],
 )
 admin.include_router(employees_router)

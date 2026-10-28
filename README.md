@@ -15,6 +15,8 @@ Python 3.13, PostgreSQL, SQLAlchemy, Alembic, Poetry.
 - [GlitchTip, SDK, проверка диска/бэкапов и активация мониторинга](docs/operations/monitoring.md).
 - [Контракт эксплуатации и выпусков](docs/contracts/operations-deployment-updates.md).
 - [План внедрения](docs/contracts/operations-implementation-plan.md).
+- [Совместимость Flutter и API](docs/contracts/client-api-compatibility-plan.md)
+  — проверка версии клиента, требование обновления и правила выпуска.
 
 ## Разработка
 
