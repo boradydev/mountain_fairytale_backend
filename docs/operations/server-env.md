@@ -141,6 +141,8 @@ sudo docker compose -f compose.yaml -f compose.backup.yaml run --rm --no-deps ba
   и клиентов; произвольное редактирование этих полей ломает подключение.
 - `ADMIN_PASSWORD` не меняет пароль существующей учётной записи. Используйте
   `sudo docker compose exec api python -m src.common.cli.main admin change-password`.
+  Текущий логин показывает `admin info`; см. [восстановление доступа администратора](admin-access.md).
+  Текущий логин показывает `admin info`; см. [восстановление доступа администратора](admin-access.md).
 - Смена `JWT_SECRET_KEY` делает текущие токены недействительными — потребуется вход.
 - Новый IP/порт/подсеть требуют проверки firewall и адреса в Flutter. При
   `API_BIND_HOST=0.0.0.0` смена только LAN-IP не требует пересоздания API.
