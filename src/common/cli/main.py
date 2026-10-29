@@ -14,6 +14,20 @@ from src.feat.employees.app.usecases.change_password import (
 from src.feat.employees.infra.employee_uow import EmployeesUOW
 
 
+async def show_admin_info() -> None:
+    postgres = Postgres()
+    try:
+        async with EmployeesUOW(session_factory=postgres.session_factory) as uow:
+            admin = await uow.employees.get_admin()
+            if admin is None:
+                raise RuntimeError("Bootstrap-администратор не найден.")
+
+            print(f"Логин администратора: {admin.username}")
+            print(f"Учётная запись активна: {'да' if admin.is_active else 'нет'}")
+    finally:
+        await postgres.dispose()
+
+
 async def change_admin_password() -> None:
     postgres = Postgres()
     password_service = PasswordService()
@@ -36,6 +50,7 @@ async def change_admin_password() -> None:
                     "Учётная запись не является администратором.",
                 )
 
+            print(f"Смена пароля администратора: {admin.username}")
             password = getpass.getpass("Новый пароль: ")
             password_confirmation = getpass.getpass(
                 "Повторите новый пароль: ",
@@ -85,13 +100,20 @@ def main() -> None:
     )
 
     admin_subparsers.add_parser(
+        "info",
+        help="Показать текущий логин и активность администратора.",
+    )
+
+    admin_subparsers.add_parser(
         "change-password",
-        help="Изменить пароль администратора.",
+        help="Задать новый пароль администратора без знания старого.",
     )
 
     args = parser.parse_args()
 
-    if args.command == "admin" and args.admin_command == "change-password":
+    if args.command == "admin" and args.admin_command == "info":
+        asyncio.run(show_admin_info())
+    elif args.command == "admin" and args.admin_command == "change-password":
         asyncio.run(change_admin_password())
 
 

@@ -55,7 +55,7 @@ docstring-code-format = true
 
 [tool.poetry]
 name = "mountain_fairytale"
-version = "1.0.0"
+version = "1.0.1"
 description = "mountain_fairytale"
 authors = ["boradydev"]
 package-mode = false

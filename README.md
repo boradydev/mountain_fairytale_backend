@@ -16,6 +16,7 @@ Python 3.13, PostgreSQL, SQLAlchemy, Alembic, Poetry.
 - [Контракт эксплуатации и выпусков](docs/contracts/operations-deployment-updates.md).
 - [План внедрения](docs/contracts/operations-implementation-plan.md).
 - [Совместимость Flutter и API](docs/contracts/client-api-compatibility-plan.md)
+- **[Восстановление доступа администратора: узнать логин и сменить забытый пароль](docs/operations/admin-access.md).**
   — проверка версии клиента, требование обновления и правила выпуска.
 
 ## Разработка
