@@ -155,7 +155,7 @@ class Point(BaseEntity):
     commission: Mapped[PointCommission | None] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
-    _ALLOWED_UPDATE_FIELDS = {"position"}
+    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id"}
 
     @property
     def client_name(self) -> str:
@@ -237,7 +237,9 @@ class Point(BaseEntity):
             "items": [item.snapshot() for item in self.items],
         }
 
-    def update(self, *, actor_id: UUID, client_id: UUID, position: int, items: list[Any]) -> None:
+    def update(
+        self, *, actor_id: UUID, client_id: UUID, position: int, items: list[Any], payment_method_id: UUID | None
+    ) -> None:
         if client_id != self.client_id:
             raise DeliveryDocumentUpdateException(
                 field="client_id",
@@ -245,7 +247,7 @@ class Point(BaseEntity):
             )
         previous_items = [item.snapshot() for item in self.items]
         changes = self._apply_update_changes(
-            payload={"client_id": client_id, "position": position},
+            payload={"client_id": client_id, "position": position, "payment_method_id": payment_method_id},
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
@@ -451,7 +453,11 @@ class DeliveryDocument(BaseEntity):
                     client_id=point.client_id,
                     position=index,
                     items=point.items,
-                    payment_method_id=(payment_method_ids or {}).get(point.client_id),
+                    payment_method_id=(
+                        point.payment_method_id
+                        if "payment_method_id" in getattr(point, "model_fields_set", ())
+                        else (payment_method_ids or {}).get(point.client_id)
+                    ),
                 )
                 for index, point in enumerate(points)
             ],
@@ -509,7 +515,11 @@ class DeliveryDocument(BaseEntity):
                         client_id=requested.client_id,
                         position=position,
                         items=requested.items,
-                        payment_method_id=(payment_method_ids or {}).get(requested.client_id),
+                        payment_method_id=(
+                            requested.payment_method_id
+                            if "payment_method_id" in getattr(requested, "model_fields_set", ())
+                            else (payment_method_ids or {}).get(requested.client_id)
+                        ),
                     )
                 else:
                     if requested.point_id in used_ids:
@@ -523,7 +533,15 @@ class DeliveryDocument(BaseEntity):
                             field="point_id", message="The point does not belong to this document."
                         )
                     point.update(
-                        actor_id=actor_id, client_id=requested.client_id, position=position, items=requested.items
+                        actor_id=actor_id,
+                        client_id=requested.client_id,
+                        position=position,
+                        items=requested.items,
+                        payment_method_id=(
+                            requested.payment_method_id
+                            if "payment_method_id" in getattr(requested, "model_fields_set", ())
+                            else point.payment_method_id
+                        ),
                     )
                 new_points.append(point)
             retained_ids = {point.point_id for point in new_points}

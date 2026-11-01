@@ -35,6 +35,7 @@ from src.feat.delivery_document.domain.sales_report_models import (
 from src.feat.delivery_document.infra.sql.registry import SQL
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 from src.feat.products.domain.product_entities import Product
 from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
@@ -401,6 +402,9 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
 
     async def validate_references(self, document: DeliveryDocument) -> None:
         client_ids = {point.client_id for point in document.points}
+        payment_method_ids = {
+            point.payment_method_id for point in document.points if point.payment_method_id is not None
+        }
         product_ids = {item.product_id for point in document.points for item in point.items}
         new_client_ids = {point.client_id for point in document.points if not sa_inspect(point).persistent}
         new_product_ids = {
@@ -408,6 +412,19 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         }
 
         with self._session.no_autoflush:
+            found_payment_methods = (
+                set(
+                    (
+                        await self._session.scalars(
+                            select(PaymentMethod.payment_method_id).where(
+                                PaymentMethod.payment_method_id.in_(payment_method_ids)
+                            )
+                        )
+                    ).all()
+                )
+                if payment_method_ids
+                else set()
+            )
             found_clients = (
                 dict(
                     (
@@ -432,6 +449,12 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                 else {}
             )
 
+        missing_payment_methods = payment_method_ids - found_payment_methods
+        if missing_payment_methods:
+            raise DeliveryDocumentRelatedEntityNotFoundException(
+                field="payment_method_id",
+                entity_id=next(iter(missing_payment_methods)),
+            )
         missing_clients = client_ids - found_clients.keys()
         if missing_clients:
             raise DeliveryDocumentRelatedEntityNotFoundException(

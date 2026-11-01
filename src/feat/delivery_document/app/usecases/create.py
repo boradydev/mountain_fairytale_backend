@@ -44,6 +44,11 @@ class CreateDeliveryDocumentUseCase:
                             "points": [
                                 {
                                     "client": str(point.client_id),
+                                    **(
+                                        {"payment": str(point.payment_method_id) if point.payment_method_id else None}
+                                        if "payment_method_id" in getattr(point, "model_fields_set", ())
+                                        else {}
+                                    ),
                                     "items": [
                                         {
                                             "id": str(item.product_id),
