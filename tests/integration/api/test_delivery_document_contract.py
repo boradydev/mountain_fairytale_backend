@@ -881,6 +881,48 @@ async def test_creation_retry_preserves_payment_snapshot(client, document_case):
     assert listed["points"][0]["paymentMethodId"] == method_id
 
 
+async def test_inactive_payment_report_card_requires_sales_in_period_including_zero_price(client, document_case):
+    case = document_case
+    methods = []
+    for _ in range(2):
+        response = await client.post("/protected/payment-methods/create", json={"name": f"Visibility {uuid7()}"})
+        assert response.status_code == 201
+        methods.append(response.json()["data"]["paymentMethodId"])
+    active_id, inactive_id = methods
+    assert (
+        await client.patch(f"/protected/payment-methods/{inactive_id}", json={"isActive": False})
+    ).status_code == 200
+
+    async def cards(day="2187-09-15"):
+        response = await client.get("/protected/sales-report", params={"date_from": day, "date_to": day})
+        assert response.status_code == 200
+        return {row["paymentMethodId"]: row for row in response.json()["data"]["paymentMethods"]}
+
+    before = await cards()
+    assert before[active_id]["products"] == []
+    assert inactive_id not in before
+    point = case["document"]["points"][0]
+    payload = {
+        "plannedDate": "2187-09-15",
+        "points": [
+            {
+                **case["payload"]["points"][0],
+                "pointId": point["pointId"],
+                "paymentMethodId": inactive_id,
+                "items": [{**case["payload"]["points"][0]["items"][0], "price": 0}],
+            }
+        ],
+    }
+    assert (await patch_with_revision(client, case["path"], json=payload)).status_code == 200
+    with_sales = await cards()
+    assert with_sales[inactive_id]["isActive"] is False
+    assert with_sales[inactive_id]["totalAmount"] == "0.00"
+    assert with_sales[inactive_id]["totalQuantity"] == 2
+    assert len(with_sales[inactive_id]["products"]) == 1
+    assert inactive_id not in await cards("2187-09-14")
+    assert active_id in await cards("2187-09-14")
+
+
 async def test_report_and_historical_payment_lifecycle(client, document_case):
     case = document_case
     path = case["path"]
@@ -967,7 +1009,7 @@ async def test_report_and_historical_payment_lifecycle(client, document_case):
     data = await report()
     assert data["totalQuantity"] == 0
     assert data["totalAmount"] == "0.00"
-    assert next(row for row in data["paymentMethods"] if row["paymentMethodId"] == method_id)["products"] == []
+    assert all(row["paymentMethodId"] != method_id for row in data["paymentMethods"])
     assert (
         await client.post(
             f"{path}/restore", json={"expectedRevision": (await client.get(path)).json()["data"]["revision"]}

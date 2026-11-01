@@ -28,6 +28,7 @@ WITH filtered_lines AS (
     FROM payment_methods AS method
     LEFT JOIN product_totals AS product
       ON product.payment_method_id = method.payment_method_id
+    WHERE method.is_active OR product.product_id IS NOT NULL
 ), unassigned_card AS (
     SELECT NULL::uuid AS payment_method_id,
            'Не указан'::text AS payment_method_name,
