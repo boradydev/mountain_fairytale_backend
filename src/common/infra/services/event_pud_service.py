@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 _REFERENCE_FIELDS: dict[str, tuple[type[BaseEntity], str, tuple[str, ...]]] = {
     "sales_representative_id": (SalesRepresentative, "sales_representative_id", ("name",)),
     "default_payment_method_id": (PaymentMethod, "payment_method_id", ("name",)),
+    "payment_method_id": (PaymentMethod, "payment_method_id", ("name",)),
     "driver_id": (Driver, "driver_id", ("name",)),
     "car_id": (Car, "car_id", ("model", "number")),
     "client_id": (Client, "client_id", ("name",)),

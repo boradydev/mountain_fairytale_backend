@@ -44,6 +44,11 @@ class CreateDeliveryDocumentUseCase:
                             "points": [
                                 {
                                     "client": str(point.client_id),
+                                    **(
+                                        {"payment": str(point.payment_method_id) if point.payment_method_id else None}
+                                        if "payment_method_id" in getattr(point, "model_fields_set", ())
+                                        else {}
+                                    ),
                                     "items": [
                                         {
                                             "id": str(item.product_id),
@@ -79,11 +84,15 @@ class CreateDeliveryDocumentUseCase:
                 driver_id=dto.driver_id,
                 car_id=dto.car_id,
             )
+            payment_method_ids = await uow.delivery_documents.get_default_payment_method_ids(
+                {point.client_id for point in dto.points}
+            )
             document = DeliveryDocument.create(
                 actor_id=dto.actor_id,
                 document_type=dto.document_type,
                 planned_date=dto.planned_date,
                 points=dto.points,
+                payment_method_ids=payment_method_ids,
                 driver_id=dto.driver_id,
                 car_id=dto.car_id,
                 start_mileage=dto.start_mileage,

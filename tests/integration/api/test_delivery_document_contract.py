@@ -725,3 +725,326 @@ async def test_lock_operations_do_not_change_revision(client, document_case):
     assert (await client.delete(f"{case['path']}/edit-lock")).status_code == 200
     assert (await client.post(f"{case['path']}/edit-lock")).status_code == 200
     assert (await client.get(case["path"])).json()["data"] == case["document"]
+
+
+async def test_explicit_payment_on_creation_and_creation_retry(client, document_case):
+    case = document_case
+    methods = []
+    for _ in range(2):
+        response = await client.post("/protected/payment-methods/create", json={"name": f"Create payment {uuid7()}"})
+        assert response.status_code == 201
+        methods.append(response.json()["data"]["paymentMethodId"])
+    customer = case["customers"][0]["clientId"]
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": methods[1],
+            },
+        )
+    ).status_code == 200
+    # Explicit null and UUID both override the client's default at creation.
+    for selected in (None, methods[0]):
+        payload = {
+            **case["payload"],
+            "creationRequestId": str(uuid7()),
+            "points": [
+                {**case["payload"]["points"][0], "paymentMethodId": selected},
+            ],
+        }
+        response = await client.post(f"{case['base']}/create", json=payload)
+        assert response.status_code == 201
+        saved = response.json()["data"]
+        path = f"{case['base']}/{saved['deliveryDocumentId']}"
+        assert (await client.get(path)).json()["data"]["points"][0]["paymentMethodId"] == selected
+        response = await client.post(f"{case['base']}/create", json=payload)
+        assert response.status_code == 201
+        assert response.json()["data"] == saved
+        payload["points"][0]["paymentMethodId"] = methods[1]
+        assert (await client.post(f"{case['base']}/create", json=payload)).status_code == 422
+        assert (await client.get(path)).json()["data"] == saved
+    assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
+
+
+async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(client, document_case, postgres):
+    case = document_case
+    path = case["path"]
+    methods = []
+    for _ in range(2):
+        response = await client.post("/protected/payment-methods/create", json={"name": f"Edit payment {uuid7()}"})
+        assert response.status_code == 201
+        methods.append(response.json()["data"]["paymentMethodId"])
+    original = case["document"]
+    point = original["points"][0]
+    customer = point["clientId"]
+    # The immediate client PATCH alone does not change the document.
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": methods[1],
+            },
+        )
+    ).status_code == 200
+    assert (await client.get(path)).json()["data"]["points"][0]["paymentMethodId"] is None
+    payload = {"points": [{**case["payload"]["points"][0], "pointId": point["pointId"], "paymentMethodId": methods[0]}]}
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    saved = response.json()["data"]
+    assert saved["revision"] == original["revision"] + 1
+    assert saved["points"][0]["pointId"] == point["pointId"]
+    assert saved["points"][0]["paymentMethodId"] == methods[0]
+    assert saved["points"][0]["defaultPaymentMethodId"] == methods[1]
+    async with postgres.session_factory() as session:
+        changes = (
+            await session.execute(
+                text(
+                    "SELECT payload->'changes'->'payment_method_id' FROM events "
+                    "WHERE event_type='UpdatePointEvent' AND payload->>'point_id'=:point_id"
+                ),
+                {"point_id": point["pointId"]},
+            )
+        ).scalar_one()
+    assert changes["old"] is None
+    assert changes["new"]["id"] == methods[0]
+    assert changes["new"]["display_name"].startswith("Edit payment ")
+
+    # Saving another selection keeps the same point and moves sales to that group.
+    payload["points"][0]["paymentMethodId"] = methods[1]
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    saved = response.json()["data"]
+    assert saved["points"][0]["pointId"] == point["pointId"]
+    report = (
+        await client.get(
+            "/protected/sales-report",
+            params={
+                "date_from": saved["plannedDate"],
+                "date_to": saved["plannedDate"],
+            },
+        )
+    ).json()["data"]
+    old = next(row for row in report["paymentMethods"] if row["paymentMethodId"] == methods[0])
+    new = next(row for row in report["paymentMethods"] if row["paymentMethodId"] == methods[1])
+    assert old["products"] == []
+    assert new["totalAmount"] == "25.00"
+    assert new["totalQuantity"] == 2
+    # Invalid references fail without changing the saved document or revision.
+    payload["points"][0]["paymentMethodId"] = str(uuid7())
+    assert (await patch_with_revision(client, path, json=payload)).status_code == 422
+    assert (await client.get(path)).json()["data"] == saved
+    payload["points"][0]["paymentMethodId"] = None
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    assert response.json()["data"]["points"][0]["paymentMethodId"] is None
+    assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
+
+
+async def test_document_client_details_are_separate_and_match_day_projection(client, document_case):
+    case = document_case
+    customer = case["customers"][0]["clientId"]
+    for details in ("Вход со двора.\nПозвонить перед доставкой.", ""):
+        response = await client.patch(f"/protected/clients/{customer}", json={"deliveryDetails": details})
+        assert response.status_code == 200
+        client_address = response.json()["data"]["address"]
+        direct = await client.get(case["path"])
+        assert direct.status_code == 200
+        point = direct.json()["data"]["points"][0]
+        assert point["clientAddress"] == client_address
+        assert point["deliveryDetails"] == details
+        assert point["address"] == client_address + (f" — {details}" if details else "")
+        response = await client.get(f"/protected/delivery-days/{case['payload']['plannedDate']}/documents")
+        assert response.status_code == 200
+        listed = next(
+            row
+            for row in response.json()["data"]["documents"]
+            if row["deliveryDocumentId"] == case["document"]["deliveryDocumentId"]
+        )
+        assert listed["points"][0] == point
+
+
+async def test_creation_retry_preserves_payment_snapshot(client, document_case):
+    case = document_case
+    customer = case["customers"][0]["clientId"]
+    response = await client.post("/protected/payment-methods/create", json={"name": f"Snapshot {uuid7()}"})
+    assert response.status_code == 201
+    method_id = response.json()["data"]["paymentMethodId"]
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": method_id,
+            },
+        )
+    ).status_code == 200
+    payload = {**case["payload"], "creationRequestId": str(uuid7())}
+    response = await client.post(f"{case['base']}/create", json=payload)
+    assert response.status_code == 201
+    created = response.json()["data"]
+    assert created["points"][0]["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": None,
+            },
+        )
+    ).status_code == 200
+    response = await client.post(f"{case['base']}/create", json=payload)
+    assert response.status_code == 201
+    assert response.json()["data"]["deliveryDocumentId"] == created["deliveryDocumentId"]
+    assert response.json()["data"]["points"][0]["paymentMethodId"] == method_id
+    response = await client.get(f"/protected/delivery-days/{payload['plannedDate']}/documents")
+    assert response.status_code == 200
+    listed = next(
+        row
+        for row in response.json()["data"]["documents"]
+        if row["deliveryDocumentId"] == created["deliveryDocumentId"]
+    )
+    assert listed["points"][0]["paymentMethodId"] == method_id
+
+
+async def test_inactive_payment_report_card_requires_sales_in_period_including_zero_price(client, document_case):
+    case = document_case
+    methods = []
+    for _ in range(2):
+        response = await client.post("/protected/payment-methods/create", json={"name": f"Visibility {uuid7()}"})
+        assert response.status_code == 201
+        methods.append(response.json()["data"]["paymentMethodId"])
+    active_id, inactive_id = methods
+    assert (
+        await client.patch(f"/protected/payment-methods/{inactive_id}", json={"isActive": False})
+    ).status_code == 200
+
+    async def cards(day="2187-09-15"):
+        response = await client.get("/protected/sales-report", params={"date_from": day, "date_to": day})
+        assert response.status_code == 200
+        return {row["paymentMethodId"]: row for row in response.json()["data"]["paymentMethods"]}
+
+    before = await cards()
+    assert before[active_id]["products"] == []
+    assert inactive_id not in before
+    point = case["document"]["points"][0]
+    payload = {
+        "plannedDate": "2187-09-15",
+        "points": [
+            {
+                **case["payload"]["points"][0],
+                "pointId": point["pointId"],
+                "paymentMethodId": inactive_id,
+                "items": [{**case["payload"]["points"][0]["items"][0], "price": 0}],
+            }
+        ],
+    }
+    assert (await patch_with_revision(client, case["path"], json=payload)).status_code == 200
+    with_sales = await cards()
+    assert with_sales[inactive_id]["isActive"] is False
+    assert with_sales[inactive_id]["totalAmount"] == "0.00"
+    assert with_sales[inactive_id]["totalQuantity"] == 2
+    assert len(with_sales[inactive_id]["products"]) == 1
+    assert inactive_id not in await cards("2187-09-14")
+    assert active_id in await cards("2187-09-14")
+
+
+async def test_report_and_historical_payment_lifecycle(client, document_case):
+    case = document_case
+    path = case["path"]
+    customer = case["customers"][0]["clientId"]
+    response = await client.post("/protected/payment-methods/create", json={"name": f"Report {uuid7()}"})
+    assert response.status_code == 201
+    method = response.json()["data"]
+    method_id = method["paymentMethodId"]
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": method_id,
+            },
+        )
+    ).status_code == 200
+
+    point = case["document"]["points"][0]
+    items = [{**case["payload"]["points"][0]["items"][0], "quantity": 3, "price": "0.005"}]
+    day = "2188-04-16" if case["base"] == PICKUP_BASE_PATH else "2188-04-15"
+    payload = {
+        "plannedDate": day,
+        "points": [
+            {
+                "pointId": point["pointId"],
+                "clientId": customer,
+                "items": items,
+            }
+        ],
+    }
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    assert response.json()["data"]["points"][0]["paymentMethodId"] is None
+
+    async def report(day=day):
+        response = await client.get("/protected/sales-report", params={"date_from": day, "date_to": day})
+        assert response.status_code == 200
+        return response.json()["data"]
+
+    data = await report()
+    assert data["totalQuantity"] == 3
+    assert data["totalAmount"] == "0.02"
+    assert next(row for row in data["paymentMethods"] if row["paymentMethodId"] is None)["totalAmount"] == "0.02"
+
+    # Replacing the point captures the current default on the server.
+    del payload["points"][0]["pointId"]
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    saved = response.json()["data"]["points"][0]
+    assert saved["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": None,
+            },
+        )
+    ).status_code == 200
+    payload["points"][0]["pointId"] = saved["pointId"]
+    assert (await patch_with_revision(client, path, json=payload)).status_code == 200
+    assert (await client.get(path)).json()["data"]["points"][0]["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/payment-methods/{method_id}",
+            json={
+                "name": f"Renamed {uuid7()}",
+                "isActive": False,
+            },
+        )
+    ).status_code == 200
+    data = await report()
+    card = next(row for row in data["paymentMethods"] if row["paymentMethodId"] == method_id)
+    assert card["paymentMethodName"].startswith("Renamed ")
+    assert card["isActive"] is False
+    assert card["totalQuantity"] == 3
+    assert card["totalAmount"] == card["products"][0]["amount"] == "0.02"
+    assert all(row["paymentMethodId"] is not None for row in data["paymentMethods"])
+    assert (await report("2188-04-14"))["totalAmount"] == "0.00"
+    assert (
+        await client.post(
+            f"{path}/cancel", json={"expectedRevision": (await client.get(path)).json()["data"]["revision"]}
+        )
+    ).status_code == 200
+    data = await report()
+    assert data["totalQuantity"] == 0
+    assert data["totalAmount"] == "0.00"
+    assert all(row["paymentMethodId"] != method_id for row in data["paymentMethods"])
+    assert (
+        await client.post(
+            f"{path}/restore", json={"expectedRevision": (await client.get(path)).json()["data"]["revision"]}
+        )
+    ).status_code == 200
+    assert (await report())["totalAmount"] == "0.02"
+    assert (
+        await client.get(
+            "/protected/sales-report",
+            params={
+                "date_from": "2188-04-16",
+                "date_to": "2188-04-15",
+            },
+        )
+    ).status_code == 422

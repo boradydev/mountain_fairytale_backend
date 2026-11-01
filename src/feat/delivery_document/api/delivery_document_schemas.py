@@ -26,6 +26,10 @@ class UpdateItemReq(BaseSchema):
 
 class CreatePointReq(BaseSchema):
     client_id: UUID
+    payment_method_id: UUID | None = Field(
+        default=None,
+        description="Saved point payment method. Explicit null means unassigned; omitted uses the client default.",
+    )
     items: list[CreateItemReq]
 
     @model_validator(mode="after")
@@ -40,6 +44,11 @@ class UpdatePointReq(BaseSchema):
     # Omitted/null point_id means that this is a new point.
     point_id: UUID | None = None
     client_id: UUID
+    payment_method_id: UUID | None = Field(
+        default=None,
+        description="Explicit UUID/null replaces the point payment method. Omitted preserves existing points; "
+        "new points use the client default.",
+    )
     items: list[UpdateItemReq]
 
     @model_validator(mode="after")
@@ -170,8 +179,12 @@ class PointResp(BaseSchema):
     client_name: str
     phone: str
     address: str
+    client_address: str
+    delivery_details: str
     default_payment_method_id: UUID | None
     default_payment_method_name: str | None
+    payment_method_id: UUID | None
+    payment_method_name: str | None
     sales_representative_id: UUID | None
     sales_representative_name: str | None
     position: int

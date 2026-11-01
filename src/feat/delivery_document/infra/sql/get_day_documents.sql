@@ -17,9 +17,13 @@ LEFT JOIN LATERAL (
         'client_id', p.client_id,
         'client_name', client.name,
         'phone', client.phone,
-        'address', client.address,
+        'address', client.address || CASE WHEN client.delivery_details <> '' THEN ' — ' || client.delivery_details ELSE '' END,
+        'client_address', client.address,
+        'delivery_details', client.delivery_details,
         'default_payment_method_id', client.default_payment_method_id,
-        'default_payment_method_name', payment.name,
+        'default_payment_method_name', default_payment.name,
+        'payment_method_id', p.payment_method_id,
+        'payment_method_name', historical_payment.name,
         'sales_representative_id', client.sales_representative_id,
         'sales_representative_name', representative.name,
         'position', p.position,
@@ -27,7 +31,10 @@ LEFT JOIN LATERAL (
     ) ORDER BY p.position) AS points
     FROM points AS p
     JOIN clients AS client ON client.client_id = p.client_id
-    LEFT JOIN payment_methods AS payment ON payment.payment_method_id = client.default_payment_method_id
+    LEFT JOIN payment_methods AS default_payment
+        ON default_payment.payment_method_id = client.default_payment_method_id
+    LEFT JOIN payment_methods AS historical_payment
+        ON historical_payment.payment_method_id = p.payment_method_id
     LEFT JOIN sales_representatives AS representative
         ON representative.sales_representative_id = client.sales_representative_id
     LEFT JOIN LATERAL (
