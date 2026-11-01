@@ -36,6 +36,8 @@ class DayDocumentPoint:
     client_name: str
     phone: str
     address: str
+    client_address: str
+    delivery_details: str
     default_payment_method_id: UUID | None
     default_payment_method_name: str | None
     payment_method_id: UUID | None

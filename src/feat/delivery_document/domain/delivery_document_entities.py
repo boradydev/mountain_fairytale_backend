@@ -171,6 +171,14 @@ class Point(BaseEntity):
         return self.client.address + (f" — {details}" if details else "")
 
     @property
+    def client_address(self) -> str:
+        return self.client.address
+
+    @property
+    def delivery_details(self) -> str:
+        return self.client.delivery_details
+
+    @property
     def default_payment_method_id(self) -> UUID | None:
         return self.client.default_payment_method_id
 

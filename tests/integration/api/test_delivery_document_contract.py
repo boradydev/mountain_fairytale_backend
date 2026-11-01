@@ -840,6 +840,29 @@ async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(c
     assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
 
 
+async def test_document_client_details_are_separate_and_match_day_projection(client, document_case):
+    case = document_case
+    customer = case["customers"][0]["clientId"]
+    for details in ("Вход со двора.\nПозвонить перед доставкой.", ""):
+        response = await client.patch(f"/protected/clients/{customer}", json={"deliveryDetails": details})
+        assert response.status_code == 200
+        client_address = response.json()["data"]["address"]
+        direct = await client.get(case["path"])
+        assert direct.status_code == 200
+        point = direct.json()["data"]["points"][0]
+        assert point["clientAddress"] == client_address
+        assert point["deliveryDetails"] == details
+        assert point["address"] == client_address + (f" — {details}" if details else "")
+        response = await client.get(f"/protected/delivery-days/{case['payload']['plannedDate']}/documents")
+        assert response.status_code == 200
+        listed = next(
+            row
+            for row in response.json()["data"]["documents"]
+            if row["deliveryDocumentId"] == case["document"]["deliveryDocumentId"]
+        )
+        assert listed["points"][0] == point
+
+
 async def test_creation_retry_preserves_payment_snapshot(client, document_case):
     case = document_case
     customer = case["customers"][0]["clientId"]
