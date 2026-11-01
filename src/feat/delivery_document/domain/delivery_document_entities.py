@@ -41,6 +41,7 @@ from src.feat.delivery_document.domain.delivery_document_events import (
 from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDocumentUpdateException
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
+from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
 
 
 class DocumentType(str, Enum):
@@ -118,7 +119,7 @@ class Item(BaseEntity):
 
 
 class Point(BaseEntity):
-    _EVENT_FIELDS = {"point_id", "client_id", "position", "items"}
+    _EVENT_FIELDS = {"point_id", "client_id", "payment_method_id", "position", "items"}
     _EVENT_SUBJECT_TYPE = "delivery_point"
     _EVENT_ID_FIELD = "point_id"
     _EVENT_NAME_FIELDS = ("display_name",)
@@ -143,9 +144,13 @@ class Point(BaseEntity):
         ForeignKey("delivery_documents.delivery_document_id", ondelete="CASCADE"),
     )
     client_id: Mapped[UUID] = mapped_column(ForeignKey("clients.client_id"))
+    payment_method_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("payment_methods.payment_method_id"), nullable=True
+    )
     position: Mapped[int] = mapped_column(Integer)
 
     client: Mapped[Client] = relationship(lazy="joined")
+    payment_method: Mapped[PaymentMethod | None] = relationship(lazy="joined")
     items: Mapped[list[Item]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     commission: Mapped[PointCommission | None] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
@@ -174,6 +179,10 @@ class Point(BaseEntity):
         return self.client.default_payment_method_name
 
     @property
+    def payment_method_name(self) -> str | None:
+        return self.payment_method.name if self.payment_method else None
+
+    @property
     def sales_representative_id(self) -> UUID | None:
         return self.client.sales_representative_id
 
@@ -183,13 +192,21 @@ class Point(BaseEntity):
 
     @classmethod
     def create(
-        cls, *, actor_id: UUID, delivery_document_id: UUID, client_id: UUID, position: int, items: list[Any]
+        cls,
+        *,
+        actor_id: UUID,
+        delivery_document_id: UUID,
+        client_id: UUID,
+        position: int,
+        items: list[Any],
+        payment_method_id: UUID | None = None,
     ) -> Self:
         point_id = uuid7()
         point = cls(
             point_id=point_id,
             delivery_document_id=delivery_document_id,
             client_id=client_id,
+            payment_method_id=payment_method_id,
             position=position,
             items=[],
         )
@@ -215,6 +232,7 @@ class Point(BaseEntity):
         return {
             "point_id": self.point_id,
             "client_id": self.client_id,
+            "payment_method_id": self.payment_method_id,
             "position": self.position,
             "items": [item.snapshot() for item in self.items],
         }
@@ -395,6 +413,7 @@ class DeliveryDocument(BaseEntity):
         document_type: str,
         planned_date: date,
         points: list[Any],
+        payment_method_ids: dict[UUID, UUID | None] | None = None,
         driver_id: UUID | None = None,
         car_id: UUID | None = None,
         start_mileage: float | None = None,
@@ -432,6 +451,7 @@ class DeliveryDocument(BaseEntity):
                     client_id=point.client_id,
                     position=index,
                     items=point.items,
+                    payment_method_id=(payment_method_ids or {}).get(point.client_id),
                 )
                 for index, point in enumerate(points)
             ],
@@ -457,7 +477,13 @@ class DeliveryDocument(BaseEntity):
             "points": [point.snapshot() for point in self.points],
         }
 
-    def update(self, *, actor_id: UUID, request: Any) -> None:
+    def update(
+        self,
+        *,
+        actor_id: UUID,
+        request: Any,
+        payment_method_ids: dict[UUID, UUID | None] | None = None,
+    ) -> None:
         changes: dict[str, Any] = {}
         payload = request.changes()
         payload.pop("points", None)
@@ -483,6 +509,7 @@ class DeliveryDocument(BaseEntity):
                         client_id=requested.client_id,
                         position=position,
                         items=requested.items,
+                        payment_method_id=(payment_method_ids or {}).get(requested.client_id),
                     )
                 else:
                     if requested.point_id in used_ids:

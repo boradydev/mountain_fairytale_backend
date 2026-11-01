@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from typing import Annotated
+from decimal import Decimal
+from typing import Annotated, TypedDict
 from uuid import UUID
 
 from psycopg import errors as pg_excs
@@ -26,6 +27,11 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentRelatedEntityNotFoundException,
     DeliveryDocumentUpdateException,
 )
+from src.feat.delivery_document.domain.sales_report_models import (
+    SalesReport,
+    SalesReportPaymentMethod,
+    SalesReportProduct,
+)
 from src.feat.delivery_document.infra.sql.registry import SQL
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
@@ -35,6 +41,12 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 _days_adapter = TypeAdapter(list[DeliveryDay])
 _day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discriminator="document_type")])
+
+
+class _SalesReportGroup(TypedDict):
+    payment_method_name: str
+    is_active: bool | None
+    products: list[SalesReportProduct]
 
 
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
@@ -160,12 +172,76 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         )
         return [_day_document_adapter.validate_python(dict(row)) for row in result.mappings().all()]
 
+    async def get_sales_report(self, *, date_from: date, date_to: date) -> SalesReport:
+        result = await self._session.execute(
+            SQL.GET_SALES_REPORT,
+            {"date_from": date_from, "date_to": date_to},
+        )
+        rows = result.mappings().all()
+        total_quantity = int(rows[0]["total_quantity"])
+        total_amount = Decimal(rows[0]["total_amount"])
+        groups: dict[UUID | None, _SalesReportGroup] = {}
+
+        for row in rows:
+            payment_method_id = row["payment_method_id"]
+            payment_method_name = row["payment_method_name"]
+            if payment_method_name is None:
+                continue
+            group = groups.setdefault(
+                payment_method_id,
+                {
+                    "payment_method_name": str(payment_method_name),
+                    "is_active": row["is_active"],
+                    "products": [],
+                },
+            )
+            if row["product_id"] is not None:
+                group["products"].append(
+                    SalesReportProduct(
+                        product_id=row["product_id"],
+                        product_name=row["product_name"],
+                        quantity=int(row["quantity"]),
+                        amount=Decimal(row["amount"]),
+                    )
+                )
+
+        payment_methods = []
+        for payment_method_id, group in groups.items():
+            products = group["products"]
+            payment_methods.append(
+                SalesReportPaymentMethod(
+                    payment_method_id=payment_method_id,
+                    payment_method_name=group["payment_method_name"],
+                    is_active=group["is_active"],
+                    total_quantity=sum(product.quantity for product in products),
+                    total_amount=sum((product.amount for product in products), Decimal("0.00")),
+                    products=products,
+                )
+            )
+
+        return SalesReport(
+            date_from=date_from,
+            date_to=date_to,
+            total_quantity=total_quantity,
+            total_amount=total_amount,
+            payment_methods=payment_methods,
+        )
+
+    async def get_default_payment_method_ids(self, client_ids: set[UUID]) -> dict[UUID, UUID | None]:
+        if not client_ids:
+            return {}
+        result = await self._session.execute(
+            select(Client.client_id, Client.default_payment_method_id).where(Client.client_id.in_(client_ids)),
+        )
+        return dict(result.all())
+
     def _document_options(self):
         return (
             joinedload(DeliveryDocument.driver),
             joinedload(DeliveryDocument.car),
             joinedload(DeliveryDocument.edit_lock).joinedload(EditLock.employee),
             selectinload(DeliveryDocument.points).joinedload(Point.client),
+            selectinload(DeliveryDocument.points).joinedload(Point.payment_method),
             selectinload(DeliveryDocument.points).selectinload(Point.items),
         )
 

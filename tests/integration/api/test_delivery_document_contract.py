@@ -725,3 +725,148 @@ async def test_lock_operations_do_not_change_revision(client, document_case):
     assert (await client.delete(f"{case['path']}/edit-lock")).status_code == 200
     assert (await client.post(f"{case['path']}/edit-lock")).status_code == 200
     assert (await client.get(case["path"])).json()["data"] == case["document"]
+
+
+async def test_creation_retry_preserves_payment_snapshot(client, document_case):
+    case = document_case
+    customer = case["customers"][0]["clientId"]
+    response = await client.post("/protected/payment-methods/create", json={"name": f"Snapshot {uuid7()}"})
+    assert response.status_code == 201
+    method_id = response.json()["data"]["paymentMethodId"]
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": method_id,
+            },
+        )
+    ).status_code == 200
+    payload = {**case["payload"], "creationRequestId": str(uuid7())}
+    response = await client.post(f"{case['base']}/create", json=payload)
+    assert response.status_code == 201
+    created = response.json()["data"]
+    assert created["points"][0]["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": None,
+            },
+        )
+    ).status_code == 200
+    response = await client.post(f"{case['base']}/create", json=payload)
+    assert response.status_code == 201
+    assert response.json()["data"]["deliveryDocumentId"] == created["deliveryDocumentId"]
+    assert response.json()["data"]["points"][0]["paymentMethodId"] == method_id
+    response = await client.get(f"/protected/delivery-days/{payload['plannedDate']}/documents")
+    assert response.status_code == 200
+    listed = next(
+        row
+        for row in response.json()["data"]["documents"]
+        if row["deliveryDocumentId"] == created["deliveryDocumentId"]
+    )
+    assert listed["points"][0]["paymentMethodId"] == method_id
+
+
+async def test_report_and_historical_payment_lifecycle(client, document_case):
+    case = document_case
+    path = case["path"]
+    customer = case["customers"][0]["clientId"]
+    response = await client.post("/protected/payment-methods/create", json={"name": f"Report {uuid7()}"})
+    assert response.status_code == 201
+    method = response.json()["data"]
+    method_id = method["paymentMethodId"]
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": method_id,
+            },
+        )
+    ).status_code == 200
+
+    point = case["document"]["points"][0]
+    items = [{**case["payload"]["points"][0]["items"][0], "quantity": 3, "price": "0.005"}]
+    day = "2188-04-16" if case["base"] == PICKUP_BASE_PATH else "2188-04-15"
+    payload = {
+        "plannedDate": day,
+        "points": [
+            {
+                "pointId": point["pointId"],
+                "clientId": customer,
+                "items": items,
+            }
+        ],
+    }
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    assert response.json()["data"]["points"][0]["paymentMethodId"] is None
+
+    async def report(day=day):
+        response = await client.get("/protected/sales-report", params={"date_from": day, "date_to": day})
+        assert response.status_code == 200
+        return response.json()["data"]
+
+    data = await report()
+    assert data["totalQuantity"] == 3
+    assert data["totalAmount"] == "0.02"
+    assert next(row for row in data["paymentMethods"] if row["paymentMethodId"] is None)["totalAmount"] == "0.02"
+
+    # Replacing the point captures the current default on the server.
+    del payload["points"][0]["pointId"]
+    response = await patch_with_revision(client, path, json=payload)
+    assert response.status_code == 200
+    saved = response.json()["data"]["points"][0]
+    assert saved["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/clients/{customer}",
+            json={
+                "defaultPaymentMethodId": None,
+            },
+        )
+    ).status_code == 200
+    payload["points"][0]["pointId"] = saved["pointId"]
+    assert (await patch_with_revision(client, path, json=payload)).status_code == 200
+    assert (await client.get(path)).json()["data"]["points"][0]["paymentMethodId"] == method_id
+    assert (
+        await client.patch(
+            f"/protected/payment-methods/{method_id}",
+            json={
+                "name": f"Renamed {uuid7()}",
+                "isActive": False,
+            },
+        )
+    ).status_code == 200
+    data = await report()
+    card = next(row for row in data["paymentMethods"] if row["paymentMethodId"] == method_id)
+    assert card["paymentMethodName"].startswith("Renamed ")
+    assert card["isActive"] is False
+    assert card["totalQuantity"] == 3
+    assert card["totalAmount"] == card["products"][0]["amount"] == "0.02"
+    assert all(row["paymentMethodId"] is not None for row in data["paymentMethods"])
+    assert (await report("2188-04-14"))["totalAmount"] == "0.00"
+    assert (
+        await client.post(
+            f"{path}/cancel", json={"expectedRevision": (await client.get(path)).json()["data"]["revision"]}
+        )
+    ).status_code == 200
+    data = await report()
+    assert data["totalQuantity"] == 0
+    assert data["totalAmount"] == "0.00"
+    assert next(row for row in data["paymentMethods"] if row["paymentMethodId"] == method_id)["products"] == []
+    assert (
+        await client.post(
+            f"{path}/restore", json={"expectedRevision": (await client.get(path)).json()["data"]["revision"]}
+        )
+    ).status_code == 200
+    assert (await report())["totalAmount"] == "0.02"
+    assert (
+        await client.get(
+            "/protected/sales-report",
+            params={
+                "date_from": "2188-04-16",
+                "date_to": "2188-04-15",
+            },
+        )
+    ).status_code == 422

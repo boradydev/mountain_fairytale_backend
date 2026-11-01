@@ -5,6 +5,7 @@ from uuid import UUID
 from src.common.domain.events import BaseDomainEvent
 from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock
+from src.feat.delivery_document.domain.sales_report_models import SalesReport
 
 
 class IDeliveryDocumentsRepository(ABC):
@@ -30,6 +31,12 @@ class IDeliveryDocumentsRepository(ABC):
 
     @abstractmethod
     async def get_day_documents(self, *, planned_date: date, include_cancelled: bool) -> list[DayDocumentRecord]: ...
+
+    @abstractmethod
+    async def get_sales_report(self, *, date_from: date, date_to: date) -> SalesReport: ...
+
+    @abstractmethod
+    async def get_default_payment_method_ids(self, client_ids: set[UUID]) -> dict[UUID, UUID | None]: ...
 
     @abstractmethod
     async def add(self, document: DeliveryDocument) -> None: ...
