@@ -37,7 +37,7 @@ WITH eligible AS (
     LEFT JOIN LATERAL (
         SELECT count(*) AS purchase_count, COALESCE(sum(CASE WHEN p.is_delivered THEN goods.total_amount ELSE 0 END), 0) AS total_amount,
                COALESCE(jsonb_agg(jsonb_build_object(
-                   'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason, 'client_id', c.client_id,
+                   'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason, 'memo', p.memo, 'client_id', c.client_id,
                    'client_name', c.name,
                    'address', c.address || CASE WHEN c.delivery_details <> '' THEN ' — ' || c.delivery_details ELSE '' END,
                    'phone', c.phone,

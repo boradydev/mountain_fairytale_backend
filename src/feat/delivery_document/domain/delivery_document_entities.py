@@ -166,6 +166,7 @@ class Point(BaseEntity):
     )
     is_delivered: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     non_delivery_reason: Mapped[str] = mapped_column(Text, default="", server_default="")
+    memo: Mapped[str] = mapped_column(Text, default="", server_default="")
     position: Mapped[int] = mapped_column(Integer)
 
     client: Mapped[Client | None] = relationship(lazy="joined")
@@ -174,7 +175,7 @@ class Point(BaseEntity):
     commission: Mapped[PointCommission | None] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
-    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id", "is_delivered", "non_delivery_reason"}
+    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id", "is_delivered", "non_delivery_reason", "memo"}
 
     @property
     def client_name(self) -> str:
@@ -231,6 +232,7 @@ class Point(BaseEntity):
         payment_method_id: UUID | None = None,
         is_delivered: bool = True,
         non_delivery_reason: str = "",
+        memo: str = "",
     ) -> Self:
         point_id = uuid7()
         point = cls(
@@ -241,6 +243,7 @@ class Point(BaseEntity):
             position=position,
             is_delivered=is_delivered,
             non_delivery_reason=_delivery_reason(is_delivered, non_delivery_reason),
+            memo=_memo(memo),
             items=[],
         )
         point.items = [
@@ -271,6 +274,7 @@ class Point(BaseEntity):
             "payment_method_id": self.payment_method_id,
             "is_delivered": self.is_delivered,
             "non_delivery_reason": self.non_delivery_reason,
+            "memo": self.memo,
             "position": self.position,
             "items": [item.snapshot() for item in self.items],
         }
@@ -285,6 +289,7 @@ class Point(BaseEntity):
         payment_method_id: UUID | None,
         is_delivered: bool = True,
         non_delivery_reason: str = "",
+        memo: str = "",
     ) -> None:
         if client_id != self.client_id:
             raise DeliveryDocumentUpdateException(
@@ -299,6 +304,7 @@ class Point(BaseEntity):
                 "payment_method_id": payment_method_id,
                 "is_delivered": is_delivered,
                 "non_delivery_reason": _delivery_reason(is_delivered, non_delivery_reason),
+                "memo": _memo(memo),
             },
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
@@ -506,6 +512,7 @@ class DeliveryDocument(BaseEntity):
                     client_id=point.client_id,
                     is_delivered=getattr(point, "is_delivered", True),
                     non_delivery_reason=getattr(point, "non_delivery_reason", ""),
+                    memo=getattr(point, "memo", ""),
                     position=index,
                     items=point.items,
                     payment_method_id=(
@@ -582,6 +589,7 @@ class DeliveryDocument(BaseEntity):
                         client_id=requested.client_id,
                         is_delivered=requested.is_delivered if requested.is_delivered is not None else True,
                         non_delivery_reason=requested.non_delivery_reason or "",
+                        memo=requested.memo or "",
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -610,6 +618,7 @@ class DeliveryDocument(BaseEntity):
                         non_delivery_reason=requested.non_delivery_reason
                         if requested.non_delivery_reason is not None
                         else point.non_delivery_reason,
+                        memo=requested.memo if requested.memo is not None else point.memo,
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -674,6 +683,8 @@ def _validate_point_clients(document_type: str, points: list[Any]) -> None:
         getattr(p, "is_delivered", True) is False or getattr(p, "non_delivery_reason", "") for p in points
     ):
         raise DeliveryDocumentUpdateException(field="is_delivered", message="Pickup cannot be marked not delivered.")
+    if pickup and any(getattr(point, "memo", "") for point in points):
+        raise DeliveryDocumentUpdateException(field="memo", message="Pickup purchases cannot contain route memos.")
     if any((point.client_id is not None) == pickup for point in points):
         raise DeliveryDocumentUpdateException(
             field="client_id", message="Pickup requires no client; delivery requires a client."
@@ -698,3 +709,10 @@ def _delivery_reason(delivered: bool, reason: str) -> str:
             field="non_delivery_reason", message="A reason of 1 to 1000 characters is required."
         )
     return reason
+
+
+def _memo(value: str) -> str:
+    value = value.strip()
+    if len(value) > 1000:
+        raise DeliveryDocumentUpdateException(field="memo", message="Memo cannot exceed 1000 characters.")
+    return value

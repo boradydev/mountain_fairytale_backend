@@ -36,6 +36,7 @@ class HistoryItem:
 class HistoryClientPurchase:
     is_delivered: bool
     non_delivery_reason: str
+    memo: str
     point_id: UUID
     client_id: UUID
     client_name: str

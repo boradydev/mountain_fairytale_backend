@@ -44,6 +44,7 @@ class CreateDeliveryDocumentUseCase:
                             "points": [
                                 {
                                     "client": str(point.client_id),
+                                    **({"memo": point.memo.strip()} if getattr(point, "memo", "").strip() else {}),
                                     **(
                                         {"isDelivered": False, "nonDeliveryReason": point.non_delivery_reason.strip()}
                                         if getattr(point, "is_delivered", True) is False

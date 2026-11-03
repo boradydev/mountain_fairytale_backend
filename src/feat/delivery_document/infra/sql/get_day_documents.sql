@@ -13,7 +13,7 @@ LEFT JOIN drivers AS driver ON driver.driver_id = d.driver_id
 LEFT JOIN cars AS car ON car.car_id = d.car_id
 LEFT JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
-        'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason,
+        'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason, 'memo', p.memo,
         'client_id', p.client_id,
         'client_name', COALESCE(client.name, ''),
         'phone', COALESCE(client.phone, ''),
