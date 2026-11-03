@@ -1,8 +1,11 @@
 import runpy
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
+import sqlparse
+from alembic import op
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
@@ -147,7 +150,11 @@ async def test_failed_delivery_migration_preserves_old_rows_and_guards_downgrade
 
     def migrate(connection, *, upgrade):
         with Operations.context(MigrationContext.configure(connection)):
-            migration["upgrade" if upgrade else "downgrade"]()
+            # asyncpg test connections require one statement per execution;
+            # production Alembic uses psycopg and executes the SQL file directly.
+            execute = op.execute
+            with patch.object(op, "execute", side_effect=lambda sql: [execute(s) for s in sqlparse.split(sql)]):
+                migration["upgrade" if upgrade else "downgrade"]()
 
     async with postgres.session_factory() as session:
         connection = await session.connection()
