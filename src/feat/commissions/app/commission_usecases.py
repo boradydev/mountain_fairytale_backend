@@ -75,7 +75,9 @@ class GetCommissionsUseCase:
                         sales_representative_name=rep.name,
                         is_active=rep.is_active,
                         assigned_clients_count=len(current),
-                        clients_count=len(current | {entry.client_id for entry in entries}),
+                        clients_count=len(
+                            current | {entry.client_id for entry in entries if entry.client_id is not None}
+                        ),
                         orders_count=sum(entry.orders_count for entry in entries),
                         turnover=sum_amounts(entry.turnover for entry in entries),
                         commission_payable=sum_amounts(entry.commission_payable for entry in entries),
@@ -89,7 +91,8 @@ class GetCommissionsUseCase:
                 entries = by_representative.get(representative_id, [])
                 historical: dict[UUID, list[PointAccrual]] = {}
                 for entry in entries:
-                    historical.setdefault(entry.client_id, []).append(entry)
+                    if entry.client_id is not None:
+                        historical.setdefault(entry.client_id, []).append(entry)
                 current = assigned.get(representative_id, set())
                 details = []
                 for customer in clients:

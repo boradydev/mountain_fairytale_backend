@@ -125,7 +125,10 @@ class Point(BaseEntity):
     _EVENT_NAME_FIELDS = ("display_name",)
 
     def _event_snapshot(self) -> dict[str, Any]:
-        return self.snapshot()
+        data = self.snapshot()
+        if self.client_id is None:
+            data["display_name"] = f"Покупка {self.position + 1}"
+        return data
 
     __tablename__ = "points"
     UQ_DOCUMENT_CLIENT = "points_delivery_document_id_client_id_key"
@@ -143,13 +146,13 @@ class Point(BaseEntity):
     delivery_document_id: Mapped[UUID] = mapped_column(
         ForeignKey("delivery_documents.delivery_document_id", ondelete="CASCADE"),
     )
-    client_id: Mapped[UUID] = mapped_column(ForeignKey("clients.client_id"))
+    client_id: Mapped[UUID | None] = mapped_column(ForeignKey("clients.client_id"), nullable=True)
     payment_method_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("payment_methods.payment_method_id"), nullable=True
     )
     position: Mapped[int] = mapped_column(Integer)
 
-    client: Mapped[Client] = relationship(lazy="joined")
+    client: Mapped[Client | None] = relationship(lazy="joined")
     payment_method: Mapped[PaymentMethod | None] = relationship(lazy="joined")
     items: Mapped[list[Item]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     commission: Mapped[PointCommission | None] = relationship(
@@ -159,32 +162,34 @@ class Point(BaseEntity):
 
     @property
     def client_name(self) -> str:
-        return self.client.name
+        return self.client.name if self.client else ""
 
     @property
     def phone(self) -> str:
-        return self.client.phone
+        return self.client.phone if self.client else ""
 
     @property
     def address(self) -> str:
+        if self.client is None:
+            return ""
         details = self.client.delivery_details
         return self.client.address + (f" — {details}" if details else "")
 
     @property
     def client_address(self) -> str:
-        return self.client.address
+        return self.client.address if self.client else ""
 
     @property
     def delivery_details(self) -> str:
-        return self.client.delivery_details
+        return self.client.delivery_details if self.client else ""
 
     @property
     def default_payment_method_id(self) -> UUID | None:
-        return self.client.default_payment_method_id
+        return self.client.default_payment_method_id if self.client else None
 
     @property
     def default_payment_method_name(self) -> str | None:
-        return self.client.default_payment_method_name
+        return self.client.default_payment_method_name if self.client else None
 
     @property
     def payment_method_name(self) -> str | None:
@@ -192,11 +197,11 @@ class Point(BaseEntity):
 
     @property
     def sales_representative_id(self) -> UUID | None:
-        return self.client.sales_representative_id
+        return self.client.sales_representative_id if self.client else None
 
     @property
     def sales_representative_name(self) -> str | None:
-        return self.client.sales_representative_name
+        return self.client.sales_representative_name if self.client else None
 
     @classmethod
     def create(
@@ -204,7 +209,7 @@ class Point(BaseEntity):
         *,
         actor_id: UUID,
         delivery_document_id: UUID,
-        client_id: UUID,
+        client_id: UUID | None,
         position: int,
         items: list[Any],
         payment_method_id: UUID | None = None,
@@ -231,7 +236,10 @@ class Point(BaseEntity):
         ]
         point._add_event(
             CreatePointEvent(
-                actor_id=actor_id, point_id=point_id, delivery_document_id=delivery_document_id, data=point.snapshot()
+                actor_id=actor_id,
+                point_id=point_id,
+                delivery_document_id=delivery_document_id,
+                data=point._event_snapshot(),
             )
         )
         return point
@@ -246,7 +254,7 @@ class Point(BaseEntity):
         }
 
     def update(
-        self, *, actor_id: UUID, client_id: UUID, position: int, items: list[Any], payment_method_id: UUID | None
+        self, *, actor_id: UUID, client_id: UUID | None, position: int, items: list[Any], payment_method_id: UUID | None
     ) -> None:
         if client_id != self.client_id:
             raise DeliveryDocumentUpdateException(
@@ -440,6 +448,7 @@ class DeliveryDocument(BaseEntity):
             raise DeliveryDocumentUpdateException(
                 field="delivery_fields", message="Pickup sheets cannot contain delivery fields."
             )
+        _validate_point_clients(document_type, points)
         _validate_mileage(start_mileage, end_mileage)
         now = datetime.now()
         document_id = uuid7()
@@ -512,6 +521,18 @@ class DeliveryDocument(BaseEntity):
             requested_points = request.points
             if requested_points is None:
                 raise DeliveryDocumentUpdateException(field="points", message="Points cannot be null.")
+            _validate_point_clients(self.document_type, requested_points)
+            if self.document_type == self.TYPE_PICKUP_SHEET:
+                retained = [point.point_id for point in requested_points if point.point_id is not None]
+                expected = [point.point_id for point in self.points if point.point_id in retained]
+                new_seen = False
+                for requested in requested_points:
+                    if requested.point_id is None:
+                        new_seen = True
+                    elif new_seen:
+                        raise DeliveryDocumentUpdateException(field="points", message="New purchases must be appended.")
+                if retained != expected:
+                    raise DeliveryDocumentUpdateException(field="points", message="Purchase order cannot be changed.")
             old_by_id = {point.point_id: point for point in self.points}
             new_points: list[Point] = []
             used_ids: set[UUID] = set()
@@ -599,6 +620,14 @@ class DeliveryDocument(BaseEntity):
         for point in self.points:
             events.extend(point.pull_aggregate_events())
         return events
+
+
+def _validate_point_clients(document_type: str, points: list[Any]) -> None:
+    pickup = document_type == DeliveryDocument.TYPE_PICKUP_SHEET
+    if any((point.client_id is not None) == pickup for point in points):
+        raise DeliveryDocumentUpdateException(
+            field="client_id", message="Pickup requires no client; delivery requires a client."
+        )
 
 
 def _validate_mileage(start: float | None, end: float | None) -> None:

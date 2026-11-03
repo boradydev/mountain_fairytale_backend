@@ -48,7 +48,7 @@ class TestDeliveryDocumentRouters:
 
     @staticmethod
     def point_payload(
-        client_id: str,
+        client_id: str | None,
         product_id: str,
         *,
         quantity: int = 2,
@@ -169,14 +169,8 @@ class TestDeliveryDocumentRouters:
         self,
         client: AsyncClient,
         active_employee: EmployeeTestData,
-        client_factory,
     ) -> None:
         await self.login(client, active_employee)
-        pickup_client = await client_factory(
-            name=f"Клиент самовывоза {uuid7()}",
-            phone=unique_phone(),
-            address=f"Адрес самовывоза {uuid7()}",
-        )
         product = await self.create_product(
             client,
             unique_product_name("pickup_api"),
@@ -189,7 +183,7 @@ class TestDeliveryDocumentRouters:
                 "plannedDate": date(2025, 3, 20).isoformat(),
                 "points": [
                     self.point_payload(
-                        str(pickup_client.client_id),
+                        None,
                         product["productId"],
                         quantity=4,
                         price=75.25,
@@ -212,7 +206,8 @@ class TestDeliveryDocumentRouters:
         assert get_response.status_code == 200
         document = get_response.json()["data"]
         assert document["plannedDate"] == date(2025, 3, 20).isoformat()
-        assert document["points"][0]["clientName"] == pickup_client.name
+        assert document["points"][0]["clientId"] is None
+        assert document["points"][0]["clientName"] == ""
         assert document["points"][0]["items"][0]["productName"] == product["name"]
         assert document["points"][0]["items"][0]["quantity"] == 4
         assert document["points"][0]["items"][0]["price"] == 75.25
@@ -226,10 +221,6 @@ class TestDeliveryDocumentRouters:
     ) -> None:
         await self.login(client, active_employee)
         first_client = await client_factory(
-            name=f"Клиент проверки {uuid7()}",
-            phone=unique_phone(),
-        )
-        second_client = await client_factory(
             name=f"Клиент проверки {uuid7()}",
             phone=unique_phone(),
         )
@@ -253,7 +244,7 @@ class TestDeliveryDocumentRouters:
         assert no_points.json()["data"]["points"] == []
 
         point_without_items = {
-            "clientId": str(first_client.client_id),
+            "clientId": None,
             "items": [],
         }
         empty_items = await client.post(
@@ -287,7 +278,7 @@ class TestDeliveryDocumentRouters:
                 "plannedDate": date(2025, 3, 15).isoformat(),
                 "points": [
                     {
-                        "clientId": str(second_client.client_id),
+                        "clientId": None,
                         "items": [
                             {
                                 "productName": product["name"],

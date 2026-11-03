@@ -32,7 +32,11 @@ async def test_employee_turnover_uses_unique_historical_documents(client, admin_
     async def create(amount, *, delivery=False):
         payload = {
             "plannedDate": "2194-01-10",
-            "points": [DeliveryAPI.point_payload(customer, product["productId"], quantity=1, price=amount)],
+            "points": [
+                DeliveryAPI.point_payload(
+                    customer if delivery else None, product["productId"], quantity=1, price=amount
+                )
+            ],
         }
         base = "/protected/pickup-sheets"
         if delivery:

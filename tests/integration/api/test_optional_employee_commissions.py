@@ -8,7 +8,6 @@ from src.feat.commissions.domain.commission_entities import DocumentEmployeeComm
 from src.feat.employees.domain.employee_entities import Employee
 from tests.document_requests import patch_with_revision
 from tests.helpers import unique_product_name, unique_username
-from tests.integration.api.test_commissions import create_customer
 from tests.integration.api.test_delivery_document_routers import TestDeliveryDocumentRouters as DeliveryAPI
 
 
@@ -74,9 +73,8 @@ async def test_report_and_snapshots_follow_rate_not_role(client, admin_employee,
                 assert Decimal(current[target_id]["commissionPayable"]) == 0
                 assert current[target_id]["commissionRateBreakdown"] == []
 
-    customer = await create_customer(client)
     product = await DeliveryAPI.create_product(client, unique_product_name("optional_rate"))
-    point = DeliveryAPI.point_payload(customer, product["productId"], quantity=1, price="100")
+    point = DeliveryAPI.point_payload(None, product["productId"], quantity=1, price="100")
     created = await client.post(
         "/protected/pickup-sheets/create", json={"plannedDate": "2190-01-05", "points": [point]}
     )
@@ -152,9 +150,8 @@ async def test_assigning_rate_never_backfills_document_with_empty_snapshots(
 ):
     await DeliveryAPI.login(client, admin_employee)
     target = await employee_factory(commission_percent=None)
-    customer = await create_customer(client)
     product = await DeliveryAPI.create_product(client, unique_product_name("empty_snapshots"))
-    point = DeliveryAPI.point_payload(customer, product["productId"], quantity=1, price="100")
+    point = DeliveryAPI.point_payload(None, product["productId"], quantity=1, price="100")
     # Isolate a genuinely empty recipient list, regardless of accounts from earlier tests.
     async with postgres.session_factory() as session:
         existing = (await session.scalars(select(Employee).where(Employee.commission_percent.is_not(None)))).all()

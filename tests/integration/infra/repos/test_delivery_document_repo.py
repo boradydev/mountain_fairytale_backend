@@ -124,7 +124,7 @@ async def _create_document(
     quantities = quantities or [2] * len(clients)
     points = [
         _make_point(
-            client.client_id,
+            client.client_id if document_type == DocumentType.DELIVERY else None,
             product.product_id,
             product_name=product.name,
             quantity=quantities[index],
@@ -525,16 +525,19 @@ async def test_validate_references_rejects_missing_entities(
     expected_field: str,
 ) -> None:
     async with postgres.session_factory() as session:
-        clients, product, _, _ = await _create_related_entities(
+        clients, product, driver, car = await _create_related_entities(
             session,
-            delivery=False,
+            delivery=True,
         )
         client_id = uuid7() if missing_reference == "client" else clients[0].client_id
         product_id = uuid7() if missing_reference == "product" else product.product_id
         document = DeliveryDocument.create(
             actor_id=uuid7(),
-            document_type=DocumentType.PICKUP,
+            document_type=DocumentType.DELIVERY,
             planned_date=date(2025, 3, 15),
+            driver_id=driver.driver_id,
+            car_id=car.car_id,
+            start_mileage=0,
             points=[
                 SimpleNamespace(
                     client_id=client_id,
@@ -743,7 +746,7 @@ async def test_duplicate_product_in_same_point_is_forbidden(postgres) -> None:
             planned_date=date(2025, 3, 15),
             points=[
                 SimpleNamespace(
-                    client_id=clients[0].client_id,
+                    client_id=None,
                     items=[duplicate_item, duplicate_item],
                 ),
             ],
