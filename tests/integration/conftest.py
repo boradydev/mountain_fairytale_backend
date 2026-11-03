@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from dataclasses import dataclass
+from decimal import Decimal
 from os import environ
 from pathlib import Path
 from typing import Any
@@ -85,6 +86,12 @@ class ClientTestData:
         return self.client.is_active
 
 
+@pytest.fixture(autouse=True)
+def select_test_database(test_database_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use the suite's database for both HTTP lifespan and repository fixtures."""
+    monkeypatch.setenv("POSTGRES_DB", test_database_name)
+
+
 @pytest.fixture
 def config_dir() -> Path:
     return Path(environ["CONFIG_DIR"])
@@ -151,7 +158,7 @@ def employee_factory(
             username=username or unique_username(),
             password_hash=password_service.hash(password=password),
             role=role,
-            commission_percent=commission_percent,
+            commission_percent=None if commission_percent is None else Decimal(str(commission_percent)),
         )
         if not is_active:
             employee.update(actor_id=uuid7(), is_active=False)

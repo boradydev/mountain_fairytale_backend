@@ -1,31 +1,32 @@
 import os
+import re
 import subprocess
 import sys
-from sqlalchemy import create_engine, text
 from pathlib import Path
+
+from sqlalchemy import create_engine, text
+
 from src.common.infra.db.postgres.settings import PostgresSettings
 
 
-def bootstrap_test_database(test_db_name: str, alembic_config_path: Path, project_dir: Path) -> None:
-    """
-    Универсальная функция для подготовки тестовой БД.
-    Проверяет локаль триграмм, сносит схему и накатывает миграции для указанной БД.
-    """
-    # Сохраняем оригинальное значение, чтобы восстановить в конце
-    old_postgres_db = os.environ.get("POSTGRES_DB")
+def validate_test_database_name(test_db_name: str) -> None:
+    """Refuse schema recreation outside explicitly named test databases."""
+    if re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*_test", test_db_name) is None:
+        raise ValueError("Test database name must be a PostgreSQL identifier ending in _test.")
 
-    # 1. Подменяем имя БД в окружении, чтобы PostgresSettings прочитал именно её
-    os.environ["POSTGRES_DB"] = test_db_name
+
+def bootstrap_test_database(test_db_name: str, alembic_config_path: Path, project_dir: Path) -> None:
+    """Recreate a test schema and migrate it without changing the runtime database."""
+    validate_test_database_name(test_db_name)
+    settings = PostgresSettings(POSTGRES_DB=test_db_name)
+    sync_engine = create_engine(url=settings.DB_URL_SYNC, isolation_level="AUTOCOMMIT")
 
     try:
-        # Инициализируем настройки (они подтянут уже измененный POSTGRES_DB)
-        settings = PostgresSettings()
-
-        # 2. Создаем временный синхронный движок с AUTOCOMMIT
-        sync_engine = create_engine(url=settings.DB_URL_SYNC, isolation_level="AUTOCOMMIT")
-
-        # 3. Блокируем поток, сносим старую схему и ПРОВЕРЯЕМ ЛОКАЛЬ СУБД
+        # Check the selected database and Cyrillic locale before recreating its schema.
         with sync_engine.connect() as connection:
+            actual_db = connection.execute(text("SELECT current_database()")).scalar_one()
+            if actual_db != test_db_name:
+                raise RuntimeError("Test connection targets an unexpected database; schema recreation refused.")
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
             trigrams = connection.execute(text("SELECT show_trgm('Тест');")).scalar()
 
@@ -46,29 +47,15 @@ def bootstrap_test_database(test_db_name: str, alembic_config_path: Path, projec
             connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
             connection.execute(text("CREATE SCHEMA public;"))
 
+    finally:
         sync_engine.dispose()
 
-        # 4. Накатываем миграции через Alembic
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "alembic",
-                "-c",
-                str(alembic_config_path),
-                "upgrade",
-                "head",
-            ],
-            cwd=project_dir,
-            env=os.environ.copy(),
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    finally:
-        # Возвращаем старую переменную на место, чтобы не ломать глобальный env сессии
-        if old_postgres_db is not None:
-            os.environ["POSTGRES_DB"] = old_postgres_db
-        else:
-            os.environ.pop("POSTGRES_DB", None)
+    # Alembic receives a separate process environment; the caller retains its DB.
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", str(alembic_config_path), "upgrade", "head"],
+        cwd=project_dir,
+        env={**os.environ, "POSTGRES_DB": test_db_name},
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )

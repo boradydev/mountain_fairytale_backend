@@ -407,7 +407,7 @@ Backend `1.0.0` обозначает первый законченный вып�
 ### Проверки
 
 Backend: `tests/unit/test_client_compatibility.py` и
-`tests/integration/api/test_client_compatibility.py`. Интеграционный тест
+`tests/integration/api/test_client_api_compatibility.py`. Интеграционный тест
 проверяет отсутствие записи после отказа и читает обратно успешно созданную
 запись поддерживаемого клиента. Остальные API-тесты передают версию через
 общую fixture. Существующий CI автоматически запускает эти тесты.
