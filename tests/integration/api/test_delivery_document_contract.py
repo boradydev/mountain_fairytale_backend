@@ -83,9 +83,8 @@ def patch_points(document: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_free_address_details_and_manual_order_without_coordinates(client, document_case):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     customer = case["customers"][0]
     response = await patch_with_revision(
@@ -150,9 +149,8 @@ async def test_empty_documents_and_collections(client: AsyncClient, document_cas
     assert response.status_code == 422  # Deleted point IDs cannot be reused.
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_existing_inactive_references_and_new_rows(client: AsyncClient, document_case) -> None:
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     customer_id = case["customers"][0]["clientId"]
     product_id = case["product"]["productId"]
@@ -193,9 +191,8 @@ async def test_existing_inactive_references_and_new_rows(client: AsyncClient, do
     assert (await patch_with_revision(client, case["path"], json={"points": points})).status_code == 200
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_client_identity_and_point_replacement_are_atomic(client: AsyncClient, document_case, postgres) -> None:
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     saved = case["document"]
     events = await read_events(postgres, saved)
@@ -738,9 +735,8 @@ async def test_lock_operations_do_not_change_revision(client, document_case):
     assert (await client.get(case["path"])).json()["data"] == case["document"]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_explicit_payment_on_creation_and_creation_retry(client, document_case):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     methods = []
     for _ in range(2):
@@ -779,9 +775,8 @@ async def test_explicit_payment_on_creation_and_creation_retry(client, document_
     assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(client, document_case, postgres):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     path = case["path"]
     methods = []
@@ -855,9 +850,8 @@ async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(c
     assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_document_client_details_are_separate_and_match_day_projection(client, document_case):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     customer = case["customers"][0]["clientId"]
     for details in ("Вход со двора.\nПозвонить перед доставкой.", ""):
@@ -880,9 +874,8 @@ async def test_document_client_details_are_separate_and_match_day_projection(cli
         assert listed["points"][0] == point
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_creation_retry_preserves_payment_snapshot(client, document_case):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     customer = case["customers"][0]["clientId"]
     response = await client.post("/protected/payment-methods/create", json={"name": f"Snapshot {uuid7()}"})
@@ -965,9 +958,8 @@ async def test_inactive_payment_report_card_requires_sales_in_period_including_z
     assert active_id in await cards("2187-09-14")
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_report_and_historical_payment_lifecycle(client, document_case):
-    if document_case["base"] == PICKUP_BASE_PATH:
-        pytest.skip("Client-specific behavior applies to delivery; anonymous pickup has separate coverage.")
     case = document_case
     path = case["path"]
     customer = case["customers"][0]["clientId"]
