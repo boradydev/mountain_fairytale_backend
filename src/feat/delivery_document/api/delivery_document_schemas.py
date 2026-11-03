@@ -25,6 +25,8 @@ class UpdateItemReq(BaseSchema):
 
 
 class CreatePointReq(BaseSchema):
+    is_delivered: bool = True
+    non_delivery_reason: Annotated[str, Field(max_length=1000)] = ""
     client_id: UUID | None = None
     payment_method_id: UUID | None = Field(
         default=None,
@@ -41,6 +43,8 @@ class CreatePointReq(BaseSchema):
 
 
 class UpdatePointReq(BaseSchema):
+    is_delivered: bool | None = None
+    non_delivery_reason: Annotated[str | None, Field(max_length=1000)] = None
     # Omitted/null point_id means that this is a new point.
     point_id: UUID | None = None
     client_id: UUID | None = None
@@ -182,6 +186,8 @@ class ItemResp(BaseSchema):
 
 
 class PointResp(BaseSchema):
+    is_delivered: bool
+    non_delivery_reason: str
     point_id: UUID
     client_id: UUID | None
     client_name: str

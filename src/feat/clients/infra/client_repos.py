@@ -46,7 +46,7 @@ class ClientsRepository(IClientsRepository):
                 FROM points p
                 JOIN delivery_documents d USING (delivery_document_id)
                 JOIN delivery_document_items i USING (point_id)
-                WHERE d.is_active AND p.client_id IN :client_ids
+                WHERE d.is_active AND p.is_delivered AND p.client_id IN :client_ids
             ), latest AS (
                 SELECT client_id, max(planned_date) AS planned_date
                 FROM sales GROUP BY client_id

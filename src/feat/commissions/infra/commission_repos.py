@@ -37,6 +37,7 @@ class CommissionsRepository(ICommissionsRepository):
             .join(DeliveryDocument, DeliveryDocument.delivery_document_id == Point.delivery_document_id)
             .where(
                 DeliveryDocument.is_active.is_(True),
+                Point.is_delivered.is_(True),
                 DeliveryDocument.planned_date >= start,
                 DeliveryDocument.planned_date < end,
             )

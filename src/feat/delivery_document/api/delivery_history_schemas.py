@@ -15,6 +15,8 @@ class HistoryItemResp(BaseSchema):
 
 
 class HistoryClientPurchaseResp(BaseSchema):
+    is_delivered: bool
+    non_delivery_reason: str
     point_id: UUID
     client_id: UUID
     client_name: str

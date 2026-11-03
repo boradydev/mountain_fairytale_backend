@@ -7,6 +7,7 @@ from typing import Any, Self
 from uuid import UUID, uuid5
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -119,7 +120,15 @@ class Item(BaseEntity):
 
 
 class Point(BaseEntity):
-    _EVENT_FIELDS = {"point_id", "client_id", "payment_method_id", "position", "items"}
+    _EVENT_FIELDS = {
+        "point_id",
+        "client_id",
+        "payment_method_id",
+        "position",
+        "items",
+        "is_delivered",
+        "non_delivery_reason",
+    }
     _EVENT_SUBJECT_TYPE = "delivery_point"
     _EVENT_ID_FIELD = "point_id"
     _EVENT_NAME_FIELDS = ("display_name",)
@@ -134,6 +143,11 @@ class Point(BaseEntity):
     UQ_DOCUMENT_CLIENT = "points_delivery_document_id_client_id_key"
     UQ_DOCUMENT_POSITION = "points_delivery_document_id_position_key"
     __table_args__ = (
+        CheckConstraint(
+            "(is_delivered AND non_delivery_reason = '') OR "
+            "(NOT is_delivered AND length(trim(non_delivery_reason)) BETWEEN 1 AND 1000 AND client_id IS NOT NULL)",
+            name="points_delivery_reason_check",
+        ),
         UniqueConstraint(
             "delivery_document_id", "client_id", name=UQ_DOCUMENT_CLIENT, deferrable=True, initially="IMMEDIATE"
         ),
@@ -150,6 +164,8 @@ class Point(BaseEntity):
     payment_method_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("payment_methods.payment_method_id"), nullable=True
     )
+    is_delivered: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    non_delivery_reason: Mapped[str] = mapped_column(Text, default="", server_default="")
     position: Mapped[int] = mapped_column(Integer)
 
     client: Mapped[Client | None] = relationship(lazy="joined")
@@ -158,7 +174,7 @@ class Point(BaseEntity):
     commission: Mapped[PointCommission | None] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
-    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id"}
+    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id", "is_delivered", "non_delivery_reason"}
 
     @property
     def client_name(self) -> str:
@@ -213,6 +229,8 @@ class Point(BaseEntity):
         position: int,
         items: list[Any],
         payment_method_id: UUID | None = None,
+        is_delivered: bool = True,
+        non_delivery_reason: str = "",
     ) -> Self:
         point_id = uuid7()
         point = cls(
@@ -221,6 +239,8 @@ class Point(BaseEntity):
             client_id=client_id,
             payment_method_id=payment_method_id,
             position=position,
+            is_delivered=is_delivered,
+            non_delivery_reason=_delivery_reason(is_delivered, non_delivery_reason),
             items=[],
         )
         point.items = [
@@ -249,12 +269,22 @@ class Point(BaseEntity):
             "point_id": self.point_id,
             "client_id": self.client_id,
             "payment_method_id": self.payment_method_id,
+            "is_delivered": self.is_delivered,
+            "non_delivery_reason": self.non_delivery_reason,
             "position": self.position,
             "items": [item.snapshot() for item in self.items],
         }
 
     def update(
-        self, *, actor_id: UUID, client_id: UUID | None, position: int, items: list[Any], payment_method_id: UUID | None
+        self,
+        *,
+        actor_id: UUID,
+        client_id: UUID | None,
+        position: int,
+        items: list[Any],
+        payment_method_id: UUID | None,
+        is_delivered: bool = True,
+        non_delivery_reason: str = "",
     ) -> None:
         if client_id != self.client_id:
             raise DeliveryDocumentUpdateException(
@@ -263,7 +293,13 @@ class Point(BaseEntity):
             )
         previous_items = [item.snapshot() for item in self.items]
         changes = self._apply_update_changes(
-            payload={"client_id": client_id, "position": position, "payment_method_id": payment_method_id},
+            payload={
+                "client_id": client_id,
+                "position": position,
+                "payment_method_id": payment_method_id,
+                "is_delivered": is_delivered,
+                "non_delivery_reason": _delivery_reason(is_delivered, non_delivery_reason),
+            },
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
@@ -468,6 +504,8 @@ class DeliveryDocument(BaseEntity):
                     actor_id=actor_id,
                     delivery_document_id=document_id,
                     client_id=point.client_id,
+                    is_delivered=getattr(point, "is_delivered", True),
+                    non_delivery_reason=getattr(point, "non_delivery_reason", ""),
                     position=index,
                     items=point.items,
                     payment_method_id=(
@@ -542,6 +580,8 @@ class DeliveryDocument(BaseEntity):
                         actor_id=actor_id,
                         delivery_document_id=self.delivery_document_id,
                         client_id=requested.client_id,
+                        is_delivered=requested.is_delivered if requested.is_delivered is not None else True,
+                        non_delivery_reason=requested.non_delivery_reason or "",
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -564,6 +604,12 @@ class DeliveryDocument(BaseEntity):
                     point.update(
                         actor_id=actor_id,
                         client_id=requested.client_id,
+                        is_delivered=requested.is_delivered
+                        if requested.is_delivered is not None
+                        else point.is_delivered,
+                        non_delivery_reason=requested.non_delivery_reason
+                        if requested.non_delivery_reason is not None
+                        else point.non_delivery_reason,
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -624,6 +670,10 @@ class DeliveryDocument(BaseEntity):
 
 def _validate_point_clients(document_type: str, points: list[Any]) -> None:
     pickup = document_type == DeliveryDocument.TYPE_PICKUP_SHEET
+    if pickup and any(
+        getattr(p, "is_delivered", True) is False or getattr(p, "non_delivery_reason", "") for p in points
+    ):
+        raise DeliveryDocumentUpdateException(field="is_delivered", message="Pickup cannot be marked not delivered.")
     if any((point.client_id is not None) == pickup for point in points):
         raise DeliveryDocumentUpdateException(
             field="client_id", message="Pickup requires no client; delivery requires a client."
@@ -637,3 +687,14 @@ def _validate_mileage(start: float | None, end: float | None) -> None:
         raise DeliveryDocumentUpdateException(
             field="end_mileage", message="End mileage cannot be less than start mileage."
         )
+
+
+def _delivery_reason(delivered: bool, reason: str) -> str:
+    if delivered:
+        return ""
+    reason = reason.strip()
+    if not reason or len(reason) > 1000:
+        raise DeliveryDocumentUpdateException(
+            field="non_delivery_reason", message="A reason of 1 to 1000 characters is required."
+        )
+    return reason

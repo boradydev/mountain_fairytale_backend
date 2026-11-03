@@ -34,6 +34,8 @@ class HistoryItem:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class HistoryClientPurchase:
+    is_delivered: bool
+    non_delivery_reason: str
     point_id: UUID
     client_id: UUID
     client_name: str

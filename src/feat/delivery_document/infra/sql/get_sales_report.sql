@@ -7,7 +7,7 @@ WITH filtered_lines AS (
     FROM delivery_documents AS d
     JOIN points AS p USING (delivery_document_id)
     JOIN delivery_document_items AS i USING (point_id)
-    WHERE d.is_active
+    WHERE d.is_active AND p.is_delivered
       AND d.planned_date BETWEEN :date_from AND :date_to
 ), product_totals AS (
     SELECT payment_method_id,

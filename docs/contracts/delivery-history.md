@@ -27,6 +27,9 @@
 совпавшей покупки: `pointId`, `clientId`, `clientName`, `address`, `phone`,
 `paymentMethodId`, `paymentMethodName`, `totalAmount`, `items`.
 В `items`: `productId`, `productName`, `quantity`, `price`, `amount`.
+Покупка также содержит `isDelivered`, `nonDeliveryReason`: попытка неудачной
+доставки остаётся доступной в истории с суммой заказа, но её сумма исключена
+из `totalAmount` документа. См. [правила недоставки](failed-delivery.md).
 Названия товаров, цены и способ оплаты взяты из сохранённой покупки;
 название способа оплаты — из связанного справочника. Денежные значения —
 десятичные строки, сумма строки округлена до копеек перед сложением.

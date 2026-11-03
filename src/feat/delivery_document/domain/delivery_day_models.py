@@ -31,6 +31,8 @@ class DayDocumentItem:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DayDocumentPoint:
+    is_delivered: bool
+    non_delivery_reason: str
     point_id: UUID
     client_id: UUID | None
     client_name: str

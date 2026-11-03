@@ -180,7 +180,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                         commission_percent=decimal_value((assignment.commission_percent if assignment else None) or 0),
                     )
                 turnover = sum_amounts(line_amount(item.quantity, item.price) for item in point.items)
-                point.commission.recalculate(turnover)
+                point.commission.recalculate(turnover if point.is_delivered else Decimal(0))
             if is_new:
                 employees = (
                     await self._session.scalars(

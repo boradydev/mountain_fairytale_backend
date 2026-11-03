@@ -45,6 +45,11 @@ class CreateDeliveryDocumentUseCase:
                                 {
                                     "client": str(point.client_id),
                                     **(
+                                        {"isDelivered": False, "nonDeliveryReason": point.non_delivery_reason.strip()}
+                                        if getattr(point, "is_delivered", True) is False
+                                        else {}
+                                    ),
+                                    **(
                                         {"payment": str(point.payment_method_id) if point.payment_method_id else None}
                                         if "payment_method_id" in getattr(point, "model_fields_set", ())
                                         else {}
