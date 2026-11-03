@@ -15,6 +15,13 @@ class CreateItemReq(BaseSchema):
     product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
+    is_free_price: bool = Field(
+        default=False,
+        description="Must match the catalog product setting. Supported only in delivery routes.",
+    )
+    driver_note: Annotated[str, Field(max_length=1000)] = Field(
+        default="", description="Route-only note for a free-price item."
+    )
 
 
 class UpdateItemReq(BaseSchema):
@@ -22,6 +29,13 @@ class UpdateItemReq(BaseSchema):
     product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
+    is_free_price: bool | None = Field(
+        default=None,
+        description="Immutable snapshot of the product's free-price setting; omit to preserve it.",
+    )
+    driver_note: Annotated[str | None, Field(max_length=1000)] = Field(
+        default=None, description="Route-only note for a free-price item; omit to preserve it."
+    )
 
 
 class CreatePointReq(BaseSchema):
@@ -185,6 +199,8 @@ class ItemResp(BaseSchema):
     product_name: str
     quantity: int
     price: float
+    is_free_price: bool
+    driver_note: str
 
 
 class PointResp(BaseSchema):

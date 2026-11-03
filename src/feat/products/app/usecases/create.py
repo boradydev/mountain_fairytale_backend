@@ -11,6 +11,7 @@ class CreateProductDTO:
     actor_id: UUID
     name: str
     base_price: Decimal
+    is_free_price: bool = False
 
 
 class CreateProductUseCase:
@@ -29,6 +30,7 @@ class CreateProductUseCase:
                 actor_id=dto.actor_id,
                 name=dto.name,
                 base_price=dto.base_price,
+                is_free_price=dto.is_free_price,
             )
 
             await uow.products.add(product)

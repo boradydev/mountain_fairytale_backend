@@ -30,6 +30,8 @@ class HistoryItem:
     quantity: int
     price: Decimal
     amount: Decimal
+    is_free_price: bool = False
+    driver_note: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

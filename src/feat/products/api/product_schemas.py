@@ -14,6 +14,7 @@ class ProductResp(BaseSchema):
     product_id: UUID
     name: str
     base_price: float
+    is_free_price: bool = False
     created_at: datetime
     is_active: bool
 
@@ -25,6 +26,7 @@ class ProductsResp(BaseSchema):
 class CreateProductReq(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=120)]
     base_price: Annotated[Decimal, Field(ge=0, le=1_000_000_000)]
+    is_free_price: bool = False
 
 
 class UpdateProductReq(BasePatchSchema):
@@ -32,4 +34,5 @@ class UpdateProductReq(BasePatchSchema):
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     base_price: Decimal | None = Field(default=None, ge=0, le=1_000_000_000)
+    is_free_price: bool | None = None
     is_active: bool | None = None

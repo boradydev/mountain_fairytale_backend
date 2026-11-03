@@ -480,13 +480,16 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             )
 
             found_products = (
-                dict(
-                    (
+                {
+                    product_id: (is_active, is_free_price)
+                    for product_id, is_active, is_free_price in (
                         await self._session.execute(
-                            select(Product.product_id, Product.is_active).where(Product.product_id.in_(product_ids)),
+                            select(Product.product_id, Product.is_active, Product.is_free_price).where(
+                                Product.product_id.in_(product_ids)
+                            ),
                         )
-                    ).all(),
-                )
+                    ).all()
+                }
                 if product_ids
                 else {}
             )
@@ -513,16 +516,31 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
 
         if any(not found_clients[client_id] for client_id in new_client_ids):
             raise DeliveryDocumentUpdateException(field="client_id", message="New points require an active client.")
-        if any(not found_products[product_id] for product_id in new_product_ids):
+        if any(not found_products[product_id][0] for product_id in new_product_ids):
             raise DeliveryDocumentUpdateException(field="product_id", message="New items require an active product.")
+        for point in document.points:
+            for item in point.items:
+                if not sa_inspect(item).persistent:
+                    catalog_free_price = found_products[item.product_id][1]
+                    if document.document_type == DeliveryDocument.TYPE_PICKUP_SHEET and catalog_free_price:
+                        raise DeliveryDocumentUpdateException(
+                            field="is_free_price",
+                            message="Free-price products can only be added to delivery routes.",
+                        )
+                    if (
+                        document.document_type != DeliveryDocument.TYPE_PICKUP_SHEET
+                        and item.is_free_price != catalog_free_price
+                    ):
+                        raise DeliveryDocumentUpdateException(
+                            field="is_free_price",
+                            message="A new item must use the current free-price setting of its catalog product.",
+                        )
 
     async def _translate_integrity_error(self, exc: IntegrityError, document: DeliveryDocument) -> None:
         original = str(exc.orig)
         pgcode = getattr(exc.orig, "pgcode", None) or getattr(getattr(exc.orig, "__cause__", None), "sqlstate", None)
         if pgcode == pg_excs.UniqueViolation.sqlstate and Point.UQ_DOCUMENT_CLIENT in original:
-            client_id = next(
-                (point.client_id for point in document.points if point.client_id is not None), UUID(int=0)
-            )
+            client_id = next((point.client_id for point in document.points if point.client_id is not None), UUID(int=0))
             raise DeliveryDocumentPointClientAlreadyExistsException(client_id=client_id) from exc
         if pgcode == pg_excs.UniqueViolation.sqlstate and "delivery_document_items_pkey" in original:
             entity_id = next((item.product_id for point in document.points for item in point.items), UUID(int=0))

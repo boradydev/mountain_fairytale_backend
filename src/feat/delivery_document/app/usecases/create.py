@@ -61,6 +61,12 @@ class CreateDeliveryDocumentUseCase:
                                             "name": item.product_name,
                                             "quantity": item.quantity,
                                             "price": str(item.price.normalize()),
+                                            **({"isFreePrice": True} if getattr(item, "is_free_price", False) else {}),
+                                            **(
+                                                {"driverNote": item.driver_note.strip()}
+                                                if getattr(item, "driver_note", "").strip()
+                                                else {}
+                                            ),
                                         }
                                         for item in point.items
                                     ],

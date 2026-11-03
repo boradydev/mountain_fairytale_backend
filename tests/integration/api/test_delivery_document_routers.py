@@ -535,6 +535,8 @@ class TestDeliveryDocumentRouters:
                 "productName": second_product["name"],
                 "quantity": 8,
                 "price": 215.0,
+                "isFreePrice": False,
+                "driverNote": "",
             },
         ]
         assert replaced["points"][1]["items"][0]["productId"] == first_product["productId"]

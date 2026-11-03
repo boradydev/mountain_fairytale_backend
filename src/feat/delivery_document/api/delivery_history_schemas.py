@@ -12,6 +12,8 @@ class HistoryItemResp(BaseSchema):
     quantity: int
     price: Decimal
     amount: Decimal
+    is_free_price: bool = False
+    driver_note: str = ""
 
 
 class HistoryClientPurchaseResp(BaseSchema):

@@ -177,6 +177,7 @@ async def get_product(
         CreateProductReq:
             - name (1-120) — обязательное поле.
             - base_price (0-1 000 000 000) — обязательное поле.
+            - is_free_price — признак цены, задаваемой в маршрутной точке; при true цена каталога сохраняется как 0.
 
     Результат:
         HTTP 201.
@@ -205,6 +206,7 @@ async def create_product(
             actor_id=UUID(access_token_payload.employee_id),
             name=body.name,
             base_price=body.base_price,
+            is_free_price=body.is_free_price,
         ),
     )
 
@@ -231,7 +233,7 @@ async def create_product(
 
     Входные данные:
         Path: product_id — UUID товара.
-        Body: UpdateProductReq (поля: name, base_price, is_active).
+        Body: UpdateProductReq (поля: name, base_price, is_free_price, is_active).
 
     Результат:
         HTTP 200.

@@ -27,6 +27,8 @@ class DayDocumentItem:
     product_name: str
     quantity: int
     price: float
+    is_free_price: bool = False
+    driver_note: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

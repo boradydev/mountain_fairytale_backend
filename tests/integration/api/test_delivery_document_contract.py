@@ -593,7 +593,14 @@ async def test_product_name_is_client_snapshot_and_immutable(client: AsyncClient
     assert response.status_code == 200
     saved = response.json()["data"]
     assert saved["points"][0]["items"] == [
-        {"productId": product_id, "productName": historical_name, "quantity": 7, "price": 45.0},
+        {
+            "productId": product_id,
+            "productName": historical_name,
+            "quantity": 7,
+            "price": 45.0,
+            "isFreePrice": False,
+            "driverNote": "",
+        },
     ]
     events = await read_events(postgres, saved)
     updated = next(event for event in events if event["event_type"] == "UpdateItemEvent")

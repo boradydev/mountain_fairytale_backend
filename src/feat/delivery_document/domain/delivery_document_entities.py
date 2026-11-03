@@ -51,7 +51,7 @@ class DocumentType(str, Enum):
 
 
 class Item(BaseEntity):
-    _EVENT_FIELDS = {"product_id", "product_name", "quantity", "price"}
+    _EVENT_FIELDS = {"product_id", "product_name", "quantity", "price", "is_free_price", "driver_note"}
     _EVENT_SUBJECT_TYPE = "delivery_item"
     _EVENT_NAME_FIELDS = ("product_name",)
 
@@ -66,6 +66,10 @@ class Item(BaseEntity):
         CheckConstraint(
             "char_length(product_name) BETWEEN 1 AND 120", name="delivery_document_items_product_name_check"
         ),
+        CheckConstraint(
+            "char_length(driver_note) <= 1000 AND (is_free_price OR driver_note = '')",
+            name="delivery_document_items_driver_note_check",
+        ),
     )
 
     point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"), primary_key=True)
@@ -73,18 +77,42 @@ class Item(BaseEntity):
     product_name: Mapped[str] = mapped_column(Text)
     quantity: Mapped[int] = mapped_column(Integer)
     price: Mapped[Decimal] = mapped_column(Numeric)
+    is_free_price: Mapped[bool] = mapped_column(default=False, server_default="false")
+    driver_note: Mapped[str] = mapped_column(Text, default="", server_default="")
 
-    _ALLOWED_UPDATE_FIELDS = {"quantity", "price"}
+    _ALLOWED_UPDATE_FIELDS = {"quantity", "price", "driver_note"}
 
     @classmethod
     def create(
-        cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, product_name: str, quantity: int, price: Decimal
+        cls,
+        *,
+        actor_id: UUID,
+        point_id: UUID,
+        product_id: UUID,
+        product_name: str,
+        quantity: int,
+        price: Decimal,
+        is_free_price: bool = False,
+        driver_note: str = "",
     ) -> Self:
         if not 1 <= len(product_name) <= 120:
             raise DeliveryDocumentUpdateException(
                 field="product_name", message="Product name must have 1–120 characters."
             )
-        item = cls(point_id=point_id, product_id=product_id, product_name=product_name, quantity=quantity, price=price)
+        driver_note = _driver_note(driver_note)
+        if driver_note and not is_free_price:
+            raise DeliveryDocumentUpdateException(
+                field="driver_note", message="Driver notes are available only for free-price items."
+            )
+        item = cls(
+            point_id=point_id,
+            product_id=product_id,
+            product_name=product_name,
+            quantity=quantity,
+            price=price,
+            is_free_price=is_free_price,
+            driver_note=driver_note,
+        )
         item._add_event(
             CreateItemEvent(actor_id=actor_id, point_id=point_id, product_id=product_id, data=item.snapshot())
         )
@@ -96,11 +124,22 @@ class Item(BaseEntity):
             "product_name": self.product_name,
             "quantity": self.quantity,
             "price": self.price,
+            "is_free_price": self.is_free_price,
+            "driver_note": self.driver_note,
         }
 
-    def update(self, *, actor_id: UUID, quantity: int, price: Decimal) -> None:
+    def update(self, *, actor_id: UUID, quantity: int, price: Decimal, driver_note: str | None = None) -> None:
+        next_driver_note = self.driver_note if driver_note is None else _driver_note(driver_note)
+        if next_driver_note and not self.is_free_price:
+            raise DeliveryDocumentUpdateException(
+                field="driver_note", message="Driver notes are available only for free-price items."
+            )
         changes = self._apply_update_changes(
-            payload={"quantity": quantity, "price": price},
+            payload={
+                "quantity": quantity,
+                "price": price,
+                "driver_note": next_driver_note,
+            },
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
         if changes:
@@ -255,6 +294,8 @@ class Point(BaseEntity):
                 product_name=item.product_name,
                 quantity=item.quantity,
                 price=item.price,
+                is_free_price=bool(getattr(item, "is_free_price", False)),
+                driver_note=getattr(item, "driver_note", None) or "",
             )
             for item in items
         ]
@@ -326,9 +367,21 @@ class Point(BaseEntity):
                     product_name=requested.product_name,
                     quantity=requested.quantity,
                     price=requested.price,
+                    is_free_price=bool(getattr(requested, "is_free_price", False)),
+                    driver_note=getattr(requested, "driver_note", None) or "",
                 )
             else:
-                item.update(actor_id=actor_id, quantity=requested.quantity, price=requested.price)
+                requested_free_price = getattr(requested, "is_free_price", None)
+                if requested_free_price is not None and requested_free_price != item.is_free_price:
+                    raise DeliveryDocumentUpdateException(
+                        field="is_free_price", message="An item's free-price snapshot cannot be changed."
+                    )
+                item.update(
+                    actor_id=actor_id,
+                    quantity=requested.quantity,
+                    price=requested.price,
+                    driver_note=getattr(requested, "driver_note", None),
+                )
             updated.append(item)
         for old_item in self.items:
             if old_item.product_id not in requested_ids:
@@ -686,6 +739,14 @@ def _validate_point_clients(document_type: str, points: list[Any]) -> None:
         raise DeliveryDocumentUpdateException(field="is_delivered", message="Pickup cannot be marked not delivered.")
     if pickup and any(getattr(point, "memo", "") for point in points):
         raise DeliveryDocumentUpdateException(field="memo", message="Pickup purchases cannot contain route memos.")
+    if pickup and any(
+        getattr(item, "is_free_price", False) or getattr(item, "driver_note", "")
+        for point in points
+        for item in getattr(point, "items", [])
+    ):
+        raise DeliveryDocumentUpdateException(
+            field="is_free_price", message="Pickup purchases cannot contain free-price route items."
+        )
     if any((point.client_id is not None) == pickup for point in points):
         raise DeliveryDocumentUpdateException(
             field="client_id", message="Pickup requires no client; delivery requires a client."
@@ -716,4 +777,11 @@ def _memo(value: str) -> str:
     value = value.strip()
     if len(value) > 1000:
         raise DeliveryDocumentUpdateException(field="memo", message="Memo cannot exceed 1000 characters.")
+    return value
+
+
+def _driver_note(value: str) -> str:
+    value = value.strip()
+    if len(value) > 1000:
+        raise DeliveryDocumentUpdateException(field="driver_note", message="Driver note cannot exceed 1000 characters.")
     return value
