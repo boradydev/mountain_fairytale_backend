@@ -128,6 +128,7 @@ class Point(BaseEntity):
         "items",
         "is_delivered",
         "non_delivery_reason",
+        "memo",
     }
     _EVENT_SUBJECT_TYPE = "delivery_point"
     _EVENT_ID_FIELD = "point_id"
