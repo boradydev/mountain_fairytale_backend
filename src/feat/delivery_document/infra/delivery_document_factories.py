@@ -8,6 +8,7 @@ from src.feat.delivery_document.app.usecases.get import GetDeliveryDocumentUseCa
 from src.feat.delivery_document.app.usecases.get_all import GetDeliveryDocumentsUseCase
 from src.feat.delivery_document.app.usecases.get_day_documents import GetDayDocumentsUseCase
 from src.feat.delivery_document.app.usecases.get_days import GetDeliveryDaysUseCase
+from src.feat.delivery_document.app.usecases.get_history import GetDeliveryHistoryUseCase
 from src.feat.delivery_document.app.usecases.get_sales_report import GetSalesReportUseCase
 from src.feat.delivery_document.app.usecases.update import UpdateDeliveryDocumentUseCase
 from src.feat.delivery_document.infra.delivery_document_uow import DeliveryDocumentsUOW
@@ -37,6 +38,9 @@ class DeliveryDocumentsUseCaseFactory:
 
     def get_sales_report(self) -> GetSalesReportUseCase:
         return GetSalesReportUseCase(uow=self._create_uow())
+
+    def get_history(self) -> GetDeliveryHistoryUseCase:
+        return GetDeliveryHistoryUseCase(uow=self._create_uow())
 
     def update_delivery_document(self) -> UpdateDeliveryDocumentUseCase:
         return UpdateDeliveryDocumentUseCase(uow=self._create_uow())

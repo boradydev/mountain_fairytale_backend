@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, TypedDict
@@ -27,6 +28,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentRelatedEntityNotFoundException,
     DeliveryDocumentUpdateException,
 )
+from src.feat.delivery_document.domain.delivery_history_models import HistoryDocument
 from src.feat.delivery_document.domain.sales_report_models import (
     SalesReport,
     SalesReportPaymentMethod,
@@ -41,6 +43,7 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 _days_adapter = TypeAdapter(list[DeliveryDay])
+_history_adapter = TypeAdapter(list[HistoryDocument])
 _day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discriminator="document_type")])
 
 
@@ -53,6 +56,41 @@ class _SalesReportGroup(TypedDict):
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def get_history(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        search: str,
+        include_cancelled: bool,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[HistoryDocument], int]:
+        term = search.strip()
+        literal = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        digits = re.sub(r"[^0-9]", "", term)
+        row = (
+            (
+                await self._session.execute(
+                    SQL.GET_HISTORY,
+                    {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "search": term,
+                        "pattern": f"%{literal}%",
+                        "digits": digits,
+                        "phone_pattern": f"%{digits}%",
+                        "include_cancelled": include_cancelled,
+                        "offset": offset,
+                        "limit": limit,
+                    },
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return _history_adapter.validate_python(row["documents"]), row["total"]
 
     async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None:
         # Serialize retries and recovery reads, including the first in-flight create.
