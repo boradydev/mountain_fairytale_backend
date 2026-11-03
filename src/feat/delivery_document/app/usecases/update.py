@@ -73,7 +73,11 @@ class UpdateDeliveryDocumentUseCase:
                     message="Mileage correction requires a confirmed recorded car replacement.",
                 )
             before = document.snapshot()
-            new_point_client_ids = {point.client_id for point in (dto.payload.points or []) if point.point_id is None}
+            new_point_client_ids = {
+                point.client_id
+                for point in (dto.payload.points or [])
+                if point.point_id is None and point.client_id is not None
+            }
             payment_method_ids = await repo.get_default_payment_method_ids(new_point_client_ids)
             document.update(
                 actor_id=dto.actor_id,

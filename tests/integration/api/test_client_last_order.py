@@ -1,10 +1,9 @@
 from datetime import date, timedelta
 
-from tests.document_requests import patch_with_revision
+from tests.document_requests import create_delivery, patch_with_revision
 from tests.helpers import delivery_address, unique_phone, unique_product_name
 from tests.integration.api.test_delivery_document_routers import (
     DELIVERY_BASE_PATH,
-    PICKUP_BASE_PATH,
     TestDeliveryDocumentRouters as DeliveryAPI,
 )
 
@@ -41,10 +40,8 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
         assert response.status_code == 200, response.text
         return response.json()["data"]
 
-    async def pickup(day, points):
-        response = await client.post(
-            f"{PICKUP_BASE_PATH}/create", json={"plannedDate": day.isoformat(), "points": points}
-        )
+    async def sale(day, points):
+        response = await create_delivery(client, json={"plannedDate": day.isoformat(), "points": points})
         assert response.status_code == 201, response.text
         return response.json()["data"]
 
@@ -56,7 +53,7 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
         return response.json()["data"]
 
     assert (await read())["lastOrder"] is None
-    older = await pickup(day - timedelta(days=1), [point(quantity=1)])
+    older = await sale(day - timedelta(days=1), [point(quantity=1)])
     driver = await DeliveryAPI.create_driver(client, "Last order driver")
     car = await car_factory()
     response = await client.post(
@@ -71,11 +68,11 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     )
     assert response.status_code == 201, response.text
     delivery = response.json()["data"]
-    latest = await pickup(day, [point(quantity=3, name="Вода историческая")])
-    latest_path = f"{PICKUP_BASE_PATH}/{latest['deliveryDocumentId']}"
+    latest = await sale(day, [point(quantity=3, name="Вода историческая")])
+    latest_path = f"{DELIVERY_BASE_PATH}/{latest['deliveryDocumentId']}"
     expected = {
         "date": day.isoformat(),
-        "fulfillmentTypes": ["delivery", "pickup"],
+        "fulfillmentTypes": ["delivery"],
         "items": [{"productId": product_id, "productName": "Вода историческая", "quantity": 5}],
     }
     current = await read()
@@ -83,8 +80,8 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     assert current["lastDeliveryDate"] == "2026-10-10T00:00:00"
     assert current["lastDeliveryQuantity"] == 5
     # A late-entered older sale and empty newer points must not replace the latest sale.
-    await pickup(day - timedelta(days=5), [point(quantity=99)])
-    await pickup(day + timedelta(days=1), [{"clientId": customer_id, "items": []}])
+    await sale(day - timedelta(days=5), [point(quantity=99)])
+    await sale(day + timedelta(days=1), [{"clientId": customer_id, "items": []}])
     assert (await read())["lastOrder"] == expected
     # Editing quantities must update both the composition and the compatibility total.
     changed_point = point(quantity=7)
@@ -118,9 +115,9 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     assert (await read())["lastDeliveryQuantity"] == 2
     assert (await client.post(f"{latest_path}/restore")).status_code == 200
     assert (await read())["lastOrder"] == expected
-    # Move the latest pickup to another day and then remove all its goods.
+    # Move the latest delivery to another day and then remove all its goods.
     await patch(latest_path, {"plannedDate": (day + timedelta(days=2)).isoformat()})
-    assert (await read())["lastOrder"]["fulfillmentTypes"] == ["pickup"]
+    assert (await read())["lastOrder"]["fulfillmentTypes"] == ["delivery"]
     assert (await read())["lastDeliveryQuantity"] == 7
     await patch(
         latest_path, {"points": [{"pointId": latest["points"][0]["pointId"], "clientId": customer_id, "items": []}]}
@@ -135,7 +132,7 @@ async def test_last_order_combines_sales_and_tracks_document_changes(
     assert (await read())["lastOrder"]["date"] == (day - timedelta(days=1)).isoformat()
     other = await client.get(f"/protected/clients/{customers[1]['clientId']}")
     assert other.json()["data"]["lastDeliveryQuantity"] == 4
-    assert (await client.post(f"{PICKUP_BASE_PATH}/{older['deliveryDocumentId']}/cancel")).status_code == 200
+    assert (await client.post(f"{DELIVERY_BASE_PATH}/{older['deliveryDocumentId']}/cancel")).status_code == 200
     assert (await read())["lastOrder"]["date"] == (day - timedelta(days=5)).isoformat()
 
 
@@ -143,8 +140,8 @@ async def test_cancelling_only_sale_returns_null_summary(client, active_employee
     await DeliveryAPI.login(client, active_employee)
     customer = await client_factory(phone=unique_phone())
     product = await DeliveryAPI.create_product(client, unique_product_name("only_sale"))
-    response = await client.post(
-        f"{PICKUP_BASE_PATH}/create",
+    response = await create_delivery(
+        client,
         json={
             "plannedDate": "2026-10-10",
             "points": [DeliveryAPI.point_payload(str(customer.client_id), product["productId"])],
@@ -152,7 +149,7 @@ async def test_cancelling_only_sale_returns_null_summary(client, active_employee
     )
     assert response.status_code == 201
     document_id = response.json()["data"]["deliveryDocumentId"]
-    assert (await client.post(f"{PICKUP_BASE_PATH}/{document_id}/cancel")).status_code == 200
+    assert (await client.post(f"{DELIVERY_BASE_PATH}/{document_id}/cancel")).status_code == 200
     response = await client.get(f"/protected/clients/{customer.client_id}")
     assert response.status_code == 200
     for field in ("lastOrder", "lastDeliveryDate", "lastDeliveryQuantity"):
@@ -179,7 +176,7 @@ async def test_list_keeps_clients_and_distinct_products_separate(client, active_
                 ],
             }
         )
-    response = await client.post(f"{PICKUP_BASE_PATH}/create", json={"plannedDate": "2026-10-12", "points": points})
+    response = await create_delivery(client, json={"plannedDate": "2026-10-12", "points": points})
     assert response.status_code == 201, response.text
     response = await client.get("/protected/clients", params={"limit": 1000})
     assert response.status_code == 200

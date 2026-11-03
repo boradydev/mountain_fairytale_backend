@@ -37,6 +37,8 @@ class DaysCase:
     async def create(self, day: date, *, delivery: bool = False, points=None) -> dict[str, Any]:
         payload = {"plannedDate": day.isoformat(), "points": points or []}
         base = DELIVERY_BASE_PATH if delivery else PICKUP_BASE_PATH
+        if not delivery:
+            payload["points"] = [{**point, "clientId": None} for point in payload["points"]]
         if delivery:
             payload.update(driverId=self.driver_id, carId=self.car_id, startMileage=100.0)
         response = await self.client.post(f"{base}/create", json=payload)

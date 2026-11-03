@@ -15,11 +15,11 @@ LEFT JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
         'point_id', p.point_id,
         'client_id', p.client_id,
-        'client_name', client.name,
-        'phone', client.phone,
-        'address', client.address || CASE WHEN client.delivery_details <> '' THEN ' — ' || client.delivery_details ELSE '' END,
-        'client_address', client.address,
-        'delivery_details', client.delivery_details,
+        'client_name', COALESCE(client.name, ''),
+        'phone', COALESCE(client.phone, ''),
+        'address', COALESCE(client.address || CASE WHEN client.delivery_details <> '' THEN ' — ' || client.delivery_details ELSE '' END, ''),
+        'client_address', COALESCE(client.address, ''),
+        'delivery_details', COALESCE(client.delivery_details, ''),
         'default_payment_method_id', client.default_payment_method_id,
         'default_payment_method_name', default_payment.name,
         'payment_method_id', p.payment_method_id,
@@ -30,7 +30,7 @@ LEFT JOIN LATERAL (
         'items', COALESCE(point_items.items, '[]'::jsonb)
     ) ORDER BY p.position) AS points
     FROM points AS p
-    JOIN clients AS client ON client.client_id = p.client_id
+    LEFT JOIN clients AS client ON client.client_id = p.client_id
     LEFT JOIN payment_methods AS default_payment
         ON default_payment.payment_method_id = client.default_payment_method_id
     LEFT JOIN payment_methods AS historical_payment

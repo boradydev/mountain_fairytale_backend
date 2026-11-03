@@ -135,11 +135,11 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                 assignments = {row.client_id: row for row in rows}
             for point in document.points:
                 if point.commission is None:
-                    assignment = assignments[point.client_id]
+                    assignment = assignments.get(point.client_id)
                     point.commission = PointCommission(
                         point_id=point.point_id,
-                        sales_representative_id=assignment.sales_representative_id,
-                        commission_percent=decimal_value(assignment.commission_percent or 0),
+                        sales_representative_id=assignment.sales_representative_id if assignment else None,
+                        commission_percent=decimal_value((assignment.commission_percent if assignment else None) or 0),
                     )
                 turnover = sum_amounts(line_amount(item.quantity, item.price) for item in point.items)
                 point.commission.recalculate(turnover)
@@ -401,12 +401,16 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             raise DeliveryDocumentRelatedEntityNotFoundException(field="car_id", entity_id=car_id)
 
     async def validate_references(self, document: DeliveryDocument) -> None:
-        client_ids = {point.client_id for point in document.points}
+        client_ids = {point.client_id for point in document.points if point.client_id is not None}
         payment_method_ids = {
             point.payment_method_id for point in document.points if point.payment_method_id is not None
         }
         product_ids = {item.product_id for point in document.points for item in point.items}
-        new_client_ids = {point.client_id for point in document.points if not sa_inspect(point).persistent}
+        new_client_ids = {
+            point.client_id
+            for point in document.points
+            if point.client_id is not None and not sa_inspect(point).persistent
+        }
         new_product_ids = {
             item.product_id for point in document.points for item in point.items if not sa_inspect(item).persistent
         }
@@ -478,14 +482,18 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         original = str(exc.orig)
         pgcode = getattr(exc.orig, "pgcode", None) or getattr(getattr(exc.orig, "__cause__", None), "sqlstate", None)
         if pgcode == pg_excs.UniqueViolation.sqlstate and Point.UQ_DOCUMENT_CLIENT in original:
-            client_id = next((point.client_id for point in document.points), UUID(int=0))
+            client_id = next(
+                (point.client_id for point in document.points if point.client_id is not None), UUID(int=0)
+            )
             raise DeliveryDocumentPointClientAlreadyExistsException(client_id=client_id) from exc
         if pgcode == pg_excs.UniqueViolation.sqlstate and "delivery_document_items_pkey" in original:
             entity_id = next((item.product_id for point in document.points for item in point.items), UUID(int=0))
             raise DeliveryDocumentPointProductAlreadyExistsException(product_id=entity_id) from exc
         if pgcode == pg_excs.ForeignKeyViolation.sqlstate:
             if "points_client_id_fkey" in original:
-                entity_id = next((point.client_id for point in document.points), UUID(int=0))
+                entity_id = next(
+                    (point.client_id for point in document.points if point.client_id is not None), UUID(int=0)
+                )
                 raise DeliveryDocumentRelatedEntityNotFoundException(field="client_id", entity_id=entity_id) from exc
             if "delivery_document_items_product_id_fkey" in original:
                 entity_id = next((item.product_id for point in document.points for item in point.items), UUID(int=0))

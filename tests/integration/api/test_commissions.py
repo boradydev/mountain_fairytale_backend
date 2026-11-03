@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from src.common.infra.services.event_pud_service import EventPublisher
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
-from tests.document_requests import patch_with_revision
+from tests.document_requests import create_delivery, patch_with_revision
 from tests.helpers import delivery_address, unique_car_number, unique_phone, unique_product_name, unique_username
 from tests.integration.api.test_delivery_document_routers import TestDeliveryDocumentRouters as DeliveryAPI
 
@@ -75,8 +75,8 @@ async def commission_case(client, admin_employee, active_employee):
     def point(customer, price="100.10", quantity=1):
         return DeliveryAPI.point_payload(customer, product["productId"], quantity=quantity, price=price)
 
-    response = await client.post(
-        "/protected/pickup-sheets/create",
+    response = await create_delivery(
+        client,
         json={
             "plannedDate": "2180-04-15",
             "points": [point(first), point(second, "50.00")],
@@ -84,7 +84,7 @@ async def commission_case(client, admin_employee, active_employee):
     )
     assert response.status_code == 201, response.text
     document = response.json()["data"]
-    path = f"/protected/pickup-sheets/{document['deliveryDocumentId']}"
+    path = f"/protected/delivery-route-sheets/{document['deliveryDocumentId']}"
     return dict(
         manager=manager,
         rep=rep,
@@ -190,8 +190,8 @@ async def test_historical_snapshots_edit_restore_and_rates(
     assert (await patch_with_revision(client, case["path"], json={"plannedDate": "2180-05-01"})).status_code == 200
     assert Decimal((await report(client))["summary"]["totalTurnover"]) == 0
     assert Decimal((await report(client, 5))["summary"]["totalTurnover"]) == Decimal("260.20")
-    response = await client.post(
-        "/protected/pickup-sheets/create",
+    response = await create_delivery(
+        client,
         json={
             "plannedDate": "2180-06-01",
             "points": [case["point"](case["third"], "0")],
@@ -290,14 +290,14 @@ async def test_deactivated_representative_stops_new_accruals_but_preserves_exist
     rep_path = f"/protected/sales-representatives/{case['rep']}"
     assert (await patch_with_revision(client, rep_path, json={"isActive": False})).status_code == 200
 
-    response = await client.post(
-        "/protected/pickup-sheets/create",
+    response = await create_delivery(
+        client,
         json={"plannedDate": "2182-07-01", "points": [case["point"](case["first"])]},
     )
     assert response.status_code == 201, response.text
     created = response.json()["data"]
     point_id = UUID(created["points"][0]["pointId"])
-    path = f"/protected/pickup-sheets/{created['deliveryDocumentId']}"
+    path = f"/protected/delivery-route-sheets/{created['deliveryDocumentId']}"
     async with postgres.session_factory() as session:
         snapshot = await session.get(PointCommission, point_id)
         assert snapshot is not None
@@ -368,8 +368,8 @@ async def test_deactivated_representative_stops_new_accruals_but_preserves_exist
         assert snapshot.sales_representative_id is None
         assert snapshot.commission_payable == 0
         assert snapshot.turnover == Decimal("200.20")
-    response = await client.post(
-        "/protected/pickup-sheets/create",
+    response = await create_delivery(
+        client,
         json={"plannedDate": "2182-08-01", "points": [case["point"](case["first"])]},
     )
     assert response.status_code == 201
@@ -404,7 +404,10 @@ async def test_delivery_and_pickup_exact_prices_independent_managers_and_month_b
     car = await client.post("/protected/cars/create", json={"model": "Машина", "number": unique_car_number()})
     assert car.status_code == 201, car.text
     for base, planned in (("pickup-sheets", "2181-01-01"), ("delivery-route-sheets", "2181-01-31")):
-        payload = {"plannedDate": planned, "points": [point]}
+        payload = {
+            "plannedDate": planned,
+            "points": [{**point, "clientId": None} if base == "pickup-sheets" else point],
+        }
         if base == "delivery-route-sheets":
             payload.update(driverId=driver["driverId"], carId=car.json()["data"]["carId"], startMileage=0)
         response = await client.post(f"/protected/{base}/create", json=payload)
@@ -412,8 +415,8 @@ async def test_delivery_and_pickup_exact_prices_independent_managers_and_month_b
     saved = (await client.get("/protected/commissions?year=2181&month=1")).json()["data"]
     assert Decimal(saved["summary"]["totalTurnover"]) == Decimal("2.02")
     rep = find(saved["salesRepresentatives"], "salesRepresentativeId", representative)
-    assert rep["ordersCount"] == 2
-    assert Decimal(rep["commissionPayable"]) == Decimal("0.1515")
+    assert rep["ordersCount"] == 1
+    assert Decimal(rep["commissionPayable"]) == Decimal("0.07575")
     assert Decimal(find(saved["employees"], "employeeId", managers[0])["commissionPayable"]) == Decimal("0.0505")
     assert Decimal(find(saved["employees"], "employeeId", managers[1])["commissionPayable"]) == Decimal("0.07575")
     assert (

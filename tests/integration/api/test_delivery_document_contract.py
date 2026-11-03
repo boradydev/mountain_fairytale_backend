@@ -52,6 +52,9 @@ async def document_case(request, client, active_employee) -> dict[str, Any]:
         )
         assert response.status_code == 201
         payload.update(driverId=driver["driverId"], carId=response.json()["data"]["carId"], startMileage=100.0)
+    if request.param == PICKUP_BASE_PATH:
+        for point in points:
+            point["clientId"] = None
     response = await client.post(f"{request.param}/create", json=payload)
     assert response.status_code == 201
     document = response.json()["data"]
@@ -80,6 +83,7 @@ def patch_points(document: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_free_address_details_and_manual_order_without_coordinates(client, document_case):
     case = document_case
     customer = case["customers"][0]
@@ -145,6 +149,7 @@ async def test_empty_documents_and_collections(client: AsyncClient, document_cas
     assert response.status_code == 422  # Deleted point IDs cannot be reused.
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_existing_inactive_references_and_new_rows(client: AsyncClient, document_case) -> None:
     case = document_case
     customer_id = case["customers"][0]["clientId"]
@@ -186,6 +191,7 @@ async def test_existing_inactive_references_and_new_rows(client: AsyncClient, do
     assert (await patch_with_revision(client, case["path"], json={"points": points})).status_code == 200
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_client_identity_and_point_replacement_are_atomic(client: AsyncClient, document_case, postgres) -> None:
     case = document_case
     saved = case["document"]
@@ -558,7 +564,9 @@ async def test_product_name_is_client_snapshot_and_immutable(client: AsyncClient
     payload = {
         **case["payload"],
         "points": [
-            DeliveryAPI.point_payload(case["customers"][0]["clientId"], product_id, product_name=historical_name),
+            DeliveryAPI.point_payload(
+                case["document"]["points"][0]["clientId"], product_id, product_name=historical_name
+            ),
         ],
     }
     response = await client.post(f"{case['base']}/create", json=payload)
@@ -727,6 +735,7 @@ async def test_lock_operations_do_not_change_revision(client, document_case):
     assert (await client.get(case["path"])).json()["data"] == case["document"]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_explicit_payment_on_creation_and_creation_retry(client, document_case):
     case = document_case
     methods = []
@@ -766,6 +775,7 @@ async def test_explicit_payment_on_creation_and_creation_retry(client, document_
     assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(client, document_case, postgres):
     case = document_case
     path = case["path"]
@@ -840,6 +850,7 @@ async def test_edit_point_payment_preserves_point_and_updates_report_and_audit(c
     assert (await client.get(f"/protected/clients/{customer}")).json()["data"]["defaultPaymentMethodId"] == methods[1]
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_document_client_details_are_separate_and_match_day_projection(client, document_case):
     case = document_case
     customer = case["customers"][0]["clientId"]
@@ -863,6 +874,7 @@ async def test_document_client_details_are_separate_and_match_day_projection(cli
         assert listed["points"][0] == point
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_creation_retry_preserves_payment_snapshot(client, document_case):
     case = document_case
     customer = case["customers"][0]["clientId"]
@@ -946,6 +958,7 @@ async def test_inactive_payment_report_card_requires_sales_in_period_including_z
     assert active_id in await cards("2187-09-14")
 
 
+@pytest.mark.parametrize("document_case", [DELIVERY_BASE_PATH], indirect=True)
 async def test_report_and_historical_payment_lifecycle(client, document_case):
     case = document_case
     path = case["path"]

@@ -85,7 +85,7 @@ class CreateDeliveryDocumentUseCase:
                 car_id=dto.car_id,
             )
             payment_method_ids = await uow.delivery_documents.get_default_payment_method_ids(
-                {point.client_id for point in dto.points}
+                {point.client_id for point in dto.points if point.client_id is not None}
             )
             document = DeliveryDocument.create(
                 actor_id=dto.actor_id,

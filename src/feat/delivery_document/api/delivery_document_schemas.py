@@ -25,7 +25,7 @@ class UpdateItemReq(BaseSchema):
 
 
 class CreatePointReq(BaseSchema):
-    client_id: UUID
+    client_id: UUID | None = None
     payment_method_id: UUID | None = Field(
         default=None,
         description="Saved point payment method. Explicit null means unassigned; omitted uses the client default.",
@@ -43,7 +43,7 @@ class CreatePointReq(BaseSchema):
 class UpdatePointReq(BaseSchema):
     # Omitted/null point_id means that this is a new point.
     point_id: UUID | None = None
-    client_id: UUID
+    client_id: UUID | None = None
     payment_method_id: UUID | None = Field(
         default=None,
         description="Explicit UUID/null replaces the point payment method. Omitted preserves existing points; "
@@ -85,7 +85,7 @@ class CreatePickupSheetReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_unique_clients(self) -> Self:
-        _validate_unique_clients(self.points)
+        _validate_pickup_clients(self.points)
         return self
 
 
@@ -121,6 +121,7 @@ class UpdateDeliveryRouteSheetReq(BasePatchSchema):
         _validate_mileage(self.start_mileage, self.end_mileage)
         if self.points is not None:
             _validate_patch_points(self.points)
+            _validate_unique_clients(self.points)
         return self
 
 
@@ -145,6 +146,7 @@ class UpdatePickupSheetReq(BasePatchSchema):
                 raise ValueError(f"Field '{name}' cannot be null.")
         if self.points is not None:
             _validate_patch_points(self.points)
+            _validate_pickup_clients(self.points)
         return self
 
 
@@ -155,15 +157,21 @@ def _validate_mileage(start: float | None, end: float | None) -> None:
 
 def _validate_unique_clients(points: list[CreatePointReq] | list[UpdatePointReq]) -> None:
     client_ids = [point.client_id for point in points]
+    if None in client_ids:
+        raise ValueError("Delivery points require a client.")
     if len(client_ids) != len(set(client_ids)):
         raise ValueError("A client can appear only once in a document.")
 
 
 def _validate_patch_points(points: list[UpdatePointReq]) -> None:
-    _validate_unique_clients(points)
     point_ids = [point.point_id for point in points if point.point_id is not None]
     if len(point_ids) != len(set(point_ids)):
         raise ValueError("A point ID can appear only once in a document.")
+
+
+def _validate_pickup_clients(points: list[CreatePointReq] | list[UpdatePointReq]) -> None:
+    if any(point.client_id is not None for point in points):
+        raise ValueError("Pickup purchases cannot contain a client.")
 
 
 class ItemResp(BaseSchema):
@@ -175,7 +183,7 @@ class ItemResp(BaseSchema):
 
 class PointResp(BaseSchema):
     point_id: UUID
-    client_id: UUID
+    client_id: UUID | None
     client_name: str
     phone: str
     address: str

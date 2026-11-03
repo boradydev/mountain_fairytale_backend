@@ -32,7 +32,7 @@ class DayDocumentItem:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DayDocumentPoint:
     point_id: UUID
-    client_id: UUID
+    client_id: UUID | None
     client_name: str
     phone: str
     address: str

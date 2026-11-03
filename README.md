@@ -26,14 +26,50 @@ poetry install --no-root
 poetry run python -m src.main
 ```
 
-Параметры разработки берутся из локального `.env`. Серверное окружение
-создаётся отдельно; шаблон — `deploy/.env.example`. Секреты не коммитятся.
+Параметры разработки берутся из локального `.env`; шаблон для нового окружения —
+[.env.example](.env.example). При обновлении существующего `.env` сохраните свои
+пароли, JWT-секрет и ключ Geoapify. Сам `.env` исключён из Git.
+
+| Переменная | Назначение | Локальное значение |
+| --- | --- | --- |
+| `POSTGRES_DB` | Ручной запуск приложения; данные сохраняются | `mountain_fairytale_sales_live_20261101` |
+| `POSTGRES_API_TEST_DB` | API-тесты | `mountain_fairytale_api_test` |
+| `POSTGRES_REPO_TEST_DB` | Тесты репозиториев | `mountain_fairytale_repo_test` |
+
+Адрес, порт и учётные данные локального PostgreSQL общие. Базы должны существовать
+до первого запуска. Достаточно выбрать нужный набор тестов: pytest автоматически
+подставляет его базу для подключения и миграций; менять `POSTGRES_DB` вручную
+для тестов не нужно. Подготовка тестов пересоздаёт только тестовую схему.
+Имена тестовых баз должны заканчиваться на `_test`; helper откажется очищать
+базу ручного запуска.
+
+В шаблоне также указаны настройки авторизации, необязательного Geoapify/cache
+и отключённого локального мониторинга (`SENTRY_ENVIRONMENT=development`).
+Для запуска из корня проекта:
+
+```powershell
+poetry run python -m alembic -c src/common/infra/db/postgres/alembic/alembic.ini current
+# Применять новые миграции к базе ручного запуска после проверки изменений:
+poetry run python -m alembic -c src/common/infra/db/postgres/alembic/alembic.ini upgrade head
+poetry run python -m src.main
+```
+
+Уже работающий процесс нужно перезапустить, чтобы он прочитал обновлённый `.env`.
+Серверное окружение создаётся отдельно; шаблон — `deploy/.env.example`.
+Параметры Docker, backup и VPN в локальный `.env` для запуска Python не требуются.
 
 ## Проверки
 
 ```powershell
 poetry check --lock
 poetry run pytest
+```
+
+Отдельный запуск API и репозиториев использует соответствующие переменные `.env`:
+
+```powershell
+poetry run pytest tests/integration/api
+poetry run pytest tests/integration/infra/repos
 ```
 
 Интеграционные тесты пересоздают схему **тестовых** PostgreSQL-баз, применяют

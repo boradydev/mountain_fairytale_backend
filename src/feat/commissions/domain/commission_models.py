@@ -7,7 +7,7 @@ from uuid import UUID
 @dataclass(frozen=True)
 class PointAccrual:
     sales_representative_id: UUID | None
-    client_id: UUID
+    client_id: UUID | None
     commission_percent: Decimal
     turnover: Decimal
     commission_payable: Decimal

@@ -18,15 +18,19 @@ ALEMBIC_CONFIG = PROJECT_DIR / "src" / "common" / "infra" / "db" / "postgres" / 
 
 
 @pytest.fixture(scope="session", autouse=True)
-def prepare_api_database() -> None:
+def prepare_api_database() -> str:
     """Готовит изолированную базу данных специально для API / End-to-End тестов."""
     # Берем имя из POSTGRES_API_TEST_DB или задаем дефолт
     api_db_name = os.environ.get("POSTGRES_API_TEST_DB", "mountain_fairytale_api_test")
 
-    os.environ["POSTGRES_DB"] = api_db_name # подмена названия базы в окружении
-
     bootstrap_test_database(test_db_name=api_db_name, alembic_config_path=ALEMBIC_CONFIG, project_dir=PROJECT_DIR)
-    return
+    return api_db_name
+
+
+@pytest.fixture
+def test_database_name(prepare_api_database: str) -> str:
+    """Name of the database used throughout the current API test."""
+    return prepare_api_database
 
 
 @pytest.fixture
