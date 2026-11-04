@@ -51,11 +51,11 @@ WITH eligible AS (
         LEFT JOIN LATERAL (
             SELECT COALESCE(sum(round(i.quantity * i.price, 2)), 0) AS total_amount,
                    COALESCE(jsonb_agg(jsonb_build_object(
-                       'product_id', i.product_id, 'product_name', i.product_name,
+                       'item_id', i.item_id, 'product_id', i.product_id, 'product_name', i.product_name,
                        'quantity', i.quantity, 'price', i.price::text,
                        'amount', round(i.quantity * i.price, 2)::text,
                        'is_free_price', i.is_free_price, 'driver_note', i.driver_note
-                   ) ORDER BY i.product_name, i.product_id), '[]'::jsonb) AS items
+                   ) ORDER BY i.product_name, i.product_id, i.item_id), '[]'::jsonb) AS items
             FROM delivery_document_items i WHERE i.point_id = p.point_id
         ) goods ON TRUE
         WHERE p.delivery_document_id = d.delivery_document_id

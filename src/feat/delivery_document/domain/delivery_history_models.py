@@ -25,6 +25,7 @@ def validate_history_period(start: date, end: date) -> None:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class HistoryItem:
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int

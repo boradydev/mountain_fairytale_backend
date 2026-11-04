@@ -212,7 +212,10 @@ async def test_client_identity_and_point_replacement_are_atomic(client: AsyncCli
     assert [point["clientId"] for point in loaded["points"]] == [p["clientId"] for p in reversed(saved["points"])]
     assert [point["position"] for point in loaded["points"]] == [0, 1]
     assert loaded["points"][1]["pointId"] != saved["points"][0]["pointId"]
-    assert loaded["points"][1]["items"] == saved["points"][0]["items"]
+    assert loaded["points"][1]["items"][0]["itemId"] != saved["points"][0]["items"][0]["itemId"]
+    assert [{k: v for k, v in row.items() if k != "itemId"} for row in loaded["points"][1]["items"]] == [
+        {k: v for k, v in row.items() if k != "itemId"} for row in saved["points"][0]["items"]
+    ]
     events = await read_events(postgres, saved)
     deleted = next(event for event in events if event["event_type"] == "DeletePointEvent")
     assert deleted["payload"]["data"]["client_id"] == {
@@ -588,12 +591,14 @@ async def test_product_name_is_client_snapshot_and_immutable(client: AsyncClient
     assert root["payload"]["data"]["points"][0]["items"][0]["product_name"] == historical_name
 
     points = patch_points(saved)
+    original_item_id = saved["points"][0]["items"][0]["itemId"]
     points[0]["items"][0].update(productName=catalog_name, quantity=7, price=45.0)
     response = await patch_with_revision(client, path, json={"points": points})
     assert response.status_code == 200
     saved = response.json()["data"]
     assert saved["points"][0]["items"] == [
         {
+            "itemId": original_item_id,
             "productId": product_id,
             "productName": historical_name,
             "quantity": 7,

@@ -39,13 +39,13 @@ LEFT JOIN LATERAL (
         ON representative.sales_representative_id = client.sales_representative_id
     LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object(
-            'product_id', i.product_id,
+            'item_id', i.item_id, 'product_id', i.product_id,
             'product_name', i.product_name,
             'quantity', i.quantity,
             'price', i.price,
             'is_free_price', i.is_free_price,
             'driver_note', i.driver_note
-        ) ORDER BY i.product_id) AS items
+        ) ORDER BY i.product_id, i.item_id) AS items
         FROM delivery_document_items AS i
         WHERE i.point_id = p.point_id
     ) AS point_items ON TRUE

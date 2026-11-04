@@ -25,6 +25,7 @@ class CreateItemReq(BaseSchema):
 
 
 class UpdateItemReq(BaseSchema):
+    item_id: UUID | None = None
     product_id: UUID
     product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
@@ -36,6 +37,16 @@ class UpdateItemReq(BaseSchema):
     driver_note: Annotated[str | None, Field(max_length=1000)] = Field(
         default=None, description="Route-only note for a free-price item; omit to preserve it."
     )
+
+
+def _validate_item_rows(items: list[CreateItemReq] | list[UpdateItemReq]) -> None:
+    ids = [getattr(item, "item_id", None) for item in items if getattr(item, "item_id", None) is not None]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Item IDs must be unique within a point.")
+    for item in items:
+        if sum(other.product_id == item.product_id for other in items) > 1:
+            if item.is_free_price is False or (item.is_free_price is None and getattr(item, "item_id", None) is None):
+                raise ValueError("Only free-price products may appear more than once in a point.")
 
 
 class CreatePointReq(BaseSchema):
@@ -51,9 +62,7 @@ class CreatePointReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        ids = [item.product_id for item in self.items]
-        if len(ids) != len(set(ids)):
-            raise ValueError("A product can appear only once in a point.")
+        _validate_item_rows(self.items)
         return self
 
 
@@ -73,9 +82,7 @@ class UpdatePointReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        ids = [item.product_id for item in self.items]
-        if len(ids) != len(set(ids)):
-            raise ValueError("A product can appear only once in a point.")
+        _validate_item_rows(self.items)
         return self
 
 
@@ -195,6 +202,7 @@ def _validate_pickup_clients(points: list[CreatePointReq] | list[UpdatePointReq]
 
 
 class ItemResp(BaseSchema):
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int

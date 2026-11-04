@@ -307,6 +307,14 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                             "points_delivery_document_id_position_key DEFERRED",
                         )
                     )
+            removed_items = [
+                item for point in document.points for item in sa_inspect(point).attrs["items"].history.deleted
+            ]
+            if removed_items:
+                for item in removed_items:
+                    await self._session.delete(item)
+                # Release ordinary-product uniqueness before inserting replacements.
+                await self._session.flush(objects=removed_items)
             await self._session.flush()
             if collection_changed:
                 await self._session.execute(
@@ -542,7 +550,9 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         if pgcode == pg_excs.UniqueViolation.sqlstate and Point.UQ_DOCUMENT_CLIENT in original:
             client_id = next((point.client_id for point in document.points if point.client_id is not None), UUID(int=0))
             raise DeliveryDocumentPointClientAlreadyExistsException(client_id=client_id) from exc
-        if pgcode == pg_excs.UniqueViolation.sqlstate and "delivery_document_items_pkey" in original:
+        if pgcode == pg_excs.UniqueViolation.sqlstate and (
+            "delivery_document_items_pkey" in original or "uq_document_item_standard_product" in original
+        ):
             entity_id = next((item.product_id for point in document.points for item in point.items), UUID(int=0))
             raise DeliveryDocumentPointProductAlreadyExistsException(product_id=entity_id) from exc
         if pgcode == pg_excs.ForeignKeyViolation.sqlstate:

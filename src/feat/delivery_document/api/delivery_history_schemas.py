@@ -7,6 +7,7 @@ from src.common.api.schemas import BaseSchema
 
 
 class HistoryItemResp(BaseSchema):
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int

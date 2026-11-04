@@ -8,6 +8,7 @@ WITH filtered_lines AS (
     JOIN points AS p USING (delivery_document_id)
     JOIN delivery_document_items AS i USING (point_id)
     WHERE d.is_active AND p.is_delivered
+      AND (NOT i.is_free_price OR i.price > 0)
       AND d.planned_date BETWEEN :date_from AND :date_to
 ), product_totals AS (
     SELECT payment_method_id,

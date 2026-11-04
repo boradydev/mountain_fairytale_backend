@@ -529,8 +529,11 @@ class TestDeliveryDocumentRouters:
         ]
         assert [point["position"] for point in replaced["points"]] == [0, 1]
         assert replaced["points"][0]["pointId"] == second_point_id
+        new_item_id = replaced["points"][0]["items"][0]["itemId"]
+        assert new_item_id not in {row["itemId"] for point in created["points"] for row in point["items"]}
         assert replaced["points"][0]["items"] == [
             {
+                "itemId": new_item_id,
                 "productId": second_product["productId"],
                 "productName": second_product["name"],
                 "quantity": 8,

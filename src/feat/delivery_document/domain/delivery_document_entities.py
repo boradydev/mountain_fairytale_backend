@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Self
-from uuid import UUID, uuid5
+from uuid import UUID
 
 from sqlalchemy import (
     Boolean,
@@ -18,6 +18,7 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -51,18 +52,26 @@ class DocumentType(str, Enum):
 
 
 class Item(BaseEntity):
-    _EVENT_FIELDS = {"product_id", "product_name", "quantity", "price", "is_free_price", "driver_note"}
+    _EVENT_FIELDS = {"item_id", "product_id", "product_name", "quantity", "price", "is_free_price", "driver_note"}
     _EVENT_SUBJECT_TYPE = "delivery_item"
     _EVENT_NAME_FIELDS = ("product_name",)
 
     def _event_subject_id(self) -> UUID:
-        return uuid5(self.point_id, str(self.product_id))
+        return self.item_id
 
     def _event_snapshot(self) -> dict[str, Any]:
         return {**self.snapshot(), "display_name": self.product_name}
 
     __tablename__ = "delivery_document_items"
     __table_args__ = (
+        Index("ix_document_items_point", "point_id"),
+        Index(
+            "uq_document_item_standard_product",
+            "point_id",
+            "product_id",
+            unique=True,
+            postgresql_where=text("NOT is_free_price"),
+        ),
         CheckConstraint(
             "char_length(product_name) BETWEEN 1 AND 120", name="delivery_document_items_product_name_check"
         ),
@@ -72,8 +81,9 @@ class Item(BaseEntity):
         ),
     )
 
-    point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"), primary_key=True)
-    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"), primary_key=True)
+    item_id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, server_default=text("gen_random_uuid()"))
+    point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"))
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"))
     product_name: Mapped[str] = mapped_column(Text)
     quantity: Mapped[int] = mapped_column(Integer)
     price: Mapped[Decimal] = mapped_column(Numeric)
@@ -105,6 +115,7 @@ class Item(BaseEntity):
                 field="driver_note", message="Driver notes are available only for free-price items."
             )
         item = cls(
+            item_id=uuid7(),
             point_id=point_id,
             product_id=product_id,
             product_name=product_name,
@@ -120,6 +131,7 @@ class Item(BaseEntity):
 
     def snapshot(self) -> dict[str, Any]:
         return {
+            "item_id": self.item_id,
             "product_id": self.product_id,
             "product_name": self.product_name,
             "quantity": self.quantity,
@@ -353,12 +365,23 @@ class Point(BaseEntity):
 
         if not hasattr(self, "_detached_events"):
             self._detached_events = []
-        existing = {item.product_id: item for item in self.items}
+        existing = {item.item_id: item for item in self.items}
         updated: list[Item] = []
         requested_ids: set[UUID] = set()
         for requested in items:
-            requested_ids.add(requested.product_id)
-            item = existing.get(requested.product_id)
+            item_id = getattr(requested, "item_id", None)
+            item = existing.get(item_id) if item_id is not None else None
+            if item_id is not None and item is None:
+                raise DeliveryDocumentUpdateException(field="item_id", message="Item does not belong to this point.")
+            if item_id is None and "item_id" not in getattr(requested, "model_fields_set", set()):
+                matches = [old for old in self.items if old.product_id == requested.product_id]
+                if len(matches) > 1:
+                    raise DeliveryDocumentUpdateException(field="item_id", message="Repeated rows require itemId.")
+                item = matches[0] if matches else None
+            if item is not None and item.product_id != requested.product_id:
+                raise DeliveryDocumentUpdateException(
+                    field="product_id", message="Replace the row to change its product."
+                )
             if item is None:
                 item = Item.create(
                     actor_id=actor_id,
@@ -382,9 +405,17 @@ class Point(BaseEntity):
                     price=requested.price,
                     driver_note=getattr(requested, "driver_note", None),
                 )
+            if item.item_id in requested_ids:
+                raise DeliveryDocumentUpdateException(field="item_id", message="Item IDs must be unique.")
+            requested_ids.add(item.item_id)
             updated.append(item)
+        for item in updated:
+            if not item.is_free_price and sum(other.product_id == item.product_id for other in updated) > 1:
+                raise DeliveryDocumentUpdateException(
+                    field="product_id", message="Only free-price products may repeat."
+                )
         for old_item in self.items:
-            if old_item.product_id not in requested_ids:
+            if old_item.item_id not in requested_ids:
                 old_item.mark_deleted(actor_id=actor_id)
                 self._detached_events.extend(old_item.pull_events())
         self.items = updated

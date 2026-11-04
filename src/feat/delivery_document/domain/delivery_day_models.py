@@ -23,6 +23,7 @@ class DeliveryDay:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DayDocumentItem:
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int
