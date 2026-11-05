@@ -269,7 +269,7 @@ class TestClientRouters:
             response = await client.get(BASE_PATH, params={"search": marker, "include_deactivated": include})
             assert response.status_code == 200
             assert response.json()["total"] == total
-        for query in (uuid4().hex, "%", "_"):
+        for query in (uuid4().hex, f"%{marker}", f"_{marker}"):
             response = await client.get(BASE_PATH, params={"search": query})
             assert response.status_code == 200
             assert response.json()["total"] == 0

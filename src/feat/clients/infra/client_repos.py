@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import bindparam, case, func, or_, select, text
+from sqlalchemy import Float, bindparam, case, cast, func, literal, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -17,6 +17,7 @@ from src.feat.clients.domain.client_excs import (
     ClientRelatedEntityNotFoundException,
 )
 from src.feat.clients.domain.client_order_models import LastOrder, LastOrderItem
+from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, Item, Point
 
 
 class ClientsRepository(IClientsRepository):
@@ -141,9 +142,10 @@ class ClientsRepository(IClientsRepository):
         offset: int,
         limit: int,
         search: str | None = None,
+        mode: Literal["database", "follow_up"] = "database",
     ) -> tuple[list[Client], int]:
         filters = []
-        if not include_deactivated:
+        if not include_deactivated or mode == "follow_up":
             filters.append(Client.is_active.is_(True))
 
         term = (search or "").strip()
@@ -151,22 +153,53 @@ class ClientsRepository(IClientsRepository):
             matches = [
                 Client.name.icontains(term, autoescape=True),
                 Client.address.icontains(term, autoescape=True),
+                Client.delivery_details.icontains(term, autoescape=True),
             ]
             digits = re.sub(r"[^0-9]", "", term)
             if digits:
                 matches.append(func.regexp_replace(Client.phone, "[^0-9]", "", "g").contains(digits))
             filters.append(or_(*matches))
 
-        count_stmt = select(func.count()).select_from(Client).where(*filters)
+        ordering = [Client.created_at.desc(), Client.client_id.desc()]
+        if mode == "follow_up":
+            # Same successful-sale criteria as _load_last_orders; aggregate before pagination.
+            last_sales = (
+                select(Point.client_id, func.max(DeliveryDocument.planned_date).label("last_date"))
+                .join(DeliveryDocument, Point.delivery_document_id == DeliveryDocument.delivery_document_id)
+                .where(
+                    DeliveryDocument.is_active.is_(True),
+                    Point.is_delivered.is_(True),
+                    select(Item.point_id).where(Item.point_id == Point.point_id).exists(),
+                )
+                .group_by(Point.client_id)
+                .subquery()
+            )
+            last_date = last_sales.c.last_date
+            # Server-local calendar dates match the date-only order projection in Flutter.
+            now = datetime.now()
+            days = literal(now.date()) - last_date
+            urgency = case(
+                (or_(last_date.is_(None), Client.sleeping_threshold_days == 0), literal(float("inf"))),
+                else_=cast(days, Float) / func.nullif(Client.sleeping_threshold_days, 0),
+            )
+            filters.extend(
+                [
+                    or_(Client.cooldown_until.is_(None), Client.cooldown_until <= now),
+                    urgency >= 1,
+                ]
+            )
+            ordering = [urgency.desc(), Client.name.collate("C").asc(), Client.client_id.asc()]
+
+        count_stmt = select(func.count()).select_from(Client)
+        if mode == "follow_up":
+            count_stmt = count_stmt.outerjoin(last_sales, last_sales.c.client_id == Client.client_id)
+        count_stmt = count_stmt.where(*filters)
         total = int((await self._session.execute(count_stmt)).scalar_one())
 
-        stmt = (
-            select(Client)
-            .where(*filters)
-            .order_by(Client.created_at.desc(), Client.client_id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        stmt = select(Client)
+        if mode == "follow_up":
+            stmt = stmt.outerjoin(last_sales, last_sales.c.client_id == Client.client_id)
+        stmt = stmt.where(*filters).order_by(*ordering).offset(offset).limit(limit)
         result = await self._session.execute(stmt)
         clients = list(result.unique().scalars().all())
         await self._load_last_orders(clients)

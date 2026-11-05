@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Literal
 from uuid import UUID
 
 from src.feat.clients.domain.client_entities import Client
@@ -25,6 +26,7 @@ class IClientsRepository(ABC):
         offset: int,
         limit: int,
         search: str | None = None,
+        mode: Literal["database", "follow_up"] = "database",
     ) -> tuple[list[Client], int]:
         """Возвращает страницу клиентов и общее количество подходящих записей."""
 
