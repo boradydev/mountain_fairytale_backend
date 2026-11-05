@@ -1,7 +1,7 @@
 import re
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, TypedDict
+from typing import Annotated, Any, TypedDict
 from uuid import UUID
 
 from psycopg import errors as pg_excs
@@ -154,6 +154,65 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                 # Historical documents never rewind the odometer automatically.
                 car.update(actor_id=actor_id, current_mileage=max(car.current_mileage, document.end_mileage))
             events.extend(car.pull_events())
+        return events
+
+    async def correct_missing_representatives(
+        self, document: DeliveryDocument, *, points: list[Any], actor_id: UUID
+    ) -> list[BaseDomainEvent]:
+        corrections = [point for point in points if "sales_representative_id" in point.model_fields_set]
+        if not corrections:
+            return []
+        if document.document_type != DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET:
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id", message="Only saved delivery route points can be corrected."
+            )
+        saved = {point.point_id: point for point in document.points}
+        for requested in corrections:
+            point = saved.get(requested.point_id)
+            if point is None or requested.sales_representative_id is None or point.client_id != requested.client_id:
+                raise DeliveryDocumentUpdateException(
+                    field="sales_representative_id",
+                    message="Supply an active representative for an existing point of this document and client.",
+                )
+        events = []
+        # The document row is already locked. Lock shared clients/representatives in a stable order,
+        # reloading their current values and keeping every mutation in the document transaction.
+        with self._session.no_autoflush:
+            clients = {
+                client.client_id: client
+                for client in await self._session.scalars(
+                    select(Client)
+                    .where(Client.client_id.in_({saved[row.point_id].client_id for row in corrections}))
+                    .order_by(Client.client_id)
+                    .with_for_update(of=Client)
+                    .execution_options(populate_existing=True)
+                )
+            }
+            representatives = {
+                rep.sales_representative_id: rep
+                for rep in await self._session.scalars(
+                    select(SalesRepresentative)
+                    .where(
+                        SalesRepresentative.sales_representative_id.in_(
+                            {row.sales_representative_id for row in corrections}
+                        )
+                    )
+                    .order_by(SalesRepresentative.sales_representative_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            }
+        for requested in corrections:
+            point = saved[requested.point_id]
+            representative = representatives.get(requested.sales_representative_id)
+            if representative is None:
+                raise DeliveryDocumentUpdateException(
+                    field="sales_representative_id", message="The selected representative does not exist."
+                )
+            point.assign_missing_representative(actor_id=actor_id, representative=representative)
+            client = clients[point.client_id]
+            client.update(actor_id=actor_id, sales_representative_id=representative.sales_representative_id)
+            events.extend(client.pull_events())
         return events
 
     async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None:

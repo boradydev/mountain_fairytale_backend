@@ -78,6 +78,11 @@ class UpdatePointReq(BaseSchema):
         description="Explicit UUID/null replaces the point payment method. Omitted preserves existing points; "
         "new points use the client default.",
     )
+    sales_representative_id: UUID | None = Field(
+        default=None,
+        description="One-time assignment for a saved route point without a historical representative or commission. "
+        "Omit to preserve history; explicit null is forbidden.",
+    )
     items: list[UpdateItemReq]
 
     @model_validator(mode="after")

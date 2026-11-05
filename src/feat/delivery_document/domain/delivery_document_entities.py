@@ -352,6 +352,38 @@ class Point(BaseEntity):
         )
         return point
 
+    def assign_missing_representative(self, *, actor_id: UUID, representative: SalesRepresentative) -> None:
+        commission = self.commission
+        if (
+            self.snapshot_sales_representative_id is not None
+            or commission is None
+            or commission.sales_representative_id is not None
+            or commission.commission_percent != 0
+            or commission.commission_payable != 0
+        ):
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id",
+                message="Historical representative or commission already exists, or commission data is inconsistent. "
+                "Only an unassigned point with a zero rate and payable can be corrected.",
+            )
+        if not representative.is_active:
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id", message="Activate the representative before assigning them."
+            )
+        representative_id = representative.sales_representative_id
+        self.snapshot_sales_representative_id = representative_id
+        self.snapshot_sales_representative = representative
+        commission.assign_missing_representative(
+            sales_representative_id=representative_id, commission_percent=representative.commission_percent
+        )
+        self._add_event(
+            UpdatePointEvent(
+                actor_id=actor_id,
+                point_id=self.point_id,
+                changes={"snapshot_sales_representative_id": FieldChange(old=None, new=representative_id)},
+            )
+        )
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "point_id": self.point_id,

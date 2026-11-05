@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from src.common.domain.events import BaseDomainEvent
@@ -36,6 +37,11 @@ class IDeliveryDocumentsRepository(ABC):
         previous_car_id: UUID | None = None,
         previous_end_mileage: float | None = None,
         previous_car_mileage: float | None = None,
+    ) -> list[BaseDomainEvent]: ...
+
+    @abstractmethod
+    async def correct_missing_representatives(
+        self, document: DeliveryDocument, *, points: list[Any], actor_id: UUID
     ) -> list[BaseDomainEvent]: ...
 
     @abstractmethod

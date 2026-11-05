@@ -79,6 +79,9 @@ class UpdateDeliveryDocumentUseCase:
                 if point.point_id is None and point.client_id is not None
             }
             payment_method_ids = await repo.get_default_payment_method_ids(new_point_client_ids)
+            client_events = await repo.correct_missing_representatives(
+                document, points=dto.payload.points or [], actor_id=dto.actor_id
+            )
             document.update(
                 actor_id=dto.actor_id,
                 request=dto.payload,
@@ -104,7 +107,7 @@ class UpdateDeliveryDocumentUseCase:
                 previous_car_mileage=correction,
             )
             await repo.update(document)
-            events = document.pull_aggregate_events() + car_events
+            events = document.pull_aggregate_events() + client_events + car_events
             loaded = await repo.get_by_id(
                 document.delivery_document_id,
                 document_type=document.document_type,
