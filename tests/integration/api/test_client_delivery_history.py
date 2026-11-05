@@ -219,3 +219,36 @@ async def test_client_history_validation_and_auth(client):
             "/protected/client-delivery-history", params={"date_from": "2026-01-01", "date_to": "2026-01-02"}
         )
     ).status_code == 401
+
+
+async def test_filtered_client_history_counts_all_route_points(client, active_employee, client_factory):
+    await API.login(client, active_employee)
+    customers = [await client_factory(name=f"Count route customer {name}") for name in ["Alpha", "Beta", "Gamma"]]
+    product = await API.create_product(client, unique_product_name("route-count"))
+    points = [API.point_payload(str(customer.client_id), product["productId"]) for customer in customers]
+    points[2].update(isDelivered=False, nonDeliveryReason="Absent")
+    response = await create_delivery(client, json={"plannedDate": "2392-06-01", "points": points})
+    assert response.status_code == 201, response.text
+    document = response.json()["data"]
+    loaded = await client.get(f"/protected/delivery-route-sheets/{document['deliveryDocumentId']}")
+    assert loaded.status_code == 200, loaded.text
+    assert len(loaded.json()["data"]["points"]) == 3
+
+    response = await client.get(
+        "/protected/client-delivery-history",
+        params={"date_from": "2392-06-01", "date_to": "2392-06-01", "search": "Count route customer Alpha", "limit": 1},
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["total"] == 1
+    delivery = result["data"]["deliveries"][0]
+    assert delivery["pointId"] == document["points"][0]["pointId"]
+    assert delivery["clientsCount"] == 3
+
+    response = await client.get(
+        "/protected/client-delivery-history",
+        params={"date_from": "2392-06-01", "date_to": "2392-06-01", "limit": 1, "offset": 2},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 3
+    assert response.json()["data"]["deliveries"][0]["clientsCount"] == 3

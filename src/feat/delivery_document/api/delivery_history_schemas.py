@@ -61,6 +61,7 @@ class ClientDeliveryResp(HistoryClientPurchaseResp):
     driver_name: str | None
     car_model_and_number: str | None
     document_total_amount: Decimal
+    clients_count: int
 
 
 class ClientDeliveryHistoryResp(BaseSchema):

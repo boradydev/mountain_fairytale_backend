@@ -29,7 +29,8 @@ OR этих условий не дублирует точки. `total` счит�
 `clientName`, `phone`, `clientAddress`, `deliveryDetails`, составной `address`,
 `salesRepresentativeId` и разрешённый из справочника `salesRepresentativeName`.
 Контекст маршрута: `plannedDate`, `createdAt`, `driverName`, `carModelAndNumber`,
-`documentTotalAmount`. Поля точки: `isDelivered`, `nonDeliveryReason`, `memo`,
+`documentTotalAmount`, `clientsCount`. Количество клиентов — все точки исходного
+маршрута, включая недоставленные, независимо от поиска и пагинации. Поля точки: `isDelivered`, `nonDeliveryReason`, `memo`,
 `paymentMethodId/Name`, исходная `totalAmount` и `items`. У товаров сохраняются
 `itemId`, `productId`, `productName`, `quantity`, `price`, `amount`,
 `isFreePrice`, `driverNote`. Общая сумма маршрута не ограничивается поиском
@@ -49,7 +50,8 @@ OR этих условий не дублирует точки. `total` счит�
 При пустом поиске `matchedClients=[]`; новый экран документов не передаёт поиск
 и не показывает вложенные совпадения. Реквизиты совпавшей точки читаются из снимка.
 `createdAt` читается Flutter-моделью и показывается с подписью рядом с плановой датой;
-обе даты также видны в диалоге документов дня.
+в диалоге документов дня и миникарточке маршрута истории клиентов показывается
+только плановая дата с подписью «Дата».
 
 ## Снимки и интерфейс
 

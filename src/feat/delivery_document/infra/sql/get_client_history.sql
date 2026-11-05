@@ -17,6 +17,11 @@ WITH filtered AS (
     SELECT * FROM filtered
     ORDER BY planned_date DESC, created_at DESC, delivery_document_id DESC, position, point_id
     OFFSET :offset LIMIT :limit
+), route_counts AS (
+    SELECT all_points.delivery_document_id, count(*) AS clients_count
+    FROM points all_points
+    JOIN (SELECT DISTINCT delivery_document_id FROM page) routes USING (delivery_document_id)
+    GROUP BY all_points.delivery_document_id
 ), records AS (
     SELECT p.point_id, p.client_id, p.delivery_document_id, p.position,
         p.snapshot_client_name AS client_name, p.snapshot_phone AS phone,
@@ -27,11 +32,12 @@ WITH filtered AS (
         p.planned_date, p.created_at, driver.name AS driver_name,
         car.model || ' ' || car.number AS car_model_and_number,
         p.is_delivered, p.non_delivery_reason, p.memo, p.payment_method_id, payment.name AS payment_method_name,
-        goods.total_amount, goods.items,
+        goods.total_amount, goods.items, route_counts.clients_count,
         (SELECT COALESCE(sum(round(i.quantity * i.price, 2)), 0)::text
          FROM points all_points JOIN delivery_document_items i USING (point_id)
          WHERE all_points.delivery_document_id = p.delivery_document_id AND all_points.is_delivered) AS document_total_amount
     FROM page p
+    JOIN route_counts USING (delivery_document_id)
     LEFT JOIN sales_representatives rep ON rep.sales_representative_id = p.snapshot_sales_representative_id
     LEFT JOIN drivers driver USING (driver_id)
     LEFT JOIN cars car USING (car_id)

@@ -78,3 +78,4 @@ class ClientDelivery(HistoryClientPurchase):
     driver_name: str | None
     car_model_and_number: str | None
     document_total_amount: Decimal
+    clients_count: int
