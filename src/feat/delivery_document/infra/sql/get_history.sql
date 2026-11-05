@@ -2,6 +2,7 @@ WITH eligible AS (
     SELECT d.* FROM delivery_documents d
     WHERE d.planned_date BETWEEN :date_from AND :date_to
       AND (d.is_active OR :include_cancelled)
+      AND (:document_type = 'all' OR d.document_type = :document_type)
 ), matching_points AS (
     SELECT p.point_id, p.delivery_document_id
     FROM points p
@@ -38,9 +39,9 @@ WITH eligible AS (
         SELECT count(*) AS purchase_count, COALESCE(sum(CASE WHEN p.is_delivered THEN goods.total_amount ELSE 0 END), 0) AS total_amount,
                COALESCE(jsonb_agg(jsonb_build_object(
                    'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason, 'memo', p.memo, 'client_id', c.client_id,
-                   'client_name', c.name,
+                   'client_name', p.snapshot_client_name,
                    'address', c.address || CASE WHEN c.delivery_details <> '' THEN ' — ' || c.delivery_details ELSE '' END,
-                   'phone', c.phone,
+                   'phone', p.snapshot_phone,
                    'payment_method_id', p.payment_method_id, 'payment_method_name', payment.name,
                    'total_amount', round(goods.total_amount, 2)::text, 'items', goods.items
                ) ORDER BY p.position) FILTER (WHERE m.point_id IS NOT NULL), '[]'::jsonb) AS matched_clients

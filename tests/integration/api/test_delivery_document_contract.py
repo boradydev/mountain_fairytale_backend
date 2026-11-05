@@ -99,7 +99,7 @@ async def test_free_address_details_and_manual_order_without_coordinates(client,
     assert response.json()["data"]["deliveryAddress"] is None
     document = (await client.get(case["path"])).json()["data"]
     point = next(p for p in document["points"] if p["clientId"] == customer["clientId"])
-    assert point["address"] == "Произвольный адрес без карты — Позвонить у ворот"
+    assert point["address"] == case["document"]["points"][0]["address"]
     reordered = patch_points(document)[::-1]
     saved = await patch_with_revision(client, case["path"], json={"points": reordered})
     assert saved.status_code == 200, saved.text
@@ -869,13 +869,13 @@ async def test_document_client_details_are_separate_and_match_day_projection(cli
     for details in ("Вход со двора.\nПозвонить перед доставкой.", ""):
         response = await client.patch(f"/protected/clients/{customer}", json={"deliveryDetails": details})
         assert response.status_code == 200
-        client_address = response.json()["data"]["address"]
         direct = await client.get(case["path"])
         assert direct.status_code == 200
         point = direct.json()["data"]["points"][0]
-        assert point["clientAddress"] == client_address
-        assert point["deliveryDetails"] == details
-        assert point["address"] == client_address + (f" — {details}" if details else "")
+        saved = case["document"]["points"][0]
+        assert point["clientAddress"] == saved["clientAddress"]
+        assert point["deliveryDetails"] == saved["deliveryDetails"]
+        assert point["address"] == saved["address"]
         response = await client.get(f"/protected/delivery-days/{case['payload']['plannedDate']}/documents")
         assert response.status_code == 200
         listed = next(

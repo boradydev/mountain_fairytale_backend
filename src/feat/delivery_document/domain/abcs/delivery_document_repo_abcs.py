@@ -5,7 +5,7 @@ from uuid import UUID
 from src.common.domain.events import BaseDomainEvent
 from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock
-from src.feat.delivery_document.domain.delivery_history_models import HistoryDocument
+from src.feat.delivery_document.domain.delivery_history_models import ClientDelivery, HistoryDocument
 from src.feat.delivery_document.domain.sales_report_models import SalesReport
 
 
@@ -20,7 +20,9 @@ class IDeliveryDocumentsRepository(ABC):
         include_cancelled: bool,
         offset: int,
         limit: int,
-    ) -> tuple[list[HistoryDocument], int]: ...
+        document_type: str = "all",
+        clients: bool = False,
+    ) -> tuple[list[HistoryDocument] | list[ClientDelivery], int]: ...
 
     @abstractmethod
     async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None: ...

@@ -15,7 +15,10 @@ from src.feat.delivery_document.api.delivery_document_routers import (
     delivery_route_sheets_router,
     pickup_sheets_router,
 )
-from src.feat.delivery_document.api.delivery_history_routers import delivery_history_router
+from src.feat.delivery_document.api.delivery_history_routers import (
+    client_delivery_history_router,
+    delivery_history_router,
+)
 from src.feat.delivery_document.api.sales_report_routers import sales_report_router
 from src.feat.drivers.api.driver_routers import drivers_router
 from src.feat.employees.api.employee_routers import employees_router
@@ -43,6 +46,7 @@ protected.include_router(clients_router)
 protected.include_router(commissions_router)
 protected.include_router(delivery_days_router)
 protected.include_router(delivery_history_router)
+protected.include_router(client_delivery_history_router)
 protected.include_router(sales_report_router)
 protected.include_router(dashboard_updates_router)
 protected.include_router(delivery_route_sheets_router)

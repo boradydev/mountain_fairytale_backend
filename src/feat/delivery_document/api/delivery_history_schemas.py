@@ -48,3 +48,20 @@ class HistoryDocumentResp(BaseSchema):
 
 class DeliveryHistoryResp(BaseSchema):
     documents: list[HistoryDocumentResp]
+
+
+class ClientDeliveryResp(HistoryClientPurchaseResp):
+    client_address: str
+    delivery_details: str
+    sales_representative_id: UUID | None
+    sales_representative_name: str | None
+    delivery_document_id: UUID
+    planned_date: date
+    created_at: datetime
+    driver_name: str | None
+    car_model_and_number: str | None
+    document_total_amount: Decimal
+
+
+class ClientDeliveryHistoryResp(BaseSchema):
+    deliveries: list[ClientDeliveryResp]

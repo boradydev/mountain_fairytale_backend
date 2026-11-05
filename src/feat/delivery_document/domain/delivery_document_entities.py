@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
@@ -44,6 +45,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDoc
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class DocumentType(str, Enum):
@@ -173,6 +175,11 @@ class Item(BaseEntity):
 class Point(BaseEntity):
     _EVENT_FIELDS = {
         "point_id",
+        "snapshot_client_name",
+        "snapshot_phone",
+        "snapshot_client_address",
+        "snapshot_delivery_details",
+        "snapshot_sales_representative_id",
         "client_id",
         "payment_method_id",
         "position",
@@ -221,6 +228,15 @@ class Point(BaseEntity):
     memo: Mapped[str] = mapped_column(Text, default="", server_default="")
     position: Mapped[int] = mapped_column(Integer)
 
+    snapshot_client_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_client_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_delivery_details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_sales_representative_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("sales_representatives.sales_representative_id"), nullable=True
+    )
+    snapshot_sales_representative: Mapped[SalesRepresentative | None] = relationship(lazy="joined")
+
     client: Mapped[Client | None] = relationship(lazy="joined")
     payment_method: Mapped[PaymentMethod | None] = relationship(lazy="joined")
     items: Mapped[list[Item]] = relationship(cascade="all, delete-orphan", lazy="selectin")
@@ -229,28 +245,43 @@ class Point(BaseEntity):
     )
     _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id", "is_delivered", "non_delivery_reason", "memo"}
 
+    _client_snapshot_captured = False
+
+    def capture_client_snapshot(self, client: Client) -> None:
+        """Initialize a new point once; repositories never call this for persisted points."""
+        if self._client_snapshot_captured:
+            return
+        self._client_snapshot_captured = True
+        self.snapshot_client_name = client.name
+        self.snapshot_phone = client.phone
+        self.snapshot_client_address = client.address
+        self.snapshot_delivery_details = client.delivery_details
+        self.snapshot_sales_representative_id = client.sales_representative_id
+        self._events = [
+            replace(event, data={**event.data, **self.snapshot()}) if isinstance(event, CreatePointEvent) else event
+            for event in self._events
+        ]
+
     @property
     def client_name(self) -> str:
-        return self.client.name if self.client else ""
+        return self.snapshot_client_name or ""
 
     @property
     def phone(self) -> str:
-        return self.client.phone if self.client else ""
+        return self.snapshot_phone or ""
 
     @property
     def address(self) -> str:
-        if self.client is None:
-            return ""
-        details = self.client.delivery_details
-        return self.client.address + (f" — {details}" if details else "")
+        details = self.delivery_details
+        return self.client_address + (f" — {details}" if details else "")
 
     @property
     def client_address(self) -> str:
-        return self.client.address if self.client else ""
+        return self.snapshot_client_address or ""
 
     @property
     def delivery_details(self) -> str:
-        return self.client.delivery_details if self.client else ""
+        return self.snapshot_delivery_details or ""
 
     @property
     def default_payment_method_id(self) -> UUID | None:
@@ -266,11 +297,11 @@ class Point(BaseEntity):
 
     @property
     def sales_representative_id(self) -> UUID | None:
-        return self.client.sales_representative_id if self.client else None
+        return self.snapshot_sales_representative_id
 
     @property
     def sales_representative_name(self) -> str | None:
-        return self.client.sales_representative_name if self.client else None
+        return self.snapshot_sales_representative.name if self.snapshot_sales_representative else None
 
     @classmethod
     def create(
@@ -324,6 +355,11 @@ class Point(BaseEntity):
     def snapshot(self) -> dict[str, Any]:
         return {
             "point_id": self.point_id,
+            "snapshot_client_name": self.snapshot_client_name,
+            "snapshot_phone": self.snapshot_phone,
+            "snapshot_client_address": self.snapshot_client_address,
+            "snapshot_delivery_details": self.snapshot_delivery_details,
+            "snapshot_sales_representative_id": self.snapshot_sales_representative_id,
             "client_id": self.client_id,
             "payment_method_id": self.payment_method_id,
             "is_delivered": self.is_delivered,
@@ -618,6 +654,25 @@ class DeliveryDocument(BaseEntity):
             )
         )
         return document
+
+    def refresh_point_snapshot_events(self) -> None:
+        """Complete aggregate event data after capturing new points' client references."""
+        refreshed = []
+        for event in self._events:
+            if isinstance(event, CreateDeliveryDocumentEvent):
+                event = replace(event, data={**event.data, **self.snapshot()})
+            elif isinstance(event, UpdateDeliveryDocumentEvent) and "points" in event.changes:
+                event = replace(
+                    event,
+                    changes={
+                        **event.changes,
+                        "points": FieldChange(
+                            old=event.changes["points"].old, new=[point.snapshot() for point in self.points]
+                        ),
+                    },
+                )
+            refreshed.append(event)
+        self._events = refreshed
 
     def snapshot(self) -> dict[str, Any]:
         return {

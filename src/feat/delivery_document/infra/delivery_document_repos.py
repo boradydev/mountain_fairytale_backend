@@ -28,7 +28,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentRelatedEntityNotFoundException,
     DeliveryDocumentUpdateException,
 )
-from src.feat.delivery_document.domain.delivery_history_models import HistoryDocument
+from src.feat.delivery_document.domain.delivery_history_models import ClientDelivery, HistoryDocument
 from src.feat.delivery_document.domain.sales_report_models import (
     SalesReport,
     SalesReportPaymentMethod,
@@ -66,15 +66,18 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         include_cancelled: bool,
         offset: int,
         limit: int,
-    ) -> tuple[list[HistoryDocument], int]:
+        document_type: str = "all",
+        clients: bool = False,
+    ) -> tuple[list[HistoryDocument] | list[ClientDelivery], int]:
         term = search.strip()
         literal = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         digits = re.sub(r"[^0-9]", "", term)
         row = (
             (
                 await self._session.execute(
-                    SQL.GET_HISTORY,
+                    SQL.GET_CLIENT_HISTORY if clients else SQL.GET_HISTORY,
                     {
+                        "document_type": document_type,
                         "date_from": date_from,
                         "date_to": date_to,
                         "search": term,
@@ -90,7 +93,9 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             .mappings()
             .one()
         )
-        return _history_adapter.validate_python(row["documents"]), row["total"]
+        return (TypeAdapter(list[ClientDelivery]) if clients else _history_adapter).validate_python(
+            row["documents"]
+        ), row["total"]
 
     async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None:
         # Serialize retries and recovery reads, including the first in-flight create.
@@ -285,6 +290,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         )
 
     async def add(self, document: DeliveryDocument) -> None:
+        await self._capture_client_snapshots(document)
         self._session.add(document)
         try:
             await self._session.flush()
@@ -293,6 +299,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             raise
 
     async def update(self, document: DeliveryDocument) -> None:
+        await self._capture_client_snapshots(document)
         # Validate uniqueness against the final collection, allowing reordering
         # and replacement of a point by a new point for the same client.
         points_changed = sa_inspect(document).attrs.points.history.has_changes()
@@ -526,6 +533,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             raise DeliveryDocumentUpdateException(field="client_id", message="New points require an active client.")
         if any(not found_products[product_id][0] for product_id in new_product_ids):
             raise DeliveryDocumentUpdateException(field="product_id", message="New items require an active product.")
+        await self._capture_client_snapshots(document)
         for point in document.points:
             for item in point.items:
                 if not sa_inspect(item).persistent:
@@ -543,6 +551,35 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                             field="is_free_price",
                             message="A new item must use the current free-price setting of its catalog product.",
                         )
+
+    async def _capture_client_snapshots(self, document: DeliveryDocument) -> None:
+        snapshot_client_ids = {
+            point.client_id
+            for point in document.points
+            if point.client_id is not None
+            and not sa_inspect(point).persistent
+            and not getattr(point, "_client_snapshot_captured", False)
+        }
+        # Only transient points capture client data. Persisted snapshots are immutable.
+        with self._session.no_autoflush:
+            snapshot_clients = (
+                {
+                    client.client_id: client
+                    for client in (
+                        await self._session.scalars(select(Client).where(Client.client_id.in_(snapshot_client_ids)))
+                    )
+                    .unique()
+                    .all()
+                }
+                if snapshot_client_ids
+                else {}
+            )
+        for point in document.points:
+            if point.client_id is not None and not sa_inspect(point).persistent:
+                client = snapshot_clients.get(point.client_id)
+                if client is not None:
+                    point.capture_client_snapshot(client)
+        document.refresh_point_snapshot_events()
 
     async def _translate_integrity_error(self, exc: IntegrityError, document: DeliveryDocument) -> None:
         original = str(exc.orig)

@@ -15,16 +15,16 @@ LEFT JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
         'point_id', p.point_id, 'is_delivered', p.is_delivered, 'non_delivery_reason', p.non_delivery_reason, 'memo', p.memo,
         'client_id', p.client_id,
-        'client_name', COALESCE(client.name, ''),
-        'phone', COALESCE(client.phone, ''),
-        'address', COALESCE(client.address || CASE WHEN client.delivery_details <> '' THEN ' — ' || client.delivery_details ELSE '' END, ''),
-        'client_address', COALESCE(client.address, ''),
-        'delivery_details', COALESCE(client.delivery_details, ''),
+        'client_name', COALESCE(p.snapshot_client_name, ''),
+        'phone', COALESCE(p.snapshot_phone, ''),
+        'address', COALESCE(p.snapshot_client_address || CASE WHEN p.snapshot_delivery_details <> '' THEN ' — ' || p.snapshot_delivery_details ELSE '' END, ''),
+        'client_address', COALESCE(p.snapshot_client_address, ''),
+        'delivery_details', COALESCE(p.snapshot_delivery_details, ''),
         'default_payment_method_id', client.default_payment_method_id,
         'default_payment_method_name', default_payment.name,
         'payment_method_id', p.payment_method_id,
         'payment_method_name', historical_payment.name,
-        'sales_representative_id', client.sales_representative_id,
+        'sales_representative_id', p.snapshot_sales_representative_id,
         'sales_representative_name', representative.name,
         'position', p.position,
         'items', COALESCE(point_items.items, '[]'::jsonb)
@@ -36,7 +36,7 @@ LEFT JOIN LATERAL (
     LEFT JOIN payment_methods AS historical_payment
         ON historical_payment.payment_method_id = p.payment_method_id
     LEFT JOIN sales_representatives AS representative
-        ON representative.sales_representative_id = client.sales_representative_id
+        ON representative.sales_representative_id = p.snapshot_sales_representative_id
     LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object(
             'item_id', i.item_id, 'product_id', i.product_id,
