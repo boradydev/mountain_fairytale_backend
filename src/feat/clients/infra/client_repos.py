@@ -10,13 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.attributes import set_committed_value
 
+from src.common.domain.money import line_amount, sum_amounts
 from src.feat.clients.domain.abcs.client_repo_abcs import IClientsRepository
 from src.feat.clients.domain.client_entities import Client
 from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
-from src.feat.clients.domain.client_order_models import LastOrder, LastOrderItem
+from src.feat.clients.domain.client_order_models import LastOrder, LastOrderItem, LatestOrder, LatestOrderItem
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, Item, Point
 
 
@@ -38,6 +39,7 @@ class ClientsRepository(IClientsRepository):
     async def _load_last_orders(self, clients: list[Client]) -> None:
         if not clients:
             return
+        await self._load_latest_order_dates(clients)
         # One query per page, including only points with actual order lines.
         stmt = text("""
             WITH sales AS (
@@ -90,6 +92,67 @@ class ClientsRepository(IClientsRepository):
             set_committed_value(
                 client, "last_delivery_quantity", sum(item.quantity for item in summary.items) if summary else None
             )
+
+    # Shared eligibility for the independent created-at projection.
+    _LATEST_ORDER_FROM = """
+        FROM points p JOIN delivery_documents d USING (delivery_document_id)
+        WHERE d.document_type = 'delivery_route_sheet' AND d.is_active AND p.is_delivered
+          AND EXISTS (SELECT 1 FROM delivery_document_items i WHERE i.point_id = p.point_id)
+    """
+
+    async def _load_latest_order_dates(self, clients: list[Client]) -> None:
+        stmt = text(
+            "SELECT p.client_id, max(d.created_at) AS created_at "
+            + self._LATEST_ORDER_FROM
+            + " AND p.client_id IN :client_ids GROUP BY p.client_id"
+        ).bindparams(bindparam("client_ids", expanding=True))
+        rows = (await self._session.execute(stmt, {"client_ids": [c.client_id for c in clients]})).all()
+        dates = dict(rows)
+        for client in clients:
+            client.latest_order_created_at = dates.get(client.client_id)
+
+    async def get_latest_order(self, client_id: UUID) -> LatestOrder | None:
+        stmt = text(
+            """
+            WITH latest AS (
+                SELECT p.point_id, d.delivery_document_id, d.created_at, d.planned_date
+        """
+            + self._LATEST_ORDER_FROM
+            + """
+                AND p.client_id = :client_id
+                ORDER BY d.created_at DESC, d.delivery_document_id DESC, p.point_id DESC LIMIT 1
+            )
+            SELECT latest.*, i.item_id, i.product_id, i.product_name, i.quantity,
+                   i.price, i.is_free_price, i.driver_note
+            FROM latest JOIN delivery_document_items i USING (point_id)
+            ORDER BY i.product_name, i.product_id, i.item_id
+        """
+        )
+        rows = (await self._session.execute(stmt, {"client_id": client_id})).mappings().all()
+        if not rows:
+            return None
+        items = [
+            LatestOrderItem(
+                item_id=r["item_id"],
+                product_id=r["product_id"],
+                product_name=r["product_name"],
+                quantity=r["quantity"],
+                price=r["price"],
+                is_free_price=r["is_free_price"],
+                driver_note=r["driver_note"],
+                amount=line_amount(r["quantity"], r["price"]),
+            )
+            for r in rows
+        ]
+        row = rows[0]
+        return LatestOrder(
+            delivery_document_id=row["delivery_document_id"],
+            point_id=row["point_id"],
+            created_at=row["created_at"],
+            planned_date=row["planned_date"],
+            items=items,
+            total_amount=sum_amounts(item.amount for item in items),
+        )
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
         # Нужно переменные создать заранее, иначе после ошибка от asyncpg к атрибутам уже не обратится.
