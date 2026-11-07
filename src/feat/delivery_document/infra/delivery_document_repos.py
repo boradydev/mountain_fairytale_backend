@@ -1,4 +1,3 @@
-import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, TypedDict
@@ -13,6 +12,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.domain.events import BaseDomainEvent
 from src.common.domain.money import decimal_value, line_amount, sum_amounts
+from src.common.domain.search import extract_phone_search_digits
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
@@ -71,7 +71,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     ) -> tuple[list[HistoryDocument] | list[ClientDelivery], int]:
         term = search.strip()
         literal = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        digits = re.sub(r"[^0-9]", "", term)
+        digits = extract_phone_search_digits(term)
         row = (
             (
                 await self._session.execute(

@@ -132,7 +132,9 @@ async def test_follow_up_order_boundaries_and_successful_sales(client, active_em
 async def test_client_search_literal_details_phone_and_total(client, active_employee):
     await DeliveryAPI.login(client, active_employee)
     marker = str(uuid4())
-    row = await customer(client, f"ИВАНОВ {marker}", deliveryDetails=f"Подъезд %_\\ {marker}")
+    row = await customer(
+        client, f"ИВАНОВ {marker}", phone=str(uuid4().int)[-20:], deliveryDetails=f"Подъезд %_\\ {marker}"
+    )
     for query in [f"иванов {marker}", f"%_\\ {marker}", row["address"], row["phone"][3:]]:
         page = await listing(client, search=query)
         assert row["clientId"] in [r["clientId"] for r in page["data"]["clients"]]

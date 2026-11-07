@@ -1,4 +1,3 @@
-import re
 from datetime import datetime, time
 from typing import Literal
 from uuid import UUID
@@ -11,6 +10,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.attributes import set_committed_value
 
 from src.common.domain.money import line_amount, sum_amounts
+from src.common.domain.search import extract_phone_search_digits
 from src.feat.clients.domain.abcs.client_repo_abcs import IClientsRepository
 from src.feat.clients.domain.client_entities import Client
 from src.feat.clients.domain.client_excs import (
@@ -218,7 +218,7 @@ class ClientsRepository(IClientsRepository):
                 Client.address.icontains(term, autoescape=True),
                 Client.delivery_details.icontains(term, autoescape=True),
             ]
-            digits = re.sub(r"[^0-9]", "", term)
+            digits = extract_phone_search_digits(term)
             if digits:
                 matches.append(func.regexp_replace(Client.phone, "[^0-9]", "", "g").contains(digits))
             filters.append(or_(*matches))
