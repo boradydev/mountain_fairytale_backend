@@ -1,7 +1,7 @@
 # QA-приёмка «Горной сказки»
 
 Дата согласования стратегии: 06.11.2026.  
-Статус: **план утверждён; выполнение этапов ещё не начато**.  
+Статус: **план утверждён; этап 1 — На проверке (07.11.2026)**.
 Проекты: [backend](https://github.com/boradydev/mountain_fairytale_backend/tree/codex/delivery-history) и [Flutter Windows](https://github.com/boradydev/mountain_fairytale/tree/codex/delivery-history).  
 Рабочие ветки: `codex/delivery-history` в обоих репозиториях.
 
