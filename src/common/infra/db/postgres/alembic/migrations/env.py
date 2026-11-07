@@ -1,17 +1,30 @@
 from logging.config import fileConfig
+from os import environ
 
 import dotenv
 from alembic import context
+from alembic.util import CommandError
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.common.domain.base_model import BaseModel
+from src.common.infra.db.postgres.alembic.qa_guard import verify_qa_migration_connection
 from src.common.infra.db.postgres.settings import PostgresSettings
 
 
 config = context.config
+qa_arguments = context.get_x_argument(as_dictionary=True)
+qa_guard = "qa_guard" in qa_arguments
+if qa_guard and qa_arguments["qa_guard"] != "1":
+    raise CommandError("QA migration guard: qa_guard must be 1; migrations refused.")
 
 dotenv.load_dotenv(encoding="utf-8")
-postgres_settings = PostgresSettings()
+try:
+    postgres_settings = PostgresSettings()
+except KeyError:
+    if qa_guard:
+        raise CommandError("QA migration guard: connection configuration missing; migrations refused.") from None
+    raise
 config.set_main_option(
     "sqlalchemy.url",
     f"{postgres_settings.DB_URL_SYNC}",
@@ -36,6 +49,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
+    if qa_guard:
+        raise CommandError("QA migration guard: an online connection is required; offline migrations refused.")
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -62,11 +77,26 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-
-        with context.begin_transaction():
-            context.run_migrations()
+    try:
+        with connectable.connect() as connection:
+            if qa_guard:
+                # Explicit outer transaction owns both the guard SELECTs and migration writes.
+                # Otherwise SQLAlchemy autobegin from SELECT could leave migrations uncommitted.
+                with connection.begin():
+                    verify_qa_migration_connection(connection, qa_arguments, environ)
+                    context.configure(connection=connection, target_metadata=target_metadata)
+                    with context.begin_transaction():
+                        context.run_migrations()
+            else:
+                context.configure(connection=connection, target_metadata=target_metadata)
+                with context.begin_transaction():
+                    context.run_migrations()
+    except SQLAlchemyError:
+        if qa_guard:
+            raise CommandError("QA migration guard: database operation failed; migrations stopped.") from None
+        raise
+    finally:
+        connectable.dispose()
 
 
 if context.is_offline_mode():

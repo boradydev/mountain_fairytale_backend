@@ -115,7 +115,25 @@ def migrate(v):
         verify(c, v)
     activate(v)
     subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", str(ALEMBIC), "upgrade", "head"],
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(ALEMBIC),
+            "-x",
+            "qa_guard=1",
+            "-x",
+            f"qa_database={DB}",
+            "-x",
+            f"qa_host={HOST}",
+            "-x",
+            f"qa_port={PORT}",
+            "-x",
+            f"qa_role={ROLE}",
+            "upgrade",
+            "head",
+        ],
         cwd=ROOT,
         env={k: value for k, value in os.environ.items() if k != "QA_PG_ADMIN_PASSWORD"},
         check=True,
