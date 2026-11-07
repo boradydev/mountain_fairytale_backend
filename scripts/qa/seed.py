@@ -36,12 +36,12 @@ def save(path, data):
 
 
 @contextmanager
-def exclusive():
-    DIRECTORY.mkdir(parents=True, exist_ok=True)
+def exclusive(directory=DIRECTORY):
+    directory.mkdir(parents=True, exist_ok=True)
     # OS lock releases on crash; no stale sentinel requiring deletion.
     import msvcrt
 
-    with (DIRECTORY / "seed.lock").open("a+b") as stream:
+    with (directory / "seed.lock").open("a+b") as stream:
         stream.seek(0)
         if not stream.read(1):
             stream.write(b"0")

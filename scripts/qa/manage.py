@@ -345,9 +345,15 @@ def main():
             "seed",
             "seed-status",
             "manual-phones",
+            "scenario-prepare",
+            "scenario-verify",
+            "scenario-status",
         ],
     )
+    parser.add_argument("scenario", nargs="?", choices=["QA-001", "QA-002", "QA-003", "QA-004"])
+    parser.add_argument("--new-cycle", action="store_true")
     args = parser.parse_args()
+    require(not args.new_cycle or args.command == "scenario-prepare", "--new-cycle requires scenario-prepare")
     os.chdir(ROOT)
     if args.command == "init":
         initialize()
@@ -360,6 +366,10 @@ def main():
         serve(v)
     elif args.command == "check":
         status(v)
+    elif args.command.startswith("scenario-"):
+        from scripts.qa.scenarios import command
+
+        command(v, args.command, args.scenario, args.new_cycle)
     elif args.command in ("seed", "seed-status", "manual-phones"):
         from scripts.qa.seed import command
 

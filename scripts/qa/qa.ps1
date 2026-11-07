@@ -1,4 +1,8 @@
-param([ValidateSet('start','stop','check','migrate','reset','admin-password','init','seed','seed-status','manual-phones')][string]$Action = 'check')
+param(
+    [ValidateSet('start','stop','check','migrate','reset','admin-password','init','seed','seed-status','manual-phones','scenario-prepare','scenario-verify','scenario-status')][string]$Action = 'check',
+    [ValidateSet('QA-001','QA-002','QA-003','QA-004')][string]$Scenario,
+    [switch]$NewCycle
+)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Push-Location $root
@@ -21,7 +25,10 @@ try {
         Write-Host 'Stopped only managed QA backend.'
     } else {
         $command = if ($Action -eq 'start') { 'serve' } else { $Action }
-        & ./.venv/Scripts/python.exe -m scripts.qa.manage $command
+        $commandArgs = @($command)
+        if ($Scenario) { $commandArgs += $Scenario }
+        if ($NewCycle) { $commandArgs += '--new-cycle' }
+        & ./.venv/Scripts/python.exe -m scripts.qa.manage @commandArgs
         if ($LASTEXITCODE -ne 0) { throw "QA command failed ($LASTEXITCODE)" }
     }
 } finally { Pop-Location }
