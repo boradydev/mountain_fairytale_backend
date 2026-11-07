@@ -333,7 +333,9 @@ def status(v):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["init", "serve", "check", "migrate", "reset", "admin-password"])
+    parser.add_argument(
+        "command", choices=["init", "serve", "check", "migrate", "reset", "admin-password", "seed", "seed-status"]
+    )
     args = parser.parse_args()
     os.chdir(ROOT)
     if args.command == "init":
@@ -347,6 +349,10 @@ def main():
         serve(v)
     elif args.command == "check":
         status(v)
+    elif args.command in ("seed", "seed-status"):
+        from scripts.qa.seed import command
+
+        command(v, status_only=args.command == "seed-status")
     elif args.command == "migrate":
         migrate(v)
     elif args.command == "reset":

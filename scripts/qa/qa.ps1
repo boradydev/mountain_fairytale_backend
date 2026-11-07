@@ -1,4 +1,4 @@
-param([ValidateSet('start','stop','check','migrate','reset','admin-password','init')][string]$Action = 'check')
+param([ValidateSet('start','stop','check','migrate','reset','admin-password','init','seed','seed-status')][string]$Action = 'check')
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Push-Location $root
