@@ -106,6 +106,9 @@ def test_disposable_database_migrations_reset_and_persistence(monkeypatch, tmp_p
     monkeypatch.setattr(qa, "ROLE", role)
     monkeypatch.setattr(qa, "ENV", tmp_path / ".env.qa")
     monkeypatch.setattr(qa, "STATE", tmp_path / "process.json")
+    # initialize() only probes a bind here; no HTTP server subsequently reuses the port.
+    # Port zero lets the kernel allocate a free port atomically, including parallel runs.
+    monkeypatch.setattr(qa, "API_PORT", 0)
     saved_env = os.environ.copy()
 
     def restore_environment():

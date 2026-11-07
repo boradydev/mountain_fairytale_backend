@@ -104,10 +104,33 @@ async def test_client_list_mixed_text_and_phone(client, active_employee, client_
         for number, phone in [("01", "0001"), ("10", "0010"), ("11", "0011")]
     ]
     own = {str(c.client_id) for c in customers}
+    if mode == "follow_up":
+        # Force matching strangers ahead of our clients, even when this test runs alone.
+        for index in range(26):
+            await client_factory(
+                name=f"AAA-pagination-{marker()}-{index}", phone=f"{tag}-01{index:04d}", sleeping_threshold_days=0
+            )
 
     async def found(term, **extra):
         body = await query(client, "/protected/clients", dict(mode=mode, search=term, limit=100) | extra)
         return body, {c["clientId"] for c in body["data"]["clients"]}
+
+    async def all_matches(term):
+        # Other tests legitimately contribute phone matches; examine every bounded page.
+        offset, total, ids = 0, None, set()
+        while total is None or offset < total:
+            body, page_ids = await found(term, offset=offset, limit=25)
+            assert body["offset"] == offset
+            assert body["limit"] == 25
+            if total is None:
+                total = body["total"]
+            assert body["total"] == total
+            assert not (ids & page_ids)
+            assert len(page_ids) == min(25, total - offset)
+            ids.update(page_ids)
+            offset += 25
+        assert len(ids) == total
+        return ids
 
     for term in [f"QA-CORE-01 {tag}", f"  qa-core-01 {tag.upper()}  "]:
         body, actual = await found(term)
@@ -115,10 +138,12 @@ async def test_client_list_mixed_text_and_phone(client, active_employee, client_
         assert actual == {str(customers[0].client_id)}
     for term in [f"QA-CORE-00 {tag}", f"{tag}-0001"]:
         assert (await found(term))[0]["total"] == 0
-    assert (await found("01"))[1] & own == own
-    assert (await found("(00) 01"))[1] & own == {str(customers[0].client_id)}
+    assert (await all_matches("01")) & own == own
+    assert (await all_matches("(00) 01")) & own == {str(customers[0].client_id)}
     body, actual = await found(tag, offset=1, limit=1)
     assert body["total"] == 3
+    assert body["offset"] == 1
+    assert body["limit"] == 1
     assert len(actual) == 1
     response = await client.patch(f"/protected/clients/{customers[0].client_id}", json={"isActive": False})
     assert response.status_code == 200

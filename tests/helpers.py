@@ -1,8 +1,17 @@
+from itertools import count
+from secrets import randbelow
+from threading import Lock
 from uuid import uuid4
 
 from src.core.uuid7 import uuid7
 
+
 _issued_car_numbers: set[str] = set()
+_phone_capacity = 10**9
+_phone_offset = randbelow(_phone_capacity)
+_phone_sequence = count()
+_phone_lock = Lock()
+_phone_step = 618_033_989  # Coprime with 10**9: a permutation, without near-identical neighbours.
 
 
 def unique_username(prefix: str = "test") -> str:
@@ -27,7 +36,12 @@ def unique_car_number() -> str:
 
 
 def unique_phone() -> str:
-    return uuid4().hex
+    """Issue synthetic +79 numbers, unique within this process; never call or send SMS."""
+    with _phone_lock:
+        index = next(_phone_sequence)
+        if index >= _phone_capacity:
+            raise RuntimeError("Synthetic phone range exhausted")
+        return f"+79{(_phone_offset + index * _phone_step) % _phone_capacity:09d}"
 
 
 def unique_product_name(prefix: str = "product") -> str:
