@@ -10,10 +10,11 @@ backup.env
 .env.deploy-tmp
 tmp/operations/
 .pytest_cache/
+.pytest-tmp/
+.codex-tmp/
 __pycache__/
 .coverage
 alembic.md
-AGENTS.md
 # Local Geoapify research responses (no credentials).
 tmp/geoapify_probe/
 .cache/geoapify-tiles/
