@@ -15,6 +15,14 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 class Client(BaseEntity):
     @property
+    def latest_order_created_at(self) -> datetime | None:
+        return getattr(self, "_latest_order_created_at", None)
+
+    @latest_order_created_at.setter
+    def latest_order_created_at(self, value: datetime | None) -> None:
+        object.__setattr__(self, "_latest_order_created_at", value)
+
+    @property
     def last_order(self) -> LastOrder | None:
         """Read projection from documents, never persisted in clients."""
         return getattr(self, "_last_order", None)

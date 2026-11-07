@@ -1,4 +1,8 @@
 from datetime import date, timedelta
+from decimal import Decimal
+from uuid import uuid4
+
+import pytest
 
 from tests.document_requests import create_delivery, patch_with_revision
 from tests.helpers import delivery_address, unique_phone, unique_product_name
@@ -189,3 +193,163 @@ async def test_list_keeps_clients_and_distinct_products_separate(client, active_
         assert {item["productId"]: item["quantity"] for item in items} == {
             product["productId"]: index + number + 1 for number, product in enumerate(products)
         }
+
+
+@pytest.mark.parametrize("planned", ["2026-10-15", "2026-10-10"])
+async def test_latest_order_is_one_point_by_creation_and_keeps_business_date(
+    client,
+    active_employee,
+    client_factory,
+    planned,
+):
+    await DeliveryAPI.login(client, active_employee)
+    customer = await client_factory(phone=unique_phone(), sleeping_threshold_days=0)
+    customer_id = str(customer.client_id)
+    product = await DeliveryAPI.create_product(client, unique_product_name("latest"))
+    free = await client.post(
+        "/protected/products/create",
+        json={
+            "name": unique_product_name("service"),
+            "basePrice": 999,
+            "isFreePrice": True,
+        },
+    )
+    assert free.status_code == 201
+    free_id = free.json()["data"]["productId"]
+    older = await create_delivery(
+        client,
+        json={
+            "plannedDate": planned,
+            "points": [
+                DeliveryAPI.point_payload(customer_id, product["productId"], quantity=99),
+            ],
+        },
+    )
+    assert older.status_code == 201, older.text
+    payload = DeliveryAPI.point_payload(
+        customer_id, product["productId"], price=12.345, quantity=3, product_name="Историческая вода"
+    )
+    payload["items"].extend(
+        [
+            {
+                "productId": free_id,
+                "productName": "Историческая услуга",
+                "quantity": 1,
+                "price": 0.005,
+                "isFreePrice": True,
+                "driverNote": "Полное сохранённое примечание",
+            },
+            {
+                "productId": free_id,
+                "productName": "Та же услуга другой строкой",
+                "quantity": 2,
+                "price": 2.222,
+                "isFreePrice": True,
+                "driverNote": "Вторая строка",
+            },
+        ]
+    )
+    response = await create_delivery(client, json={"plannedDate": "2026-10-10", "points": [payload]})
+    assert response.status_code == 201, response.text
+    saved = response.json()["data"]
+    path = f"/protected/clients/{customer_id}/latest-order"
+    response = await client.get(path)
+    assert response.status_code == 200, response.text
+    order = response.json()["data"]
+    assert order["deliveryDocumentId"] == saved["deliveryDocumentId"]
+    assert order["pointId"] == saved["points"][0]["pointId"]
+    assert order["createdAt"] == saved["createdAt"]
+    assert order["plannedDate"] == "2026-10-10"
+    assert len(order["items"]) == 3
+    rows = {i["productName"]: i for i in order["items"]}
+    assert Decimal(rows["Историческая вода"]["price"]) == Decimal("12.345")
+    assert Decimal(rows["Историческая вода"]["amount"]) == Decimal("37.04")
+    assert rows["Историческая услуга"]["driverNote"] == "Полное сохранённое примечание"
+    assert rows["Историческая услуга"]["isFreePrice"] is True
+    assert Decimal(order["totalAmount"]) == Decimal("41.49")
+    assert Decimal(order["totalAmount"]) == sum(Decimal(i["amount"]) for i in order["items"])
+    # Catalog edits must never affect saved snapshots.
+    renamed = await client.patch(
+        f"/protected/products/{product['productId']}",
+        json={
+            "name": unique_product_name("renamed_latest"),
+            "basePrice": 500,
+            "isActive": False,
+        },
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert (await client.get(path)).json()["data"] == order
+    current = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
+    assert current["lastDeliveryDate"] == f"{planned}T00:00:00"
+    assert current["lastDeliveryQuantity"] == (105 if planned == "2026-10-10" else 99)
+    # Both dashboard modes retain pagination and return only a timestamp for this projection.
+    for mode in ("database", "follow_up"):
+        page = await client.get(
+            "/protected/clients",
+            params={
+                "search": customer.phone,
+                "mode": mode,
+                "offset": 0,
+                "limit": 1,
+            },
+        )
+        assert page.status_code == 200, page.text
+        body = page.json()
+        assert body["total"] == 1
+        assert body["offset"] == 0
+        assert body["limit"] == 1
+        row = body["data"]["clients"][0]
+        assert row["latestOrderCreatedAt"] == order["createdAt"]
+        assert row["lastOrder"] == current["lastOrder"]
+        assert "latestOrder" not in row
+        next_page = await client.get(
+            "/protected/clients",
+            params={
+                "search": customer.phone,
+                "mode": mode,
+                "offset": 1,
+                "limit": 1,
+            },
+        )
+        assert next_page.json()["data"]["clients"] == []
+        assert next_page.json()["total"] == 1
+
+
+@pytest.mark.parametrize("excluded", ["cancelled", "undelivered", "empty"])
+async def test_latest_order_skips_ineligible_newer_point(client, active_employee, client_factory, excluded):
+    await DeliveryAPI.login(client, active_employee)
+    customer = await client_factory(phone=unique_phone())
+    customer_id = str(customer.client_id)
+    product = await DeliveryAPI.create_product(client, unique_product_name("eligibility"))
+    point = DeliveryAPI.point_payload(customer_id, product["productId"])
+    response = await create_delivery(client, json={"plannedDate": "2026-10-10", "points": [point]})
+    assert response.status_code == 201, response.text
+    original = response.json()["data"]
+    if excluded == "empty":
+        point = {"clientId": customer_id, "items": []}
+    elif excluded == "undelivered":
+        point = {**point, "isDelivered": False, "nonDeliveryReason": "Клиент отсутствует"}
+    response = await create_delivery(client, json={"plannedDate": "2026-10-12", "points": [point]})
+    assert response.status_code == 201, response.text
+    newer = response.json()["data"]
+    if excluded == "cancelled":
+        assert (await client.post(f"{DELIVERY_BASE_PATH}/{newer['deliveryDocumentId']}/cancel")).status_code == 200
+    response = await client.get(f"/protected/clients/{customer_id}/latest-order")
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["deliveryDocumentId"] == original["deliveryDocumentId"]
+    assert (await client.post(f"{DELIVERY_BASE_PATH}/{original['deliveryDocumentId']}/cancel")).status_code == 200
+    assert (await client.get(f"/protected/clients/{customer_id}/latest-order")).json()["data"] is None
+    summary = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
+    assert summary["latestOrderCreatedAt"] is None
+
+
+async def test_latest_order_null_missing_client_and_auth(client, active_employee, client_factory):
+    customer = await client_factory(phone=unique_phone())
+    path = f"/protected/clients/{customer.client_id}/latest-order"
+    assert (await client.get(path)).status_code == 401
+    await DeliveryAPI.login(client, active_employee)
+    response = await client.get(path)
+    assert response.status_code == 200
+    assert response.json()["data"] is None
+    assert (await client.get(f"/protected/clients/{uuid4()}/latest-order")).status_code == 404
+    assert (await client.get("/protected/clients/not-a-uuid/latest-order")).status_code == 422

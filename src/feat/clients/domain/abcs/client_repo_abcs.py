@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import UUID
 
 from src.feat.clients.domain.client_entities import Client
+from src.feat.clients.domain.client_order_models import LatestOrder
 
 
 class IClientsRepository(ABC):
@@ -17,6 +18,10 @@ class IClientsRepository(ABC):
     @abstractmethod
     async def get_by_id(self, client_id: UUID) -> Client | None:
         """Возвращает клиента по ID."""
+
+    @abstractmethod
+    async def get_latest_order(self, client_id: UUID) -> LatestOrder | None:
+        """Return one eligible point ordered by document creation time."""
 
     @abstractmethod
     async def get_all(

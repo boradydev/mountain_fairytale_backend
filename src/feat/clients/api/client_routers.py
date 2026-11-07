@@ -64,6 +64,7 @@ from src.feat.clients.api.client_schemas import (
     ClientResp,
     ClientsResp,
     CreateClientReq,
+    LatestOrderResp,
     UpdateClientReq,
 )
 from src.feat.clients.app.usecases.check_duplicate import CheckClientDuplicateDTO
@@ -373,3 +374,19 @@ async def update_client(
         ),
     )
     return StdResponse(data=ClientResp.model_validate(client))
+
+
+@clients_router.get(
+    "/{client_id}/latest-order",
+    response_model=StdResponse[LatestOrderResp | None],
+    responses=map_exceptions_to_responses(UnauthorizedException, client_excs.ClientNotFoundException),
+    description="One active delivered nonempty route point, ordered by created_at, document ID and point ID DESC. "
+    "Historical rows only; no eligible order returns data: null. Unknown client returns 404.",
+)
+async def get_latest_order(
+    client_id: Annotated[UUID, Path()],
+    ctx: Context,
+    _access_token_payload: AccessTokenPayloadDep,
+) -> StdResponse[LatestOrderResp | None]:
+    order = await ctx.clients_use_cases.get_latest_order().execute(GetClientDTO(client_id=client_id))
+    return StdResponse(data=LatestOrderResp.model_validate(order) if order is not None else None)
