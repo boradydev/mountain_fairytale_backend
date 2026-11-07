@@ -17,7 +17,7 @@ import httpx
 from psycopg import sql
 
 from scripts.qa import manage as q
-from scripts.qa.seed_plan import TABLES, VERSION, anchor_date, catalogs, clients, documents, expectations
+from scripts.qa.seed_plan import TABLES, VERSION, anchor_date, catalogs, clients, documents, expectations, manual_phone
 
 
 DIRECTORY = q.ROOT / ".codex-tmp" / "qa-seed"
@@ -283,6 +283,72 @@ class Seed:
                 if field in saved:
                     q.require(current.get(field) == saved[field], f"CORE/dependency changed: {key}/{field}")
 
+    def update_manual_phones(self):
+        """Explicit maintenance of stage2-v1; retain original inputs and resumable phone-only intents."""
+        self.guard()
+        q.require(self.state and self.state["complete"], "A complete stage2-v1 manifest is required")
+        q.require(not self.state.get("pending"), "Finish/inspect the existing seed intent first")
+        objects = self.state["objects"]
+        keys = {f"client{i}" for i in range(20, 30)}
+        actual_keys = {k for k, o in objects.items() if o["group"] == "MANUAL" and o["kind"] == "clients"}
+        q.require(actual_keys == keys, "Unexpected MANUAL client membership")
+        self.login()
+        self.inventory()
+        self.verify_objects()
+        ledger = self.state.get("manualPhoneUpdate", {})
+        q.require(set(ledger) <= keys, "Unexpected phone journal membership")
+        current = {}
+        # Validate every card and every target before the first PATCH.
+        used = {}
+        for identity, phone in self.c.execute("SELECT client_id,phone FROM clients").fetchall():
+            digits = "".join(c for c in phone if "0" <= c <= "9")
+            used.setdefault(digits, set()).add(str(identity))
+        for index in range(20, 30):
+            key, target = f"client{index}", manual_phone(index)
+            obj = objects[key]
+            old = obj["initial"]["phone"]
+            q.require(old in (f"QA-TEST-{index:04}", target), f"Unexpected initial phone: {key}")
+            card = self.request("GET", f"/protected/clients/{obj['id']}")
+            q.require(card["clientId"] == obj["id"], f"Client UUID mismatch: {key}")
+            q.require(
+                used.get(target[1:], {obj["id"]}) <= {obj["id"]}, f"Phone already belongs to another client: {key}"
+            )
+            if key in ledger:
+                row = ledger[key]
+                q.require(row["status"] in ("pending", "done"), f"Invalid phone journal status: {key}")
+                q.require(row["clientId"] == obj["id"] and row["target"] == target, f"Phone journal conflict: {key}")
+                allowed = {target} if row["status"] == "done" else {row["before"]["phone"], target}
+            else:
+                allowed = {old, target}
+            q.require(card["phone"] in allowed, f"Manual phone conflict: {key}/{obj['id']}; no overwrite")
+            current[key] = card
+        patches = 0
+        for index in range(20, 30):
+            key, target = f"client{index}", manual_phone(index)
+            obj, before = objects[key], current[f"client{index}"]
+            row = ledger.get(key)
+            if row and row["status"] == "done":
+                continue
+            if row is None:
+                row = dict(clientId=obj["id"], target=target, before=before, status="pending")
+                ledger[key] = row
+                self.state["manualPhoneUpdate"] = ledger
+                self.persist()
+            live = self.request("GET", f"/protected/clients/{obj['id']}")
+            desired = row["before"] | {"phone": target}
+            q.require(live in (row["before"], desired), f"Concurrent/manual edit: {key}; journal retained")
+            if live["phone"] != target:
+                response = self.request("PATCH", f"/protected/clients/{obj['id']}", {"phone": target})
+                live = self.request("GET", f"/protected/clients/{obj['id']}")
+                q.require(live == response, f"Phone readback mismatch: {key}; journal retained")
+                patches += 1
+            q.require(live == desired, f"Non-phone fields changed: {key}; journal retained")
+            obj["saved"] = live
+            row.update(status="done", after=live)
+            self.persist()
+        self.verify_objects()
+        print(f"MANUAL phones verified: 10 clients, {patches} PATCH; CORE and initial inputs preserved")
+
     def run(self):
         self.guard()
         self.login()
@@ -520,7 +586,7 @@ class Seed:
         )
 
 
-def command(v, status_only=False):
+def command(v, status_only=False, manual_phones=False):
     with (
         exclusive(),
         q.connect(v) as connection,
@@ -529,7 +595,9 @@ def command(v, status_only=False):
         policy = tomllib.loads((q.ROOT / "client_compatibility.toml").read_text(encoding="utf-8"))
         client.headers["X-Client-Version"] = policy["flutter"]["min_version"]
         seed = Seed(v, connection, client)
-        if status_only:
+        if manual_phones:
+            seed.update_manual_phones()
+        elif status_only:
             seed.guard()
             q.require(seed.state is not None, "No prepared seed manifest")
             seed.login()

@@ -13,7 +13,7 @@ import pytest
 
 from scripts.qa import manage as q
 from scripts.qa.seed import Seed, save
-from scripts.qa.seed_plan import TABLES, VERSION, catalogs, clients, documents, expectations
+from scripts.qa.seed_plan import TABLES, VERSION, catalogs, clients, documents, expectations, manual_phone
 
 
 class MemorySeed(Seed):
@@ -70,6 +70,144 @@ class MemorySeed(Seed):
 @pytest.fixture
 def memory(tmp_path):
     return MemorySeed(tmp_path / "manifest.json", {})
+
+
+@pytest.fixture
+def legacy_phones(memory, monkeypatch):
+    from scripts.qa import seed
+
+    def legacy_clients(objects):
+        for key, kind, body, group in clients(objects):
+            if group == "MANUAL":
+                body["phone"] = f"QA-TEST-{int(key.removeprefix('client')):04}"
+            yield key, kind, body, group
+
+    monkeypatch.setattr(seed, "clients", legacy_clients)
+    memory.run()
+
+    def phone_rows(*_):
+        memory.c.execute.return_value.fetchall.return_value = [
+            (o["id"], memory.store[o["id"]]["response"]["phone"])
+            for o in memory.state["objects"].values()
+            if o["kind"] == "clients"
+        ]
+        return memory.c.execute.return_value
+
+    memory.c.execute.side_effect = phone_rows
+    return memory
+
+
+def test_core_and_manual_phone_plan_matches_api_schema():
+    from src.feat.clients.api.client_schemas import CreateClientReq
+
+    objects = {key: dict(id=str(uuid4()), initial=body) for key, _, body, _ in catalogs()}
+    rows = list(clients(objects))
+    numbers = []
+    for index, (_, _, body, group) in enumerate(rows):
+        CreateClientReq.model_validate(body)
+        if group == "CORE":
+            assert body["phone"] == f"QA-TEST-{index:04}"
+        else:
+            number = body["phone"]
+            assert number == manual_phone(index)
+            assert number.startswith("+79")
+            assert len(number) == 12
+            assert number[1:].isascii()
+            assert number[1:].isdigit()
+            numbers.append(number)
+    assert len(set(numbers)) == 10
+
+
+def test_manual_phone_update_preserves_initial_core_and_repeats_without_patch(legacy_phones):
+    seed = legacy_phones
+    before = copy.deepcopy(seed.state)
+    store = copy.deepcopy(seed.store)
+    writes = seed.writes
+    seed.update_manual_phones()
+    assert seed.writes - writes == 10
+    for key, original in before["objects"].items():
+        actual = seed.state["objects"][key]
+        assert actual["initial"] == original["initial"]
+        if original["group"] != "MANUAL":
+            assert actual == original
+            assert seed.store[actual["id"]] == store[actual["id"]]
+        else:
+            assert actual["saved"] == original["saved"] | {"phone": manual_phone(int(key[6:]))}
+    snapshot = seed.path.read_bytes()
+    seed.update_manual_phones()
+    assert seed.writes - writes == 10
+    assert seed.path.read_bytes() == snapshot
+    repeated_seed = MemorySeed(seed.path, seed.store)
+    repeated_seed.run()
+    assert repeated_seed.writes == 0
+    assert repeated_seed.store == seed.store
+
+
+@pytest.mark.parametrize("committed", [False, True])
+def test_manual_phone_update_resumes_lost_patch_response(legacy_phones, monkeypatch, committed):
+    seed = legacy_phones
+    request = seed.request
+    interrupted = seed.state["objects"]["client23"]["id"]
+
+    def lose_response(method, path, body=None):
+        if not committed and method == "PATCH" and interrupted in path:
+            raise RuntimeError("controlled response loss")
+        result = request(method, path, body)
+        if method == "PATCH" and interrupted in path:
+            raise RuntimeError("controlled response loss")
+        return result
+
+    monkeypatch.setattr(seed, "request", lose_response)
+    with pytest.raises(RuntimeError, match="response loss"):
+        seed.update_manual_phones()
+    assert seed.state["manualPhoneUpdate"]["client23"]["status"] == "pending"
+    resumed = MemorySeed(seed.path, seed.store)
+    resumed.c = seed.c
+    resumed.update_manual_phones()
+    assert resumed.writes == (6 if committed else 7)
+    assert all(row["status"] == "done" for row in resumed.state["manualPhoneUpdate"].values())
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_manual_phone_edit_conflict_never_overwrites(legacy_phones, completed):
+    seed = legacy_phones
+    if completed:
+        seed.update_manual_phones()
+    identity = seed.state["objects"]["client29"]["id"]
+    seed.store[identity]["response"]["phone"] = "+79123456789"
+    before, writes = copy.deepcopy(seed.store), seed.writes
+    with pytest.raises(RuntimeError, match="Manual phone conflict"):
+        seed.update_manual_phones()
+    assert seed.store == before
+    assert seed.writes == writes
+
+
+def test_manual_phone_target_collision_refuses_before_any_patch(legacy_phones):
+    seed = legacy_phones
+    identity = seed.state["objects"]["client1"]["id"]
+    seed.store[identity]["response"]["phone"] = "+7 (999) 000-00-29"
+    # Ignore CORE snapshot verification here to exercise the independent phone collision check.
+    seed.verify_objects = lambda: None
+    writes = seed.writes
+    with pytest.raises(RuntimeError, match="belongs to another client"):
+        seed.update_manual_phones()
+    assert seed.writes == writes
+
+
+def test_fresh_manual_phones_require_no_patch(memory):
+    memory.run()
+    writes = memory.writes
+    memory.update_manual_phones()
+    assert memory.writes == writes
+
+
+def test_phone_update_refuses_foreign_group(legacy_phones):
+    seed = legacy_phones
+    seed.state["objects"]["client29"]["group"] = "CORE"
+    writes = seed.writes
+    with pytest.raises(RuntimeError, match="membership"):
+        seed.update_manual_phones()
+    assert seed.writes == writes
 
 
 def test_full_seed_repeat_preserves_core_and_changed_manual(memory):

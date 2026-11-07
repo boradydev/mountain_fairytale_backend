@@ -91,6 +91,12 @@ def catalogs():
     return rows
 
 
+def manual_phone(index):
+    if not 20 <= index <= 29:
+        raise ValueError("MANUAL client index must be 20..29")
+    return f"+799900000{index:02d}"
+
+
 def clients(objects):
     roles = ["Реквизиты", "Не-доставлено", "История", "Без-заказов"]
     for i in range(30):
@@ -101,7 +107,7 @@ def clients(objects):
             "clients",
             dict(
                 name=f"QA-{group}-{i:02}-{label}",
-                phone=f"QA-TEST-{i:04}",
+                phone=f"QA-TEST-{i:04}" if group == "CORE" else manual_phone(i),
                 address=f"QA-{group}-Синтетическая улица, {i}",
                 deliveryDetails=f"QA-{group}-Подъезд-{i}",
                 sleepingThresholdDays=30,
