@@ -207,6 +207,7 @@ def test_profile_counts_distribution_and_determinism(profile):
     assert prepared[f"client{plan.PROFILES[profile][0] - 1}"]["id"] not in used
     for _, kind, body in first:
         if kind == "pickup-sheets":
+            assert all(p["memo"] == "" and p["isDelivered"] and p["nonDeliveryReason"] == "" for p in body["points"])
             assert all(p["clientId"] is None and not any(i["isFreePrice"] for i in p["items"]) for p in body["points"])
 
 
@@ -471,6 +472,41 @@ def test_document_retry_keeps_native_creation_request_id(monkeypatch, tmp_path):
     assert len(sent) == 2
     assert sent[0]["creationRequestId"] == sent[1]["creationRequestId"]
     assert len(seed.state["objects"]) == 1
+
+
+@pytest.mark.parametrize("already_created", [False, True])
+def test_repair_old_pickup_intent_only_if_database_proves_absence(monkeypatch, tmp_path, already_created):
+    from scripts.load import seed as load_seed
+
+    seed = make_seed(monkeypatch, tmp_path)
+    prepared = objects()
+    key, kind, body = list(plan.documents(prepared, "main", 42))[9]
+    body["creationRequestId"] = str(UUID(int=999999))
+    for p, point in enumerate(body["points"]):
+        point["memo"] = f"LOAD 9/{p}"
+    seed.state = dict(
+        objects=prepared,
+        steps=[],
+        complete=False,
+        pending=dict(key=key, kind=kind, body=body, path="/protected/pickup-sheets/create", group="LOAD"),
+    )
+    connection_guard = MagicMock()
+    monkeypatch.setattr(load_seed, "verify", connection_guard)
+    seed.c.execute.return_value.fetchone.return_value = ("existing",) if already_created else None
+    seed.request = MagicMock(side_effect=AssertionError("Recovery must not create business data"))
+    if already_created:
+        with pytest.raises(RuntimeError, match="already exists"):
+            seed.recover_pending()
+        assert all(p["memo"] for p in seed.state["pending"]["body"]["points"])
+    else:
+        seed.recover_pending()
+        pending = seed.state["pending"]
+        assert all(p["memo"] == "" for p in pending["body"]["points"])
+        assert pending["body"]["creationRequestId"] == str(UUID(int=999999))
+        saved = json.loads(seed.path.read_text(encoding="utf-8"))["pending"]
+        assert saved == pending
+    connection_guard.assert_called_once_with(seed.c, seed.v)
+    seed.request.assert_not_called()
 
 
 def test_history_orders_equal_dates_and_creation_times_independently(monkeypatch):

@@ -3,6 +3,7 @@
 import json
 import time
 from collections import Counter
+from copy import deepcopy
 from decimal import Decimal
 from hashlib import sha256
 
@@ -92,6 +93,40 @@ class LoadSeed(Seed):
 
     def recover_pending(self):
         pending = self.state.get("pending")
+        if (
+            pending
+            and pending["path"].endswith("/create")
+            and pending.get("kind") == "pickup-sheets"
+            and any(p.get("memo") for p in pending["body"]["points"])
+        ):
+            corrected = deepcopy(pending["body"])
+            for point in corrected["points"]:
+                point["memo"] = ""
+            generated = next(
+                (
+                    body
+                    for key, _, body in plan.documents(self.state["objects"], self.args.profile, self.args.seed)
+                    if key == pending["key"]
+                ),
+                None,
+            )
+            require(
+                generated is not None
+                and corrected == generated | {"creationRequestId": pending["body"]["creationRequestId"]},
+                "Interrupted pickup differs from known generator input; inspect journal",
+            )
+            # Never alter an uncertain request that may already have committed.
+            verify(self.c, self.v)
+            require(
+                self.c.execute(
+                    "SELECT delivery_document_id FROM delivery_documents WHERE creation_request_id=%s",
+                    (pending["body"]["creationRequestId"],),
+                ).fetchone()
+                is None,
+                "Pickup already exists; refusing to change its recorded request",
+            )
+            pending["body"] = corrected
+            self.persist()
         if not pending or pending["path"].endswith("/create"):
             return super().recover_pending()
         obj = self.state["objects"][pending["key"]]

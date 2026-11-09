@@ -70,7 +70,7 @@ def documents(objects, profile, seed):
                     paymentMethodId=objects[f"payment{p}"]["id"],
                     isDelivered=not failed,
                     nonDeliveryReason="LOAD Закрыто" if failed else "",
-                    memo=f"LOAD {n}/{p}",
+                    memo="" if pickup else f"LOAD {n}/{p}",
                 )
             )
         planned = date(2026, 6, 15) if n < 300 else START + timedelta(days=rng.randrange(365))
