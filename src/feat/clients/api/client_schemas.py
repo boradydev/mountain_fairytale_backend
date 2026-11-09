@@ -45,6 +45,7 @@ class ClientResp(BaseSchema):
     last_delivery_quantity: int | None
     last_order: LastOrderResp | None = None
     latest_order_created_at: datetime | None = None
+    latest_order_planned_date: date | None = None
     cooldown_until: datetime | None
 
     sales_representative_id: UUID | None

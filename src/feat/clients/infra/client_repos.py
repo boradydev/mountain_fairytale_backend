@@ -93,7 +93,7 @@ class ClientsRepository(IClientsRepository):
                 client, "last_delivery_quantity", sum(item.quantity for item in summary.items) if summary else None
             )
 
-    # Shared eligibility for the independent created-at projection.
+    # Shared eligibility for the independent latest-created-order projection.
     _LATEST_ORDER_FROM = """
         FROM points p JOIN delivery_documents d USING (delivery_document_id)
         WHERE d.document_type = 'delivery_route_sheet' AND d.is_active AND p.is_delivered
@@ -102,14 +102,17 @@ class ClientsRepository(IClientsRepository):
 
     async def _load_latest_order_dates(self, clients: list[Client]) -> None:
         stmt = text(
-            "SELECT p.client_id, max(d.created_at) AS created_at "
+            "SELECT DISTINCT ON (p.client_id) p.client_id, d.created_at, d.planned_date "
             + self._LATEST_ORDER_FROM
-            + " AND p.client_id IN :client_ids GROUP BY p.client_id"
+            + " AND p.client_id IN :client_ids"
+            + " ORDER BY p.client_id, d.created_at DESC, d.delivery_document_id DESC, p.point_id DESC"
         ).bindparams(bindparam("client_ids", expanding=True))
         rows = (await self._session.execute(stmt, {"client_ids": [c.client_id for c in clients]})).all()
-        dates = dict(rows)
+        dates = {row.client_id: row for row in rows}
         for client in clients:
-            client.latest_order_created_at = dates.get(client.client_id)
+            row = dates.get(client.client_id)
+            client.latest_order_created_at = row.created_at if row else None
+            client.latest_order_planned_date = row.planned_date if row else None
 
     async def get_latest_order(self, client_id: UUID) -> LatestOrder | None:
         stmt = text(

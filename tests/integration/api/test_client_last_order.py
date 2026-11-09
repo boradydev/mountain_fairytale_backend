@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
 
 from tests.document_requests import create_delivery, patch_with_revision
 from tests.helpers import delivery_address, unique_phone, unique_product_name
@@ -282,7 +283,9 @@ async def test_latest_order_is_one_point_by_creation_and_keeps_business_date(
     current = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
     assert current["lastDeliveryDate"] == f"{planned}T00:00:00"
     assert current["lastDeliveryQuantity"] == (105 if planned == "2026-10-10" else 99)
-    # Both dashboard modes retain pagination and return only a timestamp for this projection.
+    assert current["latestOrderCreatedAt"] == order["createdAt"]
+    assert current["latestOrderPlannedDate"] == order["plannedDate"]
+    # Both dashboard modes retain pagination and return dates for the same selected order.
     for mode in ("database", "follow_up"):
         page = await client.get(
             "/protected/clients",
@@ -300,6 +303,7 @@ async def test_latest_order_is_one_point_by_creation_and_keeps_business_date(
         assert body["limit"] == 1
         row = body["data"]["clients"][0]
         assert row["latestOrderCreatedAt"] == order["createdAt"]
+        assert row["latestOrderPlannedDate"] == order["plannedDate"]
         assert row["lastOrder"] == current["lastOrder"]
         assert "latestOrder" not in row
         next_page = await client.get(
@@ -337,10 +341,18 @@ async def test_latest_order_skips_ineligible_newer_point(client, active_employee
     response = await client.get(f"/protected/clients/{customer_id}/latest-order")
     assert response.status_code == 200, response.text
     assert response.json()["data"]["deliveryDocumentId"] == original["deliveryDocumentId"]
+    summary = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
+    assert summary["latestOrderCreatedAt"] == original["createdAt"]
+    assert summary["latestOrderPlannedDate"] == original["plannedDate"]
     assert (await client.post(f"{DELIVERY_BASE_PATH}/{original['deliveryDocumentId']}/cancel")).status_code == 200
     assert (await client.get(f"/protected/clients/{customer_id}/latest-order")).json()["data"] is None
     summary = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
     assert summary["latestOrderCreatedAt"] is None
+    assert summary["latestOrderPlannedDate"] is None
+    page = await client.get("/protected/clients", params={"search": customer.phone})
+    row = page.json()["data"]["clients"][0]
+    assert row["latestOrderCreatedAt"] is None
+    assert row["latestOrderPlannedDate"] is None
 
 
 async def test_latest_order_null_missing_client_and_auth(client, active_employee, client_factory):
@@ -351,5 +363,47 @@ async def test_latest_order_null_missing_client_and_auth(client, active_employee
     response = await client.get(path)
     assert response.status_code == 200
     assert response.json()["data"] is None
+    summary = (await client.get(f"/protected/clients/{customer.client_id}")).json()["data"]
+    assert summary["latestOrderCreatedAt"] is None
+    assert summary["latestOrderPlannedDate"] is None
     assert (await client.get(f"/protected/clients/{uuid4()}/latest-order")).status_code == 404
     assert (await client.get("/protected/clients/not-a-uuid/latest-order")).status_code == 422
+
+
+async def test_latest_order_dates_use_same_document_when_creation_times_tie(
+    client, active_employee, client_factory, postgres
+):
+    await DeliveryAPI.login(client, active_employee)
+    customer = await client_factory(phone=unique_phone())
+    customer_id = str(customer.client_id)
+    product = await DeliveryAPI.create_product(client, unique_product_name("latest_tie"))
+    documents = []
+    for planned in ("2026-11-12", "2026-11-10"):
+        response = await create_delivery(
+            client,
+            json={
+                "plannedDate": planned,
+                "points": [DeliveryAPI.point_payload(customer_id, product["productId"])],
+            },
+        )
+        assert response.status_code == 201, response.text
+        documents.append(response.json()["data"])
+    created_at = datetime(2026, 11, 9, 12)
+    async with postgres.session_factory() as session:
+        for document in documents:
+            await session.execute(
+                text("UPDATE delivery_documents SET created_at = :created_at WHERE delivery_document_id = :id"),
+                {"created_at": created_at, "id": document["deliveryDocumentId"]},
+            )
+        await session.commit()
+    expected = max(documents, key=lambda document: document["deliveryDocumentId"])
+    order = (await client.get(f"/protected/clients/{customer_id}/latest-order")).json()["data"]
+    assert order["deliveryDocumentId"] == expected["deliveryDocumentId"]
+    assert order["pointId"] == expected["points"][0]["pointId"]
+    assert order["createdAt"] == created_at.isoformat()
+    assert order["plannedDate"] == expected["plannedDate"]
+    summary = (await client.get(f"/protected/clients/{customer_id}")).json()["data"]
+    page = await client.get("/protected/clients", params={"search": customer.phone})
+    for row in (summary, page.json()["data"]["clients"][0]):
+        assert row["latestOrderCreatedAt"] == order["createdAt"]
+        assert row["latestOrderPlannedDate"] == order["plannedDate"]
