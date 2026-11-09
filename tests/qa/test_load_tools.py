@@ -27,6 +27,41 @@ def config():
     return {"LOAD_ALLOW": "local-load-only", "LOAD_MARKER": "secret-marker"}
 
 
+@pytest.mark.parametrize("failure", [None, "ready", "login", "body"])
+def test_managed_http_client_opens_once_and_always_closes(monkeypatch, tmp_path, failure):
+    state = tmp_path / "process.json"
+    state.write_text(json.dumps({"run_id": "nonce"}), encoding="utf-8")
+    monkeypatch.setattr(manage, "STATE", state)
+    paths = []
+
+    def handler(request):
+        paths.append(request.url.path)
+        if request.url.path == "/health/ready":
+            return httpx.Response(503 if failure == "ready" else 200, headers={"X-Load-Run": "nonce"})
+        assert request.url.path == "/public/auth/login"
+        return httpx.Response(401 if failure == "login" else 200, json={"data": {"accessToken": "test-token"}})
+
+    client = httpx.Client(base_url=manage.BASE_URL, transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(manage.httpx, "Client", lambda **_kwargs: client)
+
+    def use_client():
+        with manage.http_client({"ADMIN_USERNAME": "load_admin", "ADMIN_PASSWORD": "test-password"}) as opened:
+            assert opened is client
+            assert not opened.is_closed
+            assert opened.headers["Authorization"] == "Bearer test-token"
+            if failure == "body":
+                raise RuntimeError("Caller failed")
+
+    if failure:
+        message = {"ready": "attestation", "login": "login", "body": "Caller failed"}[failure]
+        with pytest.raises(RuntimeError, match=message):
+            use_client()
+    else:
+        use_client()
+    assert client.is_closed
+    assert paths == (["/health/ready"] if failure == "ready" else ["/health/ready", "/public/auth/login"])
+
+
 @pytest.mark.parametrize(
     ("position", "value"),
     [

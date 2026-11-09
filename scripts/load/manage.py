@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 import tomllib
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 
 import httpx
@@ -226,21 +226,18 @@ def attest(client):
     return nonce
 
 
+@contextmanager
 def http_client(v):
-    client = httpx.Client(base_url=BASE_URL, timeout=60, trust_env=False, follow_redirects=False)
-    policy = tomllib.loads((ROOT / "client_compatibility.toml").read_text(encoding="utf-8"))
-    client.headers["X-Client-Version"] = policy["flutter"]["min_version"]
-    try:
+    with httpx.Client(base_url=BASE_URL, timeout=60, trust_env=False, follow_redirects=False) as client:
+        policy = tomllib.loads((ROOT / "client_compatibility.toml").read_text(encoding="utf-8"))
+        client.headers["X-Client-Version"] = policy["flutter"]["min_version"]
         attest(client)
         response = client.post(
             "/public/auth/login", json={"username": v["ADMIN_USERNAME"], "password": v["ADMIN_PASSWORD"]}
         )
         require(response.status_code == 200, "Load admin login failed")
         client.headers["Authorization"] = "Bearer " + response.json()["data"]["accessToken"]
-        return client
-    except Exception:
-        client.close()
-        raise
+        yield client
 
 
 def serve(v):
