@@ -1,6 +1,7 @@
 """Deterministic synthetic HTTP inputs; no production calculation imports."""
 
 import random
+from copy import deepcopy
 from datetime import date, timedelta
 
 from scripts.qa.seed_plan import catalogs
@@ -10,6 +11,30 @@ VERSION = "load-v1"
 PROFILES = {"main": (1000, 5000), "high": (5000, 20000)}
 START = date(2026, 1, 1)
 END = date(2026, 12, 31)
+
+
+def normalize_document(body, kind, objects, profile):
+    """Correct only legacy route duplicates/pickup memos without consuming random values."""
+    body = deepcopy(body)
+    if kind == "pickup-sheets":
+        for point in body["points"]:
+            point["memo"] = ""
+    else:
+        identities = [point["clientId"] for point in body["points"]]
+        if len(identities) == len(set(identities)):
+            return body
+        pool = [objects[f"client{i}"]["id"] for i in range(PROFILES[profile][0] * 9 // 10)]
+        positions = {identity: index for index, identity in enumerate(pool)}
+        used = set()
+        for point in body["points"]:
+            identity = point["clientId"]
+            if identity in used:
+                index = positions[identity]
+                while pool[index] in used:
+                    index = (index + 1) % len(pool)
+                point["clientId"] = pool[index]
+            used.add(point["clientId"])
+    return body
 
 
 def directories():
@@ -77,4 +102,5 @@ def documents(objects, profile, seed):
         body = dict(plannedDate=planned.isoformat(), points=points)
         if not pickup:
             body.update(driverId=objects[f"driver{n % 2}"]["id"], carId=objects[f"car{n % 2}"]["id"], startMileage=100)
-        yield f"{VERSION}-{profile}-{seed}-doc{n}", "pickup-sheets" if pickup else "delivery-route-sheets", body
+        kind = "pickup-sheets" if pickup else "delivery-route-sheets"
+        yield f"{VERSION}-{profile}-{seed}-doc{n}", kind, normalize_document(body, kind, objects, profile)

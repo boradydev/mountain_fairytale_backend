@@ -211,15 +211,57 @@ def test_profile_counts_distribution_and_determinism(profile):
             assert all(p["clientId"] is None and not any(i["isFreePrice"] for i in p["items"]) for p in body["points"])
 
 
-def test_generated_payloads_follow_request_schemas():
+@pytest.mark.parametrize("profile", ["main", "high"])
+@pytest.mark.parametrize("random_seed", [42, 20261110])
+def test_generated_payloads_follow_request_schemas(profile, random_seed):
     from src.feat.delivery_document.api.delivery_document_schemas import (
         CreateDeliveryRouteSheetReq,
         CreatePickupSheetReq,
     )
 
-    for _, kind, body in list(plan.documents(objects(), "main", 42))[:30]:
+    for _, kind, body in plan.documents(objects(), profile, random_seed):
         schema = CreatePickupSheetReq if kind == "pickup-sheets" else CreateDeliveryRouteSheetReq
         schema.model_validate(body)
+
+
+@pytest.mark.parametrize("already_created", [False, True])
+def test_repair_duplicate_client_intent_preserves_id_and_recalculates_commission(
+    monkeypatch, tmp_path, already_created
+):
+    from scripts.load import seed as load_seed
+
+    seed = make_seed(monkeypatch, tmp_path)
+    seed.args.seed = 20261110
+    prepared = objects()
+    key, kind, body = next(
+        row for row in plan.documents(prepared, "main", seed.args.seed) if row[0].endswith("-doc394")
+    )
+    expected_client = body["points"][1]["clientId"]
+    body["points"][1]["clientId"] = body["points"][0]["clientId"]
+    body["creationRequestId"] = str(UUID(int=999999))
+    seed.state = dict(
+        objects=prepared,
+        steps=[],
+        complete=False,
+        pending=dict(key=key, kind=kind, body=body, path="/protected/delivery-route-sheets/create", group="LOAD"),
+    )
+    monkeypatch.setattr(load_seed, "verify", MagicMock())
+    seed.c.execute.return_value.fetchone.return_value = ("existing",) if already_created else None
+    if already_created:
+        with pytest.raises(RuntimeError, match="already exists"):
+            seed.recover_pending()
+        assert (
+            seed.state["pending"]["body"]["points"][0]["clientId"]
+            == seed.state["pending"]["body"]["points"][1]["clientId"]
+        )
+    else:
+        seed.recover_pending()
+        pending = seed.state["pending"]
+        assert pending["body"]["points"][1]["clientId"] == expected_client
+        assert pending["body"]["creationRequestId"] == str(UUID(int=999999))
+        card = next(o["initial"] for o in prepared.values() if o["id"] == expected_client)
+        assert pending["expected"]["points"][1]["recipient"] == card["salesRepresentativeId"]
+        assert json.loads(seed.path.read_text(encoding="utf-8"))["pending"] == pending
 
 
 def test_independent_money_and_commissions():
