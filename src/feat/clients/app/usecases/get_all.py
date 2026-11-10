@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal
 
 from src.feat.clients.app.abcs.client_uow_abcs import IClientsUOW
 from src.feat.clients.domain.client_entities import Client
@@ -10,6 +11,7 @@ class GetClientsDTO:
     offset: int
     limit: int
     search: str | None = None
+    mode: Literal["database", "follow_up"] = "database"
 
 
 class GetClientsUseCase:
@@ -23,4 +25,5 @@ class GetClientsUseCase:
                 offset=dto.offset,
                 limit=dto.limit,
                 search=dto.search,
+                mode=dto.mode,
             )

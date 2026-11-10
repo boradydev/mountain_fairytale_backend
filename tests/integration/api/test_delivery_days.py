@@ -371,8 +371,8 @@ async def test_document_client_fields_match_direct_api_after_catalog_changes(cas
     listed = (await case.documents(case.today))["data"]["documents"][0]
     assert listed == {**direct, "documentType": "deliveryRouteSheet"}
     point = listed["points"][0]
-    assert point["clientName"] == "Новое имя клиента"
-    assert point["address"].endswith("Локомотивная улица, 148")
+    assert point["clientName"] == document["points"][0]["clientName"]
+    assert point["address"] == document["points"][0]["address"]
     assert point["defaultPaymentMethodId"] == payment["paymentMethodId"]
     assert point["defaultPaymentMethodName"] == payment["name"]
     assert point["salesRepresentativeId"] == representative["salesRepresentativeId"]

@@ -15,16 +15,44 @@ class CreateItemReq(BaseSchema):
     product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
+    is_free_price: bool = Field(
+        default=False,
+        description="Must match the catalog product setting. Supported only in delivery routes.",
+    )
+    driver_note: Annotated[str, Field(max_length=1000)] = Field(
+        default="", description="Route-only note for a free-price item."
+    )
 
 
 class UpdateItemReq(BaseSchema):
+    item_id: UUID | None = None
     product_id: UUID
     product_name: Annotated[str, Field(min_length=1, max_length=120)]
     quantity: fields.Quantity
     price: fields.Price
+    is_free_price: bool | None = Field(
+        default=None,
+        description="Immutable snapshot of the product's free-price setting; omit to preserve it.",
+    )
+    driver_note: Annotated[str | None, Field(max_length=1000)] = Field(
+        default=None, description="Route-only note for a free-price item; omit to preserve it."
+    )
+
+
+def _validate_item_rows(items: list[CreateItemReq] | list[UpdateItemReq]) -> None:
+    ids = [getattr(item, "item_id", None) for item in items if getattr(item, "item_id", None) is not None]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Item IDs must be unique within a point.")
+    for item in items:
+        if sum(other.product_id == item.product_id for other in items) > 1:
+            if item.is_free_price is False or (item.is_free_price is None and getattr(item, "item_id", None) is None):
+                raise ValueError("Only free-price products may appear more than once in a point.")
 
 
 class CreatePointReq(BaseSchema):
+    is_delivered: bool = True
+    non_delivery_reason: Annotated[str, Field(max_length=1000)] = ""
+    memo: Annotated[str, Field(max_length=1000)] = ""
     client_id: UUID | None = None
     payment_method_id: UUID | None = Field(
         default=None,
@@ -34,13 +62,14 @@ class CreatePointReq(BaseSchema):
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        ids = [item.product_id for item in self.items]
-        if len(ids) != len(set(ids)):
-            raise ValueError("A product can appear only once in a point.")
+        _validate_item_rows(self.items)
         return self
 
 
 class UpdatePointReq(BaseSchema):
+    is_delivered: bool | None = None
+    non_delivery_reason: Annotated[str | None, Field(max_length=1000)] = None
+    memo: Annotated[str | None, Field(max_length=1000)] = None
     # Omitted/null point_id means that this is a new point.
     point_id: UUID | None = None
     client_id: UUID | None = None
@@ -49,13 +78,16 @@ class UpdatePointReq(BaseSchema):
         description="Explicit UUID/null replaces the point payment method. Omitted preserves existing points; "
         "new points use the client default.",
     )
+    sales_representative_id: UUID | None = Field(
+        default=None,
+        description="One-time assignment for a saved route point without a historical representative or commission. "
+        "Omit to preserve history; explicit null is forbidden.",
+    )
     items: list[UpdateItemReq]
 
     @model_validator(mode="after")
     def validate_unique_products(self) -> Self:
-        ids = [item.product_id for item in self.items]
-        if len(ids) != len(set(ids)):
-            raise ValueError("A product can appear only once in a point.")
+        _validate_item_rows(self.items)
         return self
 
 
@@ -175,13 +207,19 @@ def _validate_pickup_clients(points: list[CreatePointReq] | list[UpdatePointReq]
 
 
 class ItemResp(BaseSchema):
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int
     price: float
+    is_free_price: bool
+    driver_note: str
 
 
 class PointResp(BaseSchema):
+    is_delivered: bool
+    non_delivery_reason: str
+    memo: str
     point_id: UUID
     client_id: UUID | None
     client_name: str

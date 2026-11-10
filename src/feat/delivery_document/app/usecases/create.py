@@ -44,6 +44,12 @@ class CreateDeliveryDocumentUseCase:
                             "points": [
                                 {
                                     "client": str(point.client_id),
+                                    **({"memo": point.memo.strip()} if getattr(point, "memo", "").strip() else {}),
+                                    **(
+                                        {"isDelivered": False, "nonDeliveryReason": point.non_delivery_reason.strip()}
+                                        if getattr(point, "is_delivered", True) is False
+                                        else {}
+                                    ),
                                     **(
                                         {"payment": str(point.payment_method_id) if point.payment_method_id else None}
                                         if "payment_method_id" in getattr(point, "model_fields_set", ())
@@ -55,6 +61,12 @@ class CreateDeliveryDocumentUseCase:
                                             "name": item.product_name,
                                             "quantity": item.quantity,
                                             "price": str(item.price.normalize()),
+                                            **({"isFreePrice": True} if getattr(item, "is_free_price", False) else {}),
+                                            **(
+                                                {"driverNote": item.driver_note.strip()}
+                                                if getattr(item, "driver_note", "").strip()
+                                                else {}
+                                            ),
                                         }
                                         for item in point.items
                                     ],

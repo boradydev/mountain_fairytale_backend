@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -43,6 +44,8 @@ class ClientResp(BaseSchema):
     last_delivery_date: datetime | None
     last_delivery_quantity: int | None
     last_order: LastOrderResp | None = None
+    latest_order_created_at: datetime | None = None
+    latest_order_planned_date: date | None = None
     cooldown_until: datetime | None
 
     sales_representative_id: UUID | None
@@ -96,3 +99,23 @@ class UpdateClientReq(BasePatchSchema):
     sales_representative_id: UUID | None = None
     default_payment_method_id: UUID | None = None
     is_active: bool | None = None
+
+
+class LatestOrderItemResp(BaseSchema):
+    item_id: UUID
+    product_id: UUID
+    product_name: str
+    quantity: int
+    price: Decimal
+    is_free_price: bool
+    driver_note: str
+    amount: Decimal
+
+
+class LatestOrderResp(BaseSchema):
+    delivery_document_id: UUID
+    point_id: UUID
+    created_at: datetime
+    planned_date: date
+    items: list[LatestOrderItemResp]
+    total_amount: Decimal

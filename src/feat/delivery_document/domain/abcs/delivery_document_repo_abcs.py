@@ -1,14 +1,30 @@
 from abc import ABC, abstractmethod
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from src.common.domain.events import BaseDomainEvent
 from src.feat.delivery_document.domain.delivery_day_models import DayDocumentRecord, DeliveryDay
 from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, EditLock
+from src.feat.delivery_document.domain.delivery_history_models import ClientDelivery, HistoryDocument
 from src.feat.delivery_document.domain.sales_report_models import SalesReport
 
 
 class IDeliveryDocumentsRepository(ABC):
+    @abstractmethod
+    async def get_history(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        search: str,
+        include_cancelled: bool,
+        offset: int,
+        limit: int,
+        document_type: str = "all",
+        clients: bool = False,
+    ) -> tuple[list[HistoryDocument] | list[ClientDelivery], int]: ...
+
     @abstractmethod
     async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None: ...
 
@@ -21,6 +37,11 @@ class IDeliveryDocumentsRepository(ABC):
         previous_car_id: UUID | None = None,
         previous_end_mileage: float | None = None,
         previous_car_mileage: float | None = None,
+    ) -> list[BaseDomainEvent]: ...
+
+    @abstractmethod
+    async def correct_missing_representatives(
+        self, document: DeliveryDocument, *, points: list[Any], actor_id: UUID
     ) -> list[BaseDomainEvent]: ...
 
     @abstractmethod

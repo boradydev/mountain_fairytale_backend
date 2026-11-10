@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+from typing import Literal
 from uuid import UUID
 
 from src.feat.clients.domain.client_entities import Client
+from src.feat.clients.domain.client_order_models import LatestOrder
 
 
 class IClientsRepository(ABC):
@@ -18,6 +20,10 @@ class IClientsRepository(ABC):
         """Возвращает клиента по ID."""
 
     @abstractmethod
+    async def get_latest_order(self, client_id: UUID) -> LatestOrder | None:
+        """Return one eligible point ordered by document creation time."""
+
+    @abstractmethod
     async def get_all(
         self,
         *,
@@ -25,6 +31,7 @@ class IClientsRepository(ABC):
         offset: int,
         limit: int,
         search: str | None = None,
+        mode: Literal["database", "follow_up"] = "database",
     ) -> tuple[list[Client], int]:
         """Возвращает страницу клиентов и общее количество подходящих записей."""
 

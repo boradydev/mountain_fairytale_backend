@@ -22,7 +22,7 @@ API CONTRACT — CLIENTS.
         default_payment_method_id могут быть null.
     11. Для связанных сущностей проверяется существование записи. Связанную
         деактивированную сущность разрешено назначить клиенту.
-    12. Список клиентов сортируется по created_at DESC, затем по client_id DESC.
+    12. База клиентов сортируется по created_at DESC, затем по client_id DESC.
         Параметры offset, limit и total передаются в верхнем уровне StdResponse.
     13. Проверка дубликата требует все три query-параметра: name, phone и
         address. Если хотя бы один параметр не передан или не проходит
@@ -51,7 +51,7 @@ AI TESTING RULES:
     8. Не предполагать физическое удаление клиента.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Path, Query, status
@@ -64,6 +64,7 @@ from src.feat.clients.api.client_schemas import (
     ClientResp,
     ClientsResp,
     CreateClientReq,
+    LatestOrderResp,
     UpdateClientReq,
 )
 from src.feat.clients.app.usecases.check_duplicate import CheckClientDuplicateDTO
@@ -96,15 +97,20 @@ clients_router = APIRouter(
             по умолчанию false.
         offset: число записей, которые нужно пропустить; значение не меньше 0.
         limit: максимальное число записей; значение не меньше 1.
-        search: до 500 символов; поиск по имени, адресу и цифрам телефона.
+        search: до 500 символов; поиск по имени, адресу, уточнению доставки и цифрам телефона.
+        mode: database (по умолчанию) или follow_up (только активные для обзвона).
 
     Действие:
-        Вернуть клиентов с сортировкой created_at DESC, затем client_id DESC.
+        database: сортировка created_at DESC, client_id DESC.
+        follow_up: без будущего cooldown; без заказов либо K >= 1.
+        K = календарные дни с последней продажи / порог; без заказов или порог 0: infinity.
+        Продажа: активный документ, доставленная точка с товарными строками.
+        Сортировка K DESC, name COLLATE C ASC, client_id ASC до пагинации.
 
     Результат:
         data.clients содержит страницу клиентов.
         offset, limit и total находятся на верхнем уровне StdResponse.
-        total — количество записей, соответствующих include_deactivated и search,
+        total — количество записей, соответствующих mode, include_deactivated и search,
         до применения offset и limit.
 
     Критические сценарии для API-тестов:
@@ -122,6 +128,7 @@ async def get_clients(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1)] = 100,
     search: Annotated[str | None, Query(max_length=500)] = None,
+    mode: Annotated[Literal["database", "follow_up"], Query()] = "database",
 ) -> StdResponse[ClientsResp]:
     clients, total = await ctx.clients_use_cases.get_clients().execute(
         GetClientsDTO(
@@ -129,6 +136,7 @@ async def get_clients(
             offset=offset,
             limit=limit,
             search=search,
+            mode=mode,
         ),
     )
     return StdResponse(
@@ -366,3 +374,19 @@ async def update_client(
         ),
     )
     return StdResponse(data=ClientResp.model_validate(client))
+
+
+@clients_router.get(
+    "/{client_id}/latest-order",
+    response_model=StdResponse[LatestOrderResp | None],
+    responses=map_exceptions_to_responses(UnauthorizedException, client_excs.ClientNotFoundException),
+    description="One active delivered nonempty route point, ordered by created_at, document ID and point ID DESC. "
+    "Historical rows only; no eligible order returns data: null. Unknown client returns 404.",
+)
+async def get_latest_order(
+    client_id: Annotated[UUID, Path()],
+    ctx: Context,
+    _access_token_payload: AccessTokenPayloadDep,
+) -> StdResponse[LatestOrderResp | None]:
+    order = await ctx.clients_use_cases.get_latest_order().execute(GetClientDTO(client_id=client_id))
+    return StdResponse(data=LatestOrderResp.model_validate(order) if order is not None else None)

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, TypedDict
+from typing import Annotated, Any, TypedDict
 from uuid import UUID
 
 from psycopg import errors as pg_excs
@@ -12,6 +12,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.domain.events import BaseDomainEvent
 from src.common.domain.money import decimal_value, line_amount, sum_amounts
+from src.common.domain.search import extract_phone_search_digits
 from src.feat.cars.domain.car_entities import Car
 from src.feat.clients.domain.client_entities import Client
 from src.feat.commissions.domain.commission_entities import DocumentEmployeeCommission, PointCommission
@@ -27,6 +28,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import (
     DeliveryDocumentRelatedEntityNotFoundException,
     DeliveryDocumentUpdateException,
 )
+from src.feat.delivery_document.domain.delivery_history_models import ClientDelivery, HistoryDocument
 from src.feat.delivery_document.domain.sales_report_models import (
     SalesReport,
     SalesReportPaymentMethod,
@@ -41,6 +43,7 @@ from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 _days_adapter = TypeAdapter(list[DeliveryDay])
+_history_adapter = TypeAdapter(list[HistoryDocument])
 _day_document_adapter = TypeAdapter(Annotated[DayDocumentRecord, Field(discriminator="document_type")])
 
 
@@ -53,6 +56,46 @@ class _SalesReportGroup(TypedDict):
 class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def get_history(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        search: str,
+        include_cancelled: bool,
+        offset: int,
+        limit: int,
+        document_type: str = "all",
+        clients: bool = False,
+    ) -> tuple[list[HistoryDocument] | list[ClientDelivery], int]:
+        term = search.strip()
+        literal = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        digits = extract_phone_search_digits(term)
+        row = (
+            (
+                await self._session.execute(
+                    SQL.GET_CLIENT_HISTORY if clients else SQL.GET_HISTORY,
+                    {
+                        "document_type": document_type,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "search": term,
+                        "pattern": f"%{literal}%",
+                        "digits": digits,
+                        "phone_pattern": f"%{digits}%",
+                        "include_cancelled": include_cancelled,
+                        "offset": offset,
+                        "limit": limit,
+                    },
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return (TypeAdapter(list[ClientDelivery]) if clients else _history_adapter).validate_python(
+            row["documents"]
+        ), row["total"]
 
     async def get_by_creation_request(self, request_id: UUID, *, document_type: str) -> DeliveryDocument | None:
         # Serialize retries and recovery reads, including the first in-flight create.
@@ -113,6 +156,65 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             events.extend(car.pull_events())
         return events
 
+    async def correct_missing_representatives(
+        self, document: DeliveryDocument, *, points: list[Any], actor_id: UUID
+    ) -> list[BaseDomainEvent]:
+        corrections = [point for point in points if "sales_representative_id" in point.model_fields_set]
+        if not corrections:
+            return []
+        if document.document_type != DeliveryDocument.TYPE_DELIVERY_ROUTE_SHEET:
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id", message="Only saved delivery route points can be corrected."
+            )
+        saved = {point.point_id: point for point in document.points}
+        for requested in corrections:
+            point = saved.get(requested.point_id)
+            if point is None or requested.sales_representative_id is None or point.client_id != requested.client_id:
+                raise DeliveryDocumentUpdateException(
+                    field="sales_representative_id",
+                    message="Supply an active representative for an existing point of this document and client.",
+                )
+        events = []
+        # The document row is already locked. Lock shared clients/representatives in a stable order,
+        # reloading their current values and keeping every mutation in the document transaction.
+        with self._session.no_autoflush:
+            clients = {
+                client.client_id: client
+                for client in await self._session.scalars(
+                    select(Client)
+                    .where(Client.client_id.in_({saved[row.point_id].client_id for row in corrections}))
+                    .order_by(Client.client_id)
+                    .with_for_update(of=Client)
+                    .execution_options(populate_existing=True)
+                )
+            }
+            representatives = {
+                rep.sales_representative_id: rep
+                for rep in await self._session.scalars(
+                    select(SalesRepresentative)
+                    .where(
+                        SalesRepresentative.sales_representative_id.in_(
+                            {row.sales_representative_id for row in corrections}
+                        )
+                    )
+                    .order_by(SalesRepresentative.sales_representative_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            }
+        for requested in corrections:
+            point = saved[requested.point_id]
+            representative = representatives.get(requested.sales_representative_id)
+            if representative is None:
+                raise DeliveryDocumentUpdateException(
+                    field="sales_representative_id", message="The selected representative does not exist."
+                )
+            point.assign_missing_representative(actor_id=actor_id, representative=representative)
+            client = clients[point.client_id]
+            client.update(actor_id=actor_id, sales_representative_id=representative.sales_representative_id)
+            events.extend(client.pull_events())
+        return events
+
     async def capture_commissions(self, document: DeliveryDocument, *, is_new: bool) -> None:
         """Capture new recipients once; recalculate amounts using historical rates."""
         with self._session.no_autoflush:
@@ -142,7 +244,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                         commission_percent=decimal_value((assignment.commission_percent if assignment else None) or 0),
                     )
                 turnover = sum_amounts(line_amount(item.quantity, item.price) for item in point.items)
-                point.commission.recalculate(turnover)
+                point.commission.recalculate(turnover if point.is_delivered else Decimal(0))
             if is_new:
                 employees = (
                     await self._session.scalars(
@@ -247,6 +349,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
         )
 
     async def add(self, document: DeliveryDocument) -> None:
+        await self._capture_client_snapshots(document)
         self._session.add(document)
         try:
             await self._session.flush()
@@ -255,6 +358,7 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             raise
 
     async def update(self, document: DeliveryDocument) -> None:
+        await self._capture_client_snapshots(document)
         # Validate uniqueness against the final collection, allowing reordering
         # and replacement of a point by a new point for the same client.
         points_changed = sa_inspect(document).attrs.points.history.has_changes()
@@ -269,6 +373,14 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
                             "points_delivery_document_id_position_key DEFERRED",
                         )
                     )
+            removed_items = [
+                item for point in document.points for item in sa_inspect(point).attrs["items"].history.deleted
+            ]
+            if removed_items:
+                for item in removed_items:
+                    await self._session.delete(item)
+                # Release ordinary-product uniqueness before inserting replacements.
+                await self._session.flush(objects=removed_items)
             await self._session.flush()
             if collection_changed:
                 await self._session.execute(
@@ -442,13 +554,16 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
             )
 
             found_products = (
-                dict(
-                    (
+                {
+                    product_id: (is_active, is_free_price)
+                    for product_id, is_active, is_free_price in (
                         await self._session.execute(
-                            select(Product.product_id, Product.is_active).where(Product.product_id.in_(product_ids)),
+                            select(Product.product_id, Product.is_active, Product.is_free_price).where(
+                                Product.product_id.in_(product_ids)
+                            ),
                         )
-                    ).all(),
-                )
+                    ).all()
+                }
                 if product_ids
                 else {}
             )
@@ -475,18 +590,65 @@ class DeliveryDocumentsRepository(IDeliveryDocumentsRepository):
 
         if any(not found_clients[client_id] for client_id in new_client_ids):
             raise DeliveryDocumentUpdateException(field="client_id", message="New points require an active client.")
-        if any(not found_products[product_id] for product_id in new_product_ids):
+        if any(not found_products[product_id][0] for product_id in new_product_ids):
             raise DeliveryDocumentUpdateException(field="product_id", message="New items require an active product.")
+        await self._capture_client_snapshots(document)
+        for point in document.points:
+            for item in point.items:
+                if not sa_inspect(item).persistent:
+                    catalog_free_price = found_products[item.product_id][1]
+                    if document.document_type == DeliveryDocument.TYPE_PICKUP_SHEET and catalog_free_price:
+                        raise DeliveryDocumentUpdateException(
+                            field="is_free_price",
+                            message="Free-price products can only be added to delivery routes.",
+                        )
+                    if (
+                        document.document_type != DeliveryDocument.TYPE_PICKUP_SHEET
+                        and item.is_free_price != catalog_free_price
+                    ):
+                        raise DeliveryDocumentUpdateException(
+                            field="is_free_price",
+                            message="A new item must use the current free-price setting of its catalog product.",
+                        )
+
+    async def _capture_client_snapshots(self, document: DeliveryDocument) -> None:
+        snapshot_client_ids = {
+            point.client_id
+            for point in document.points
+            if point.client_id is not None
+            and not sa_inspect(point).persistent
+            and not getattr(point, "_client_snapshot_captured", False)
+        }
+        # Only transient points capture client data. Persisted snapshots are immutable.
+        with self._session.no_autoflush:
+            snapshot_clients = (
+                {
+                    client.client_id: client
+                    for client in (
+                        await self._session.scalars(select(Client).where(Client.client_id.in_(snapshot_client_ids)))
+                    )
+                    .unique()
+                    .all()
+                }
+                if snapshot_client_ids
+                else {}
+            )
+        for point in document.points:
+            if point.client_id is not None and not sa_inspect(point).persistent:
+                client = snapshot_clients.get(point.client_id)
+                if client is not None:
+                    point.capture_client_snapshot(client)
+        document.refresh_point_snapshot_events()
 
     async def _translate_integrity_error(self, exc: IntegrityError, document: DeliveryDocument) -> None:
         original = str(exc.orig)
         pgcode = getattr(exc.orig, "pgcode", None) or getattr(getattr(exc.orig, "__cause__", None), "sqlstate", None)
         if pgcode == pg_excs.UniqueViolation.sqlstate and Point.UQ_DOCUMENT_CLIENT in original:
-            client_id = next(
-                (point.client_id for point in document.points if point.client_id is not None), UUID(int=0)
-            )
+            client_id = next((point.client_id for point in document.points if point.client_id is not None), UUID(int=0))
             raise DeliveryDocumentPointClientAlreadyExistsException(client_id=client_id) from exc
-        if pgcode == pg_excs.UniqueViolation.sqlstate and "delivery_document_items_pkey" in original:
+        if pgcode == pg_excs.UniqueViolation.sqlstate and (
+            "delivery_document_items_pkey" in original or "uq_document_item_standard_product" in original
+        ):
             entity_id = next((item.product_id for point in document.points for item in point.items), UUID(int=0))
             raise DeliveryDocumentPointProductAlreadyExistsException(product_id=entity_id) from exc
         if pgcode == pg_excs.ForeignKeyViolation.sqlstate:

@@ -23,14 +23,20 @@ class DeliveryDay:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DayDocumentItem:
+    item_id: UUID
     product_id: UUID
     product_name: str
     quantity: int
     price: float
+    is_free_price: bool = False
+    driver_note: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DayDocumentPoint:
+    is_delivered: bool
+    non_delivery_reason: str
+    memo: str
     point_id: UUID
     client_id: UUID | None
     client_name: str

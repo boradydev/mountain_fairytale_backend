@@ -1,0 +1,1 @@
+ALTER TABLE points DROP COLUMN snapshot_client_name, DROP COLUMN snapshot_phone, DROP COLUMN snapshot_client_address, DROP COLUMN snapshot_delivery_details, DROP COLUMN snapshot_sales_representative_id;

@@ -99,7 +99,7 @@ async def test_free_address_details_and_manual_order_without_coordinates(client,
     assert response.json()["data"]["deliveryAddress"] is None
     document = (await client.get(case["path"])).json()["data"]
     point = next(p for p in document["points"] if p["clientId"] == customer["clientId"])
-    assert point["address"] == "Произвольный адрес без карты — Позвонить у ворот"
+    assert point["address"] == case["document"]["points"][0]["address"]
     reordered = patch_points(document)[::-1]
     saved = await patch_with_revision(client, case["path"], json={"points": reordered})
     assert saved.status_code == 200, saved.text
@@ -212,7 +212,10 @@ async def test_client_identity_and_point_replacement_are_atomic(client: AsyncCli
     assert [point["clientId"] for point in loaded["points"]] == [p["clientId"] for p in reversed(saved["points"])]
     assert [point["position"] for point in loaded["points"]] == [0, 1]
     assert loaded["points"][1]["pointId"] != saved["points"][0]["pointId"]
-    assert loaded["points"][1]["items"] == saved["points"][0]["items"]
+    assert loaded["points"][1]["items"][0]["itemId"] != saved["points"][0]["items"][0]["itemId"]
+    assert [{k: v for k, v in row.items() if k != "itemId"} for row in loaded["points"][1]["items"]] == [
+        {k: v for k, v in row.items() if k != "itemId"} for row in saved["points"][0]["items"]
+    ]
     events = await read_events(postgres, saved)
     deleted = next(event for event in events if event["event_type"] == "DeletePointEvent")
     assert deleted["payload"]["data"]["client_id"] == {
@@ -588,12 +591,21 @@ async def test_product_name_is_client_snapshot_and_immutable(client: AsyncClient
     assert root["payload"]["data"]["points"][0]["items"][0]["product_name"] == historical_name
 
     points = patch_points(saved)
+    original_item_id = saved["points"][0]["items"][0]["itemId"]
     points[0]["items"][0].update(productName=catalog_name, quantity=7, price=45.0)
     response = await patch_with_revision(client, path, json={"points": points})
     assert response.status_code == 200
     saved = response.json()["data"]
     assert saved["points"][0]["items"] == [
-        {"productId": product_id, "productName": historical_name, "quantity": 7, "price": 45.0},
+        {
+            "itemId": original_item_id,
+            "productId": product_id,
+            "productName": historical_name,
+            "quantity": 7,
+            "price": 45.0,
+            "isFreePrice": False,
+            "driverNote": "",
+        },
     ]
     events = await read_events(postgres, saved)
     updated = next(event for event in events if event["event_type"] == "UpdateItemEvent")
@@ -857,13 +869,13 @@ async def test_document_client_details_are_separate_and_match_day_projection(cli
     for details in ("Вход со двора.\nПозвонить перед доставкой.", ""):
         response = await client.patch(f"/protected/clients/{customer}", json={"deliveryDetails": details})
         assert response.status_code == 200
-        client_address = response.json()["data"]["address"]
         direct = await client.get(case["path"])
         assert direct.status_code == 200
         point = direct.json()["data"]["points"][0]
-        assert point["clientAddress"] == client_address
-        assert point["deliveryDetails"] == details
-        assert point["address"] == client_address + (f" — {details}" if details else "")
+        saved = case["document"]["points"][0]
+        assert point["clientAddress"] == saved["clientAddress"]
+        assert point["deliveryDetails"] == saved["deliveryDetails"]
+        assert point["address"] == saved["address"]
         response = await client.get(f"/protected/delivery-days/{case['payload']['plannedDate']}/documents")
         assert response.status_code == 200
         listed = next(

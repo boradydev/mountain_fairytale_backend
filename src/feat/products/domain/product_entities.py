@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Numeric, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Numeric, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.common.domain.entities import BaseEntity
@@ -13,12 +13,15 @@ from src.feat.products.domain.product_excs import ProductDomainUpdateException
 
 
 class Product(BaseEntity):
-    _EVENT_FIELDS = {"name", "is_active", "base_price"}
+    _EVENT_FIELDS = {"name", "is_active", "base_price", "is_free_price"}
     _EVENT_SUBJECT_TYPE = "product"
     _EVENT_ID_FIELD = "product_id"
     _EVENT_NAME_FIELDS = ("name",)
 
     __tablename__ = "products"
+    __table_args__ = (
+        CheckConstraint("NOT is_free_price OR base_price = 0", name="products_free_price_base_price_check"),
+    )
 
     product_id: Mapped[UUID] = mapped_column(primary_key=True)
 
@@ -26,12 +29,14 @@ class Product(BaseEntity):
     name: Mapped[str] = mapped_column(Text, UniqueConstraint(name=UQ_NAME))
 
     base_price: Mapped[Decimal] = mapped_column(Numeric)
+    is_free_price: Mapped[bool] = mapped_column(default=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
     _ALLOWED_UPDATE_FIELDS = {
         "name",
         "base_price",
+        "is_free_price",
         "is_active",
     }
 
@@ -42,11 +47,15 @@ class Product(BaseEntity):
         actor_id: UUID,
         name: str,
         base_price: Decimal,
+        is_free_price: bool = False,
     ) -> Self:
+        if is_free_price:
+            base_price = Decimal("0")
         product = cls(
             product_id=uuid7(),
             name=name,
             base_price=base_price,
+            is_free_price=is_free_price,
             is_active=True,
             created_at=datetime.now(),
         )
@@ -66,6 +75,8 @@ class Product(BaseEntity):
         actor_id: UUID,
         **payload: Any,
     ) -> None:
+        if payload.get("is_free_price", self.is_free_price):
+            payload["base_price"] = Decimal("0")
         self._validate_update(payload)
 
         changes = self._apply_update_changes(

@@ -24,6 +24,12 @@ class PointCommission(BaseEntity):
     turnover: Mapped[Decimal] = mapped_column(Numeric)
     commission_payable: Mapped[Decimal] = mapped_column(Numeric)
 
+    def assign_missing_representative(self, *, sales_representative_id: UUID, commission_percent: Decimal) -> None:
+        if self.sales_representative_id is not None or self.commission_percent != 0 or self.commission_payable != 0:
+            raise ValueError("Only an unassigned zero commission can receive a representative.")
+        self.sales_representative_id = sales_representative_id
+        self.commission_percent = commission_percent
+
     def recalculate(self, turnover: Decimal) -> None:
         self.turnover = turnover
         self.commission_payable = commission_amount(turnover, self.commission_percent)

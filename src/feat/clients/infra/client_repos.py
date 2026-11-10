@@ -1,22 +1,24 @@
-import re
 from datetime import datetime, time
 from typing import Literal
 from uuid import UUID
 
 from asyncpg import exceptions as pg_excs
-from sqlalchemy import bindparam, case, func, or_, select, text
+from sqlalchemy import Float, bindparam, case, cast, func, literal, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.attributes import set_committed_value
 
+from src.common.domain.money import line_amount, sum_amounts
+from src.common.domain.search import extract_phone_search_digits
 from src.feat.clients.domain.abcs.client_repo_abcs import IClientsRepository
 from src.feat.clients.domain.client_entities import Client
 from src.feat.clients.domain.client_excs import (
     ClientPhoneAlreadyExistsException,
     ClientRelatedEntityNotFoundException,
 )
-from src.feat.clients.domain.client_order_models import LastOrder, LastOrderItem
+from src.feat.clients.domain.client_order_models import LastOrder, LastOrderItem, LatestOrder, LatestOrderItem
+from src.feat.delivery_document.domain.delivery_document_entities import DeliveryDocument, Item, Point
 
 
 class ClientsRepository(IClientsRepository):
@@ -37,6 +39,7 @@ class ClientsRepository(IClientsRepository):
     async def _load_last_orders(self, clients: list[Client]) -> None:
         if not clients:
             return
+        await self._load_latest_order_dates(clients)
         # One query per page, including only points with actual order lines.
         stmt = text("""
             WITH sales AS (
@@ -46,7 +49,7 @@ class ClientsRepository(IClientsRepository):
                 FROM points p
                 JOIN delivery_documents d USING (delivery_document_id)
                 JOIN delivery_document_items i USING (point_id)
-                WHERE d.is_active AND p.client_id IN :client_ids
+                WHERE d.is_active AND p.is_delivered AND p.client_id IN :client_ids
             ), latest AS (
                 SELECT client_id, max(planned_date) AS planned_date
                 FROM sales GROUP BY client_id
@@ -89,6 +92,70 @@ class ClientsRepository(IClientsRepository):
             set_committed_value(
                 client, "last_delivery_quantity", sum(item.quantity for item in summary.items) if summary else None
             )
+
+    # Shared eligibility for the independent latest-created-order projection.
+    _LATEST_ORDER_FROM = """
+        FROM points p JOIN delivery_documents d USING (delivery_document_id)
+        WHERE d.document_type = 'delivery_route_sheet' AND d.is_active AND p.is_delivered
+          AND EXISTS (SELECT 1 FROM delivery_document_items i WHERE i.point_id = p.point_id)
+    """
+
+    async def _load_latest_order_dates(self, clients: list[Client]) -> None:
+        stmt = text(
+            "SELECT DISTINCT ON (p.client_id) p.client_id, d.created_at, d.planned_date "
+            + self._LATEST_ORDER_FROM
+            + " AND p.client_id IN :client_ids"
+            + " ORDER BY p.client_id, d.created_at DESC, d.delivery_document_id DESC, p.point_id DESC"
+        ).bindparams(bindparam("client_ids", expanding=True))
+        rows = (await self._session.execute(stmt, {"client_ids": [c.client_id for c in clients]})).all()
+        dates = {row.client_id: row for row in rows}
+        for client in clients:
+            row = dates.get(client.client_id)
+            client.latest_order_created_at = row.created_at if row else None
+            client.latest_order_planned_date = row.planned_date if row else None
+
+    async def get_latest_order(self, client_id: UUID) -> LatestOrder | None:
+        stmt = text(
+            """
+            WITH latest AS (
+                SELECT p.point_id, d.delivery_document_id, d.created_at, d.planned_date
+        """
+            + self._LATEST_ORDER_FROM
+            + """
+                AND p.client_id = :client_id
+                ORDER BY d.created_at DESC, d.delivery_document_id DESC, p.point_id DESC LIMIT 1
+            )
+            SELECT latest.*, i.item_id, i.product_id, i.product_name, i.quantity,
+                   i.price, i.is_free_price, i.driver_note
+            FROM latest JOIN delivery_document_items i USING (point_id)
+            ORDER BY i.product_name, i.product_id, i.item_id
+        """
+        )
+        rows = (await self._session.execute(stmt, {"client_id": client_id})).mappings().all()
+        if not rows:
+            return None
+        items = [
+            LatestOrderItem(
+                item_id=r["item_id"],
+                product_id=r["product_id"],
+                product_name=r["product_name"],
+                quantity=r["quantity"],
+                price=r["price"],
+                is_free_price=r["is_free_price"],
+                driver_note=r["driver_note"],
+                amount=line_amount(r["quantity"], r["price"]),
+            )
+            for r in rows
+        ]
+        row = rows[0]
+        return LatestOrder(
+            delivery_document_id=row["delivery_document_id"],
+            point_id=row["point_id"],
+            created_at=row["created_at"],
+            planned_date=row["planned_date"],
+            items=items,
+            total_amount=sum_amounts(item.amount for item in items),
+        )
 
     async def _flush_with_constraint_handling(self, client: Client) -> None:
         # Нужно переменные создать заранее, иначе после ошибка от asyncpg к атрибутам уже не обратится.
@@ -141,9 +208,10 @@ class ClientsRepository(IClientsRepository):
         offset: int,
         limit: int,
         search: str | None = None,
+        mode: Literal["database", "follow_up"] = "database",
     ) -> tuple[list[Client], int]:
         filters = []
-        if not include_deactivated:
+        if not include_deactivated or mode == "follow_up":
             filters.append(Client.is_active.is_(True))
 
         term = (search or "").strip()
@@ -151,22 +219,53 @@ class ClientsRepository(IClientsRepository):
             matches = [
                 Client.name.icontains(term, autoescape=True),
                 Client.address.icontains(term, autoescape=True),
+                Client.delivery_details.icontains(term, autoescape=True),
             ]
-            digits = re.sub(r"[^0-9]", "", term)
+            digits = extract_phone_search_digits(term)
             if digits:
                 matches.append(func.regexp_replace(Client.phone, "[^0-9]", "", "g").contains(digits))
             filters.append(or_(*matches))
 
-        count_stmt = select(func.count()).select_from(Client).where(*filters)
+        ordering = [Client.created_at.desc(), Client.client_id.desc()]
+        if mode == "follow_up":
+            # Same successful-sale criteria as _load_last_orders; aggregate before pagination.
+            last_sales = (
+                select(Point.client_id, func.max(DeliveryDocument.planned_date).label("last_date"))
+                .join(DeliveryDocument, Point.delivery_document_id == DeliveryDocument.delivery_document_id)
+                .where(
+                    DeliveryDocument.is_active.is_(True),
+                    Point.is_delivered.is_(True),
+                    select(Item.point_id).where(Item.point_id == Point.point_id).exists(),
+                )
+                .group_by(Point.client_id)
+                .subquery()
+            )
+            last_date = last_sales.c.last_date
+            # Server-local calendar dates match the date-only order projection in Flutter.
+            now = datetime.now()
+            days = literal(now.date()) - last_date
+            urgency = case(
+                (or_(last_date.is_(None), Client.sleeping_threshold_days == 0), literal(float("inf"))),
+                else_=cast(days, Float) / func.nullif(Client.sleeping_threshold_days, 0),
+            )
+            filters.extend(
+                [
+                    or_(Client.cooldown_until.is_(None), Client.cooldown_until <= now),
+                    urgency >= 1,
+                ]
+            )
+            ordering = [urgency.desc(), Client.name.collate("C").asc(), Client.client_id.asc()]
+
+        count_stmt = select(func.count()).select_from(Client)
+        if mode == "follow_up":
+            count_stmt = count_stmt.outerjoin(last_sales, last_sales.c.client_id == Client.client_id)
+        count_stmt = count_stmt.where(*filters)
         total = int((await self._session.execute(count_stmt)).scalar_one())
 
-        stmt = (
-            select(Client)
-            .where(*filters)
-            .order_by(Client.created_at.desc(), Client.client_id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        stmt = select(Client)
+        if mode == "follow_up":
+            stmt = stmt.outerjoin(last_sales, last_sales.c.client_id == Client.client_id)
+        stmt = stmt.where(*filters).order_by(*ordering).offset(offset).limit(limit)
         result = await self._session.execute(stmt)
         clients = list(result.unique().scalars().all())
         await self._load_last_orders(clients)

@@ -34,7 +34,7 @@ WITH bounds AS (
            SUM(i.quantity) AS quantity,
            -- Convert the saved float through its text representation: a direct
            -- float-to-numeric cast can lose digits near a half-cent boundary.
-           SUM(round(i.quantity * CAST(CAST(i.price AS text) AS numeric), 2)) AS total_amount
+           SUM(CASE WHEN p.is_delivered THEN round(i.quantity * CAST(CAST(i.price AS text) AS numeric), 2) ELSE 0 END) AS total_amount
     FROM active_documents AS d
     JOIN points AS p USING (delivery_document_id)
     JOIN delivery_document_items AS i USING (point_id)

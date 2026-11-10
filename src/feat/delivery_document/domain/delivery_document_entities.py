@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Self
-from uuid import UUID, uuid5
+from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -17,6 +19,7 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +45,7 @@ from src.feat.delivery_document.domain.delivery_document_excs import DeliveryDoc
 from src.feat.drivers.domain.driver_entities import Driver
 from src.feat.employees.domain.employee_entities import Employee
 from src.feat.pay_methods.domain.pay_method_entities import PaymentMethod
+from src.feat.sales_rep.domain.sales_rep_entities import SalesRepresentative
 
 
 class DocumentType(str, Enum):
@@ -50,40 +54,78 @@ class DocumentType(str, Enum):
 
 
 class Item(BaseEntity):
-    _EVENT_FIELDS = {"product_id", "product_name", "quantity", "price"}
+    _EVENT_FIELDS = {"item_id", "product_id", "product_name", "quantity", "price", "is_free_price", "driver_note"}
     _EVENT_SUBJECT_TYPE = "delivery_item"
     _EVENT_NAME_FIELDS = ("product_name",)
 
     def _event_subject_id(self) -> UUID:
-        return uuid5(self.point_id, str(self.product_id))
+        return self.item_id
 
     def _event_snapshot(self) -> dict[str, Any]:
         return {**self.snapshot(), "display_name": self.product_name}
 
     __tablename__ = "delivery_document_items"
     __table_args__ = (
+        Index("ix_document_items_point", "point_id"),
+        Index(
+            "uq_document_item_standard_product",
+            "point_id",
+            "product_id",
+            unique=True,
+            postgresql_where=text("NOT is_free_price"),
+        ),
         CheckConstraint(
             "char_length(product_name) BETWEEN 1 AND 120", name="delivery_document_items_product_name_check"
         ),
+        CheckConstraint(
+            "char_length(driver_note) <= 1000 AND (is_free_price OR driver_note = '')",
+            name="delivery_document_items_driver_note_check",
+        ),
     )
 
-    point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"), primary_key=True)
-    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"), primary_key=True)
+    item_id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, server_default=text("gen_random_uuid()"))
+    point_id: Mapped[UUID] = mapped_column(ForeignKey("points.point_id", ondelete="CASCADE"))
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.product_id"))
     product_name: Mapped[str] = mapped_column(Text)
     quantity: Mapped[int] = mapped_column(Integer)
     price: Mapped[Decimal] = mapped_column(Numeric)
+    is_free_price: Mapped[bool] = mapped_column(default=False, server_default="false")
+    driver_note: Mapped[str] = mapped_column(Text, default="", server_default="")
 
-    _ALLOWED_UPDATE_FIELDS = {"quantity", "price"}
+    _ALLOWED_UPDATE_FIELDS = {"quantity", "price", "driver_note"}
 
     @classmethod
     def create(
-        cls, *, actor_id: UUID, point_id: UUID, product_id: UUID, product_name: str, quantity: int, price: Decimal
+        cls,
+        *,
+        actor_id: UUID,
+        point_id: UUID,
+        product_id: UUID,
+        product_name: str,
+        quantity: int,
+        price: Decimal,
+        is_free_price: bool = False,
+        driver_note: str = "",
     ) -> Self:
         if not 1 <= len(product_name) <= 120:
             raise DeliveryDocumentUpdateException(
                 field="product_name", message="Product name must have 1–120 characters."
             )
-        item = cls(point_id=point_id, product_id=product_id, product_name=product_name, quantity=quantity, price=price)
+        driver_note = _driver_note(driver_note)
+        if driver_note and not is_free_price:
+            raise DeliveryDocumentUpdateException(
+                field="driver_note", message="Driver notes are available only for free-price items."
+            )
+        item = cls(
+            item_id=uuid7(),
+            point_id=point_id,
+            product_id=product_id,
+            product_name=product_name,
+            quantity=quantity,
+            price=price,
+            is_free_price=is_free_price,
+            driver_note=driver_note,
+        )
         item._add_event(
             CreateItemEvent(actor_id=actor_id, point_id=point_id, product_id=product_id, data=item.snapshot())
         )
@@ -91,15 +133,27 @@ class Item(BaseEntity):
 
     def snapshot(self) -> dict[str, Any]:
         return {
+            "item_id": self.item_id,
             "product_id": self.product_id,
             "product_name": self.product_name,
             "quantity": self.quantity,
             "price": self.price,
+            "is_free_price": self.is_free_price,
+            "driver_note": self.driver_note,
         }
 
-    def update(self, *, actor_id: UUID, quantity: int, price: Decimal) -> None:
+    def update(self, *, actor_id: UUID, quantity: int, price: Decimal, driver_note: str | None = None) -> None:
+        next_driver_note = self.driver_note if driver_note is None else _driver_note(driver_note)
+        if next_driver_note and not self.is_free_price:
+            raise DeliveryDocumentUpdateException(
+                field="driver_note", message="Driver notes are available only for free-price items."
+            )
         changes = self._apply_update_changes(
-            payload={"quantity": quantity, "price": price},
+            payload={
+                "quantity": quantity,
+                "price": price,
+                "driver_note": next_driver_note,
+            },
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
         if changes:
@@ -119,7 +173,21 @@ class Item(BaseEntity):
 
 
 class Point(BaseEntity):
-    _EVENT_FIELDS = {"point_id", "client_id", "payment_method_id", "position", "items"}
+    _EVENT_FIELDS = {
+        "point_id",
+        "snapshot_client_name",
+        "snapshot_phone",
+        "snapshot_client_address",
+        "snapshot_delivery_details",
+        "snapshot_sales_representative_id",
+        "client_id",
+        "payment_method_id",
+        "position",
+        "items",
+        "is_delivered",
+        "non_delivery_reason",
+        "memo",
+    }
     _EVENT_SUBJECT_TYPE = "delivery_point"
     _EVENT_ID_FIELD = "point_id"
     _EVENT_NAME_FIELDS = ("display_name",)
@@ -134,6 +202,11 @@ class Point(BaseEntity):
     UQ_DOCUMENT_CLIENT = "points_delivery_document_id_client_id_key"
     UQ_DOCUMENT_POSITION = "points_delivery_document_id_position_key"
     __table_args__ = (
+        CheckConstraint(
+            "(is_delivered AND non_delivery_reason = '') OR "
+            "(NOT is_delivered AND length(trim(non_delivery_reason)) BETWEEN 1 AND 1000 AND client_id IS NOT NULL)",
+            name="points_delivery_reason_check",
+        ),
         UniqueConstraint(
             "delivery_document_id", "client_id", name=UQ_DOCUMENT_CLIENT, deferrable=True, initially="IMMEDIATE"
         ),
@@ -150,7 +223,19 @@ class Point(BaseEntity):
     payment_method_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("payment_methods.payment_method_id"), nullable=True
     )
+    is_delivered: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    non_delivery_reason: Mapped[str] = mapped_column(Text, default="", server_default="")
+    memo: Mapped[str] = mapped_column(Text, default="", server_default="")
     position: Mapped[int] = mapped_column(Integer)
+
+    snapshot_client_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_client_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_delivery_details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    snapshot_sales_representative_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("sales_representatives.sales_representative_id"), nullable=True
+    )
+    snapshot_sales_representative: Mapped[SalesRepresentative | None] = relationship(lazy="joined")
 
     client: Mapped[Client | None] = relationship(lazy="joined")
     payment_method: Mapped[PaymentMethod | None] = relationship(lazy="joined")
@@ -158,30 +243,45 @@ class Point(BaseEntity):
     commission: Mapped[PointCommission | None] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
-    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id"}
+    _ALLOWED_UPDATE_FIELDS = {"position", "payment_method_id", "is_delivered", "non_delivery_reason", "memo"}
+
+    _client_snapshot_captured = False
+
+    def capture_client_snapshot(self, client: Client) -> None:
+        """Initialize a new point once; repositories never call this for persisted points."""
+        if self._client_snapshot_captured:
+            return
+        self._client_snapshot_captured = True
+        self.snapshot_client_name = client.name
+        self.snapshot_phone = client.phone
+        self.snapshot_client_address = client.address
+        self.snapshot_delivery_details = client.delivery_details
+        self.snapshot_sales_representative_id = client.sales_representative_id
+        self._events = [
+            replace(event, data={**event.data, **self.snapshot()}) if isinstance(event, CreatePointEvent) else event
+            for event in self._events
+        ]
 
     @property
     def client_name(self) -> str:
-        return self.client.name if self.client else ""
+        return self.snapshot_client_name or ""
 
     @property
     def phone(self) -> str:
-        return self.client.phone if self.client else ""
+        return self.snapshot_phone or ""
 
     @property
     def address(self) -> str:
-        if self.client is None:
-            return ""
-        details = self.client.delivery_details
-        return self.client.address + (f" — {details}" if details else "")
+        details = self.delivery_details
+        return self.client_address + (f" — {details}" if details else "")
 
     @property
     def client_address(self) -> str:
-        return self.client.address if self.client else ""
+        return self.snapshot_client_address or ""
 
     @property
     def delivery_details(self) -> str:
-        return self.client.delivery_details if self.client else ""
+        return self.snapshot_delivery_details or ""
 
     @property
     def default_payment_method_id(self) -> UUID | None:
@@ -197,11 +297,11 @@ class Point(BaseEntity):
 
     @property
     def sales_representative_id(self) -> UUID | None:
-        return self.client.sales_representative_id if self.client else None
+        return self.snapshot_sales_representative_id
 
     @property
     def sales_representative_name(self) -> str | None:
-        return self.client.sales_representative_name if self.client else None
+        return self.snapshot_sales_representative.name if self.snapshot_sales_representative else None
 
     @classmethod
     def create(
@@ -213,6 +313,9 @@ class Point(BaseEntity):
         position: int,
         items: list[Any],
         payment_method_id: UUID | None = None,
+        is_delivered: bool = True,
+        non_delivery_reason: str = "",
+        memo: str = "",
     ) -> Self:
         point_id = uuid7()
         point = cls(
@@ -221,6 +324,9 @@ class Point(BaseEntity):
             client_id=client_id,
             payment_method_id=payment_method_id,
             position=position,
+            is_delivered=is_delivered,
+            non_delivery_reason=_delivery_reason(is_delivered, non_delivery_reason),
+            memo=_memo(memo),
             items=[],
         )
         point.items = [
@@ -231,6 +337,8 @@ class Point(BaseEntity):
                 product_name=item.product_name,
                 quantity=item.quantity,
                 price=item.price,
+                is_free_price=bool(getattr(item, "is_free_price", False)),
+                driver_note=getattr(item, "driver_note", None) or "",
             )
             for item in items
         ]
@@ -244,17 +352,66 @@ class Point(BaseEntity):
         )
         return point
 
+    def assign_missing_representative(self, *, actor_id: UUID, representative: SalesRepresentative) -> None:
+        commission = self.commission
+        if (
+            self.snapshot_sales_representative_id is not None
+            or commission is None
+            or commission.sales_representative_id is not None
+            or commission.commission_percent != 0
+            or commission.commission_payable != 0
+        ):
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id",
+                message="Historical representative or commission already exists, or commission data is inconsistent. "
+                "Only an unassigned point with a zero rate and payable can be corrected.",
+            )
+        if not representative.is_active:
+            raise DeliveryDocumentUpdateException(
+                field="sales_representative_id", message="Activate the representative before assigning them."
+            )
+        representative_id = representative.sales_representative_id
+        self.snapshot_sales_representative_id = representative_id
+        self.snapshot_sales_representative = representative
+        commission.assign_missing_representative(
+            sales_representative_id=representative_id, commission_percent=representative.commission_percent
+        )
+        self._add_event(
+            UpdatePointEvent(
+                actor_id=actor_id,
+                point_id=self.point_id,
+                changes={"snapshot_sales_representative_id": FieldChange(old=None, new=representative_id)},
+            )
+        )
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "point_id": self.point_id,
+            "snapshot_client_name": self.snapshot_client_name,
+            "snapshot_phone": self.snapshot_phone,
+            "snapshot_client_address": self.snapshot_client_address,
+            "snapshot_delivery_details": self.snapshot_delivery_details,
+            "snapshot_sales_representative_id": self.snapshot_sales_representative_id,
             "client_id": self.client_id,
             "payment_method_id": self.payment_method_id,
+            "is_delivered": self.is_delivered,
+            "non_delivery_reason": self.non_delivery_reason,
+            "memo": self.memo,
             "position": self.position,
             "items": [item.snapshot() for item in self.items],
         }
 
     def update(
-        self, *, actor_id: UUID, client_id: UUID | None, position: int, items: list[Any], payment_method_id: UUID | None
+        self,
+        *,
+        actor_id: UUID,
+        client_id: UUID | None,
+        position: int,
+        items: list[Any],
+        payment_method_id: UUID | None,
+        is_delivered: bool = True,
+        non_delivery_reason: str = "",
+        memo: str = "",
     ) -> None:
         if client_id != self.client_id:
             raise DeliveryDocumentUpdateException(
@@ -263,18 +420,36 @@ class Point(BaseEntity):
             )
         previous_items = [item.snapshot() for item in self.items]
         changes = self._apply_update_changes(
-            payload={"client_id": client_id, "position": position, "payment_method_id": payment_method_id},
+            payload={
+                "client_id": client_id,
+                "position": position,
+                "payment_method_id": payment_method_id,
+                "is_delivered": is_delivered,
+                "non_delivery_reason": _delivery_reason(is_delivered, non_delivery_reason),
+                "memo": _memo(memo),
+            },
             allowed_fields=self._ALLOWED_UPDATE_FIELDS,
         )
 
         if not hasattr(self, "_detached_events"):
             self._detached_events = []
-        existing = {item.product_id: item for item in self.items}
+        existing = {item.item_id: item for item in self.items}
         updated: list[Item] = []
         requested_ids: set[UUID] = set()
         for requested in items:
-            requested_ids.add(requested.product_id)
-            item = existing.get(requested.product_id)
+            item_id = getattr(requested, "item_id", None)
+            item = existing.get(item_id) if item_id is not None else None
+            if item_id is not None and item is None:
+                raise DeliveryDocumentUpdateException(field="item_id", message="Item does not belong to this point.")
+            if item_id is None and "item_id" not in getattr(requested, "model_fields_set", set()):
+                matches = [old for old in self.items if old.product_id == requested.product_id]
+                if len(matches) > 1:
+                    raise DeliveryDocumentUpdateException(field="item_id", message="Repeated rows require itemId.")
+                item = matches[0] if matches else None
+            if item is not None and item.product_id != requested.product_id:
+                raise DeliveryDocumentUpdateException(
+                    field="product_id", message="Replace the row to change its product."
+                )
             if item is None:
                 item = Item.create(
                     actor_id=actor_id,
@@ -283,12 +458,32 @@ class Point(BaseEntity):
                     product_name=requested.product_name,
                     quantity=requested.quantity,
                     price=requested.price,
+                    is_free_price=bool(getattr(requested, "is_free_price", False)),
+                    driver_note=getattr(requested, "driver_note", None) or "",
                 )
             else:
-                item.update(actor_id=actor_id, quantity=requested.quantity, price=requested.price)
+                requested_free_price = getattr(requested, "is_free_price", None)
+                if requested_free_price is not None and requested_free_price != item.is_free_price:
+                    raise DeliveryDocumentUpdateException(
+                        field="is_free_price", message="An item's free-price snapshot cannot be changed."
+                    )
+                item.update(
+                    actor_id=actor_id,
+                    quantity=requested.quantity,
+                    price=requested.price,
+                    driver_note=getattr(requested, "driver_note", None),
+                )
+            if item.item_id in requested_ids:
+                raise DeliveryDocumentUpdateException(field="item_id", message="Item IDs must be unique.")
+            requested_ids.add(item.item_id)
             updated.append(item)
+        for item in updated:
+            if not item.is_free_price and sum(other.product_id == item.product_id for other in updated) > 1:
+                raise DeliveryDocumentUpdateException(
+                    field="product_id", message="Only free-price products may repeat."
+                )
         for old_item in self.items:
-            if old_item.product_id not in requested_ids:
+            if old_item.item_id not in requested_ids:
                 old_item.mark_deleted(actor_id=actor_id)
                 self._detached_events.extend(old_item.pull_events())
         self.items = updated
@@ -468,6 +663,9 @@ class DeliveryDocument(BaseEntity):
                     actor_id=actor_id,
                     delivery_document_id=document_id,
                     client_id=point.client_id,
+                    is_delivered=getattr(point, "is_delivered", True),
+                    non_delivery_reason=getattr(point, "non_delivery_reason", ""),
+                    memo=getattr(point, "memo", ""),
                     position=index,
                     items=point.items,
                     payment_method_id=(
@@ -488,6 +686,25 @@ class DeliveryDocument(BaseEntity):
             )
         )
         return document
+
+    def refresh_point_snapshot_events(self) -> None:
+        """Complete aggregate event data after capturing new points' client references."""
+        refreshed = []
+        for event in self._events:
+            if isinstance(event, CreateDeliveryDocumentEvent):
+                event = replace(event, data={**event.data, **self.snapshot()})
+            elif isinstance(event, UpdateDeliveryDocumentEvent) and "points" in event.changes:
+                event = replace(
+                    event,
+                    changes={
+                        **event.changes,
+                        "points": FieldChange(
+                            old=event.changes["points"].old, new=[point.snapshot() for point in self.points]
+                        ),
+                    },
+                )
+            refreshed.append(event)
+        self._events = refreshed
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -542,6 +759,9 @@ class DeliveryDocument(BaseEntity):
                         actor_id=actor_id,
                         delivery_document_id=self.delivery_document_id,
                         client_id=requested.client_id,
+                        is_delivered=requested.is_delivered if requested.is_delivered is not None else True,
+                        non_delivery_reason=requested.non_delivery_reason or "",
+                        memo=requested.memo or "",
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -564,6 +784,13 @@ class DeliveryDocument(BaseEntity):
                     point.update(
                         actor_id=actor_id,
                         client_id=requested.client_id,
+                        is_delivered=requested.is_delivered
+                        if requested.is_delivered is not None
+                        else point.is_delivered,
+                        non_delivery_reason=requested.non_delivery_reason
+                        if requested.non_delivery_reason is not None
+                        else point.non_delivery_reason,
+                        memo=requested.memo if requested.memo is not None else point.memo,
                         position=position,
                         items=requested.items,
                         payment_method_id=(
@@ -624,6 +851,20 @@ class DeliveryDocument(BaseEntity):
 
 def _validate_point_clients(document_type: str, points: list[Any]) -> None:
     pickup = document_type == DeliveryDocument.TYPE_PICKUP_SHEET
+    if pickup and any(
+        getattr(p, "is_delivered", True) is False or getattr(p, "non_delivery_reason", "") for p in points
+    ):
+        raise DeliveryDocumentUpdateException(field="is_delivered", message="Pickup cannot be marked not delivered.")
+    if pickup and any(getattr(point, "memo", "") for point in points):
+        raise DeliveryDocumentUpdateException(field="memo", message="Pickup purchases cannot contain route memos.")
+    if pickup and any(
+        getattr(item, "is_free_price", False) or getattr(item, "driver_note", "")
+        for point in points
+        for item in getattr(point, "items", [])
+    ):
+        raise DeliveryDocumentUpdateException(
+            field="is_free_price", message="Pickup purchases cannot contain free-price route items."
+        )
     if any((point.client_id is not None) == pickup for point in points):
         raise DeliveryDocumentUpdateException(
             field="client_id", message="Pickup requires no client; delivery requires a client."
@@ -637,3 +878,28 @@ def _validate_mileage(start: float | None, end: float | None) -> None:
         raise DeliveryDocumentUpdateException(
             field="end_mileage", message="End mileage cannot be less than start mileage."
         )
+
+
+def _delivery_reason(delivered: bool, reason: str) -> str:
+    if delivered:
+        return ""
+    reason = reason.strip()
+    if not reason or len(reason) > 1000:
+        raise DeliveryDocumentUpdateException(
+            field="non_delivery_reason", message="A reason of 1 to 1000 characters is required."
+        )
+    return reason
+
+
+def _memo(value: str) -> str:
+    value = value.strip()
+    if len(value) > 1000:
+        raise DeliveryDocumentUpdateException(field="memo", message="Memo cannot exceed 1000 characters.")
+    return value
+
+
+def _driver_note(value: str) -> str:
+    value = value.strip()
+    if len(value) > 1000:
+        raise DeliveryDocumentUpdateException(field="driver_note", message="Driver note cannot exceed 1000 characters.")
+    return value
