@@ -56,11 +56,12 @@ def scenarios(seed):
     dates = {"date_from": str(plan.START), "date_to": str(plan.END)}
     month = {"date_from": "2026-06-01", "date_to": "2026-06-30"}
     route = next(o for o in seed.state["objects"].values() if o["kind"] == "delivery-route-sheets")
+    card = seed.state["objects"]["client0"]["saved"]
     return {
         "clients": ("/protected/clients", {"limit": 50}),
-        "clients_name": ("/protected/clients", {"search": "LOAD Клиент 00000"}),
-        "clients_address": ("/protected/clients", {"search": "Синтетическая улица 00000"}),
-        "clients_phone": ("/protected/clients", {"search": "00000000"}),
+        "clients_name": ("/protected/clients", {"search": card["name"]}),
+        "clients_address": ("/protected/clients", {"search": card["address"]}),
+        "clients_phone": ("/protected/clients", {"search": "".join(ch for ch in card["phone"] if ch in "0123456789")}),
         "client_history": ("/protected/client-delivery-history", month | {"search": "LOAD", "limit": 50}),
         "client_history_page2": ("/protected/client-delivery-history", dates | {"limit": 50, "offset": 50}),
         "client_history_page3": ("/protected/client-delivery-history", dates | {"limit": 50, "offset": 100}),
@@ -69,7 +70,7 @@ def scenarios(seed):
         "route_full": (f"/protected/delivery-route-sheets/{route['id']}", {}),
         "sales_month": ("/protected/sales-report", month),
         **{
-            f"directory_{name}": (f"/protected/{name}", {})
+            f"directory_{name}": (f"/{'admin' if name == 'employees' else 'protected'}/{name}", {})
             for name in ("products", "payment-methods", "drivers", "cars", "employees", "sales-representatives")
         },
     }

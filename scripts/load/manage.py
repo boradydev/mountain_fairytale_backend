@@ -226,12 +226,43 @@ def attest(client):
     return nonce
 
 
+def readonly_token(v):
+    """Authenticate the existing LOAD administrator without recording a login event."""
+    from src.common.infra.services.password_service import PasswordService
+    from src.common.infra.services.token.jwt_service import JwtTokenService
+    from src.common.infra.services.token.settings import JwtSettings
+
+    with connect(v) as c:
+        verify(c, v)
+        with c.transaction():
+            c.execute("SET TRANSACTION READ ONLY")
+            row = c.execute(
+                "SELECT employee_id,password_hash FROM employees WHERE username=%s AND role='admin' AND is_active",
+                (v["ADMIN_USERNAME"],),
+            ).fetchone()
+    require(
+        row is not None
+        and PasswordService().verify_password(plain_password=v["ADMIN_PASSWORD"], hashed_password=row[1]),
+        "Existing active LOAD admin credentials required for read-only authentication",
+    )
+    settings = JwtSettings(
+        **{key: v[key] for key in ("JWT_SECRET_KEY", "JWT_ALGORITHM")},
+        ACCESS_TOKEN_EXPIRE_MINUTES=int(v["ACCESS_TOKEN_EXPIRE_MINUTES"]),
+        REFRESH_TOKEN_EXPIRE_DAYS=int(v["REFRESH_TOKEN_EXPIRE_DAYS"]),
+    )
+    return JwtTokenService(settings).create_access_token(employee_id=str(row[0]), role="admin")
+
+
 @contextmanager
-def http_client(v):
+def http_client(v, *, readonly=False):
     with httpx.Client(base_url=BASE_URL, timeout=60, trust_env=False, follow_redirects=False) as client:
         policy = tomllib.loads((ROOT / "client_compatibility.toml").read_text(encoding="utf-8"))
         client.headers["X-Client-Version"] = policy["flutter"]["min_version"]
         attest(client)
+        if readonly:
+            client.headers["Authorization"] = "Bearer " + readonly_token(v)
+            yield client
+            return
         response = client.post(
             "/public/auth/login", json={"username": v["ADMIN_USERNAME"], "password": v["ADMIN_PASSWORD"]}
         )
@@ -343,7 +374,7 @@ def main():
         from scripts.load.seed import LoadSeed
         from scripts.qa.seed import exclusive
 
-        with exclusive(DIRECTORY), connect(v) as c, http_client(v) as client:
+        with exclusive(DIRECTORY), connect(v) as c, http_client(v, readonly=args.command != "seed") as client:
             check_revision(c)
             seed = LoadSeed(v, c, client, args)
             if args.command == "seed":

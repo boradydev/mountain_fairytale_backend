@@ -14,7 +14,7 @@ import pytest
 from scripts.load import manage, plan
 from scripts.load.benchmark import statistics_for
 from scripts.load.seed import LoadSeed
-from scripts.load.verify import equal, history_matches, pages
+from scripts.load.verify import check_item, document_matches, equal, history_matches, pages
 from scripts.qa.seed_plan import expectations
 from src.common.infra.db.postgres.alembic import load_guard as guard
 
@@ -356,8 +356,11 @@ def test_uncertain_mutation_readback_recovers(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("corruption", [None, "duplicate", "total", "order", "missing"])
-def test_pagination_checks_all_pages(monkeypatch, tmp_path, corruption):
+@pytest.mark.parametrize("field", ["deliveries", "documents"])
+def test_pagination_checks_all_pages(monkeypatch, tmp_path, corruption, field):
     expected = [str(n) for n in range(125)]
+    pk = "pointId" if field == "deliveries" else "deliveryDocumentId"
+    path = "/protected/client-delivery-history" if field == "deliveries" else "/protected/delivery-history"
 
     def handler(request):
         offset = int(request.url.params["offset"])
@@ -374,16 +377,16 @@ def test_pagination_checks_all_pages(monkeypatch, tmp_path, corruption):
             headers={"X-Load-Run": "nonce"},
             json={
                 "total": 124 if corruption == "total" else 125,
-                "data": {"deliveries": [{"pointId": p} for p in page]},
+                "data": {field: [{pk: p} for p in page]},
             },
         )
 
     seed = make_seed(monkeypatch, tmp_path, handler)
     if corruption:
         with pytest.raises(RuntimeError, match="expected=.*actual="):
-            pages(seed, "/protected/client-delivery-history", "deliveries", expected, {})
+            pages(seed, path, field, expected, {})
     else:
-        assert len(pages(seed, "/protected/client-delivery-history", "deliveries", expected, {})) == 125
+        assert len(pages(seed, path, field, expected, {})) == 125
 
 
 def test_statistics_counts_errors_and_nearest_rank():
@@ -402,9 +405,48 @@ def test_statistics_counts_errors_and_nearest_rank():
     )
 
 
+def test_benchmark_directories_use_their_documented_api_paths():
+    from scripts.load.benchmark import scenarios
+
+    seed = SimpleNamespace(
+        state={
+            "objects": {
+                "route": dict(id="route-id", kind="delivery-route-sheets"),
+                "client0": dict(
+                    saved=dict(name="LOAD Новое имя", address="LOAD Новый адрес", phone="LOAD-PHONE-00000000")
+                ),
+            }
+        }
+    )
+    actual = scenarios(seed)
+    assert actual["directory_employees"] == ("/admin/employees", {})
+    for name in ("products", "payment-methods", "drivers", "cars", "sales-representatives"):
+        assert actual[f"directory_{name}"] == (f"/protected/{name}", {})
+    assert actual["route_full"] == ("/protected/delivery-route-sheets/route-id", {})
+    assert actual["clients_name"] == ("/protected/clients", {"search": "LOAD Новое имя"})
+    assert actual["clients_address"] == ("/protected/clients", {"search": "LOAD Новый адрес"})
+    assert actual["clients_phone"] == ("/protected/clients", {"search": "00000000"})
+    assert len(actual) == 17
+
+
 def test_diagnostics_include_identifier_expected_actual():
     with pytest.raises(RuntimeError, match="doc-id/total: expected=.*actual="):
         equal("doc-id", "total", Decimal("1"), Decimal("2"))
+
+
+@pytest.mark.parametrize("price", ["1.005", "27.125", "12.50", "0"])
+def test_verifier_accepts_legacy_json_number_prices_without_binary_artifacts(price):
+    original = dict(price=price, quantity=3, productName="LOAD")
+    item = json.loads(json.dumps(dict(original, itemId="item-id", price=float(price))))
+    check_item(original, item)
+    item["price"] = float(price) + 0.001
+    with pytest.raises(RuntimeError, match="item-id/price: expected=.*actual="):
+        check_item(original, item)
+
+
+def test_verifier_price_conversion_does_not_hide_other_item_changes():
+    with pytest.raises(RuntimeError, match="item-id/quantity"):
+        check_item(dict(price="1.005", quantity=3), dict(itemId="item-id", price=1.005, quantity=2))
 
 
 def test_api_statement_checks_the_exact_cursor_before_write():
@@ -586,9 +628,7 @@ def test_history_orders_equal_dates_and_creation_times_independently(monkeypatch
         return [{pk: identity} for identity in expected_ids]
 
     monkeypatch.setattr(verifier, "pages", capture)
-    card = dict(
-        name="LOAD Клиент 00000", address="LOAD Синтетическая улица 00000", phone="00000000", deliveryDetails=""
-    )
+    card = dict(name="LOAD Новое имя", address="LOAD Новый адрес", phone="00000000", deliveryDetails="")
     seed = SimpleNamespace(state={"objects": {"client0": dict(kind="clients", id="c", saved=card)}})
     verifier.history_checks(seed, docs)
     ordered = sorted(docs, key=lambda o: (o["saved"]["createdAt"], o["id"]), reverse=True)
@@ -689,3 +729,174 @@ def test_history_diagnostics_include_filters_and_offset(monkeypatch, tmp_path, f
     if failure != "http":
         assert "expected=" in message
         assert "actual=" in message
+
+
+@pytest.mark.parametrize(
+    ("term", "client_match", "document_match"),
+    [
+        ("LOAD Клиент 00000", True, False),
+        ("LOAD Синтетическая улица 00000", True, False),
+        ("lOaD НоВоЕ ИмЯ", True, True),
+        ("+7 (999) 111-22-33", True, True),
+        ("+7 (888) 111-22-33", True, False),
+        ("Архивное уточнение", True, False),
+        ("Текущее уточнение", True, False),
+        ("%_\\", True, True),
+        ("%", True, True),
+        ("_", True, True),
+        ("\\", True, True),
+        ("00000x", False, False),
+        ("7999/1112233", False, False),
+        ("７９９９１１１２２３３", False, False),
+        ("+", False, False),
+        ("", True, True),
+    ],
+)
+def test_separate_history_search_contracts(term, client_match, document_match):
+    card = dict(
+        name="LOAD Новое имя %_\\", address="LOAD Новый адрес", phone="79991112233", deliveryDetails="Текущее уточнение"
+    )
+    point = dict(
+        clientId="c",
+        clientName="LOAD Клиент 00000",
+        clientAddress="LOAD Синтетическая улица 00000",
+        phone="78881112233",
+        deliveryDetails="Архивное уточнение",
+    )
+    doc = dict(saved=dict(points=[point, dict(point, clientId="other"), dict(point, clientId=None)]))
+    assert history_matches(point, card, term) is client_match
+    assert document_matches(doc, {"c": card, "other": card}, term) is document_match
+    assert document_matches(dict(saved=dict(points=[dict(point, clientId=None)])), {}, term) is (not term.strip())
+
+
+def test_history_control_sample_separates_endpoints_and_filters(monkeypatch, tmp_path):
+    from scripts.load import verify as verifier
+
+    card = dict(name="LOAD Новое имя", address="LOAD Новый адрес", phone="79991112233", deliveryDetails="")
+    point = dict(
+        clientId="c",
+        clientName="LOAD Клиент 00000",
+        clientAddress="LOAD Синтетическая улица 00000",
+        phone="00000000",
+        deliveryDetails="",
+        position=0,
+    )
+    docs = []
+    for n in range(318):
+        pickup = 255 <= n < 315
+        docs.append(
+            dict(
+                id=str(UUID(int=n + 1)),
+                kind="pickup-sheets" if pickup else "delivery-route-sheets",
+                saved=dict(
+                    isActive=n != 315,
+                    plannedDate="2026-07-01" if n == 316 else "2026-06-15",
+                    createdAt="2026-11-10T10:00:00Z",
+                    points=[dict(point, pointId=f"p{n}", clientId=None if pickup else "c")],
+                ),
+            )
+        )
+    # Unrelated points must stay outside the filtered control sample.
+    docs[-1]["saved"]["points"].append(dict(point, clientId="c2", pointId="extra", position=1))
+    docs[-1]["saved"]["points"][0]["clientId"] = "c2"
+    other = dict(card, name="Другой", address="Другой", phone="12345678")
+    docs[-1]["saved"]["points"] = [
+        dict(p, clientName="Другой", clientAddress="Другой", phone="12345678") for p in docs[-1]["saved"]["points"]
+    ]
+    calls = []
+
+    def capture(_seed, path, field, expected_ids, params):
+        calls.append((path, expected_ids, params))
+        pk = "deliveryDocumentId" if field == "documents" else "pointId"
+        return [{pk: identity} for identity in expected_ids]
+
+    monkeypatch.setattr(verifier, "pages", capture)
+    seed = SimpleNamespace(
+        state={
+            "objects": {"c": dict(id="c", kind="clients", saved=card), "c2": dict(id="c2", kind="clients", saved=other)}
+        }
+    )
+    verifier.history_checks(seed, list(reversed(docs)))
+    for path, identities, params in calls:
+        assert len(identities) == len(set(identities))
+        if "search" not in params:
+            continue
+        term = params["search"]
+        if path.endswith("client-delivery-history"):
+            assert identities == [f"p{n}" for n in range(254, -1, -1)]
+            assert len(identities) == 255
+        else:
+            expected = []
+            if params["document_type"] == "delivery_route_sheet" and term in ("LOAD Новое имя", "00000000"):
+                # The phone was changed only in this test: legacy sees the current phone.
+                if term == "LOAD Новое имя":
+                    expected = [docs[n]["id"] for n in range(254, -1, -1)]
+                    if params["include_cancelled"] == "true":
+                        expected.insert(0, docs[315]["id"])
+            assert identities == expected
+
+
+def test_document_membership_multiple_matching_clients():
+    cards = {key: dict(name="LOAD", address="", phone="") for key in ("c1", "c2")}
+    docs = [dict(id="d", saved=dict(points=[dict(clientId=key) for key in cards]))]
+    assert [o["id"] for o in docs if document_matches(o, cards, "load")] == ["d"]
+
+
+@pytest.mark.parametrize("term", ["%", "_", "\\"])
+def test_history_search_does_not_treat_special_characters_as_wildcards(term):
+    card = dict(name="LOAD", address="Адрес", phone="12345678", deliveryDetails="")
+    point = dict(clientId="c", clientName="LOAD", clientAddress="Адрес", phone="12345678", deliveryDetails="")
+    assert not history_matches(point, card, term)
+    assert not document_matches(dict(saved=dict(points=[point])), {"c": card}, term)
+
+
+def test_readonly_http_authentication_never_posts(monkeypatch, tmp_path):
+    monkeypatch.setattr(manage, "STATE", tmp_path / "process.json")
+    manage.STATE.write_text(json.dumps({"run_id": "nonce"}))
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, headers={"X-Load-Run": "nonce"})
+
+    client = httpx.Client(base_url=manage.BASE_URL, transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(manage.httpx, "Client", lambda **_kw: client)
+    monkeypatch.setattr(manage, "readonly_token", lambda _v: "readonly-token")
+    with manage.http_client({}, readonly=True) as opened:
+        assert opened.headers["Authorization"] == "Bearer readonly-token"
+    assert client.is_closed
+    assert [(r.method, r.url.path) for r in requests] == [("GET", "/health/ready")]
+
+
+@pytest.mark.parametrize("invalid", [None, "missing", "password"])
+def test_readonly_token_checks_database_and_credentials(monkeypatch, invalid):
+    import jwt
+
+    from src.common.infra.services.password_service import PasswordService
+
+    c = MagicMock()
+    c.execute.return_value.fetchone.return_value = None if invalid == "missing" else (UUID(int=1), "hash")
+    monkeypatch.setattr(manage, "connect", lambda _v: nullcontext(c))
+    checked = MagicMock()
+    monkeypatch.setattr(manage, "verify", checked)
+    monkeypatch.setattr(PasswordService, "verify_password", lambda _self, **_kw: invalid != "password")
+    v = dict(
+        ADMIN_USERNAME="load_admin",
+        ADMIN_PASSWORD="password",
+        JWT_SECRET_KEY="a" * 64,
+        JWT_ALGORITHM="HS256",
+        ACCESS_TOKEN_EXPIRE_MINUTES="60",
+        REFRESH_TOKEN_EXPIRE_DAYS="1",
+    )
+    if invalid:
+        with pytest.raises(RuntimeError, match="credentials"):
+            manage.readonly_token(v)
+    else:
+        token = manage.readonly_token(v)
+        claims = jwt.decode(token, v["JWT_SECRET_KEY"], algorithms=["HS256"])
+        assert claims["employee_id"] == str(UUID(int=1))
+        assert claims["role"] == "admin"
+        assert claims["token_type"] == "access"
+    checked.assert_called_once_with(c, v)
+    assert c.execute.call_args_list[0].args == ("SET TRANSACTION READ ONLY",)
+    assert c.execute.call_count == 2

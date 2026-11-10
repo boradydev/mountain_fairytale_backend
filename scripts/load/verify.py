@@ -18,6 +18,17 @@ def equal(identity, field, expected, actual):
     require(expected == actual, f"{identity}/{field}: expected={expected!r}, actual={actual!r}")
 
 
+def check_item(original, item):
+    """Compare input fields; legacy JSON number prices use their decimal spelling."""
+    for field, value in original.items():
+        equal(
+            item["itemId"],
+            field,
+            Decimal(str(value)) if field == "price" else value,
+            Decimal(str(item[field])) if field == "price" else item[field],
+        )
+
+
 def pages(seed, path, field, expected_ids, params):
     """Compare every page against independently sorted membership, including total and empty tail."""
     # Only history filter parameters are included: never log headers or credentials.
@@ -81,20 +92,32 @@ def check_foreign_keys(c):
         )
 
 
-def history_matches(point, card, term):
-    """Compute membership independently from snapshots and the documented search contract."""
+def search_matches(fields, phones, term):
+    """Apply literal text and phone-shaped query rules without production helpers."""
     term = term.strip()
-    fields = [card[k] for k in ("name", "address", "deliveryDetails")]
-    fields += [point[k] for k in ("clientName", "clientAddress", "deliveryDetails")]
     # Deliberately avoid the production normalizer and SQL search implementation.
     phone_shaped = all(ch in "0123456789 +().-" for ch in term)
     digits = "".join(ch for ch in term if ch in "0123456789") if phone_shaped else ""
     return (
         any(term.casefold() in value.casefold() for value in fields)
         or bool(digits)
-        and any(
-            digits in "".join(ch for ch in phone if ch in "0123456789") for phone in (card["phone"], point["phone"])
-        )
+        and any(digits in "".join(ch for ch in phone if ch in "0123456789") for phone in phones)
+    )
+
+
+def history_matches(point, card, term):
+    """Client history searches current cards and each point's historical snapshot."""
+    fields = [card[k] for k in ("name", "address", "deliveryDetails")]
+    fields += [point[k] for k in ("clientName", "clientAddress", "deliveryDetails")]
+    return search_matches(fields, (card["phone"], point["phone"]), term)
+
+
+def document_matches(document, clients, term):
+    """Legacy document membership uses current name/address/phone, once per document."""
+    return not term.strip() or any(
+        search_matches((card["name"], card["address"]), (card["phone"],), term)
+        for point in document["saved"]["points"]
+        if (card := clients.get(point["clientId"])) is not None
     )
 
 
@@ -122,7 +145,8 @@ def history_checks(seed, docs):
         require(len(expected) > 50, f"Insufficient June {kind} data")
         pages(seed, "/protected/delivery-history", "documents", expected, month | {"document_type": api_kind})
     client_by_id = {o["id"]: o for o in seed.state["objects"].values() if o["kind"] == "clients"}
-    for term in ("LOAD Клиент 00000", "LOAD Синтетическая улица 00000", "00000000"):
+    cards = {identity: obj["saved"] for identity, obj in client_by_id.items()}
+    for term in ("LOAD Клиент 00000", "LOAD Синтетическая улица 00000", "LOAD Новое имя", "00000000"):
         selected = [
             (o, p)
             for o, p in points
@@ -137,14 +161,24 @@ def history_checks(seed, docs):
             [p["pointId"] for _, p in selected],
             month | {"search": term},
         )
-        selected_docs = {o["id"] for o, _ in selected}
-        pages(
-            seed,
-            "/protected/delivery-history",
-            "documents",
-            [o["id"] for o in active if o["id"] in selected_docs],
-            month | {"search": term, "document_type": "delivery_route_sheet"},
-        )
+        for kind, api_kind in (("delivery-route-sheets", "delivery_route_sheet"), ("pickup-sheets", "pickup_sheet")):
+            for include_cancelled in (False, True):
+                selected_docs = [
+                    o["id"]
+                    for o in docs
+                    if (o["saved"]["isActive"] or include_cancelled)
+                    and o["kind"] == kind
+                    and o["saved"]["plannedDate"].startswith("2026-06")
+                    and document_matches(o, cards, term)
+                ]
+                pages(
+                    seed,
+                    "/protected/delivery-history",
+                    "documents",
+                    selected_docs,
+                    month
+                    | {"search": term, "document_type": api_kind, "include_cancelled": str(include_cancelled).lower()},
+                )
     return {r["deliveryDocumentId"]: r for r in all_rows}, {r["pointId"]: r for r in client_rows}
 
 
@@ -256,13 +290,7 @@ def verify_all(seed):
             )
             for item, original_item in zip(point["items"], original["items"], strict=True):
                 item_ids.append(item["itemId"])
-                for field, value in original_item.items():
-                    equal(
-                        item["itemId"],
-                        field,
-                        Decimal(value) if field == "price" else value,
-                        Decimal(item[field]) if field == "price" else item[field],
-                    )
+                check_item(original_item, item)
             if pid in client_history:
                 equal(
                     pid,
