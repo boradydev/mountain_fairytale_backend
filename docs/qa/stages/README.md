@@ -36,6 +36,7 @@
 [6.2 принят](../reports/2026-11-10-stage-6-block-2.md),
 [6.3 — локальные Windows-обновления](06-3-windows-updates.md) принят владельцем:
 [отчёт и ограничения](../reports/2026-11-10-stage-6-block-3.md).
-**Блок 6.4 на проверке владельцем:** [финальный smoke](06-4-final-release-readiness.md),
-[отчёт, матрица этапов и рекомендация GO](../reports/2026-11-10-stage-6-block-4.md).
+**Блок 6.4 принят:** [финальный smoke](06-4-final-release-readiness.md),
+[отчёт](../reports/2026-11-10-stage-6-block-4.md).
+**Этап 6 завершён 10.11.2026:** [итог GO и остаточные риски](../reports/2026-11-10-stage-6-complete.md).
 Без автоматической публикации или production-деплоя.
