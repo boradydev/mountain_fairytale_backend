@@ -20,21 +20,28 @@ def equal(identity, field, expected, actual):
 
 def pages(seed, path, field, expected_ids, params):
     """Compare every page against independently sorted membership, including total and empty tail."""
+    # Only history filter parameters are included: never log headers or credentials.
+    filters = {
+        key: params[key]
+        for key in ("search", "date_from", "date_to", "document_type", "include_cancelled")
+        if key in params
+    }
+    identity = f"{path} filters={filters!r}"
     result = []
     for offset in range(0, len(expected_ids) + 50, 50):
         response = seed.http.get(path, params=params | {"limit": 50, "offset": offset})
         require(
             response.status_code == 200 and response.headers.get("X-Load-Run") == seed.run_id,
-            f"Pagination request failed: {path}/{offset}",
+            f"Pagination request failed: {identity} offset={offset}, status={response.status_code}",
         )
         body = response.json()
-        equal(path, "total", len(expected_ids), body["total"])
+        equal(f"{identity} offset={offset}", "total", len(expected_ids), body["total"])
         rows = body["data"][field]
         pk = "pointId" if field == "deliveries" else "deliveryDocumentId"
         actual = [row[pk] for row in rows]
-        equal(path, f"page/{offset}", expected_ids[offset : offset + 50], actual)
+        equal(f"{identity} offset={offset}", "page", expected_ids[offset : offset + 50], actual)
         result.extend(rows)
-    equal(path, "unique IDs", len(expected_ids), len({r[pk] for r in result}))
+    equal(identity, "unique IDs", len(expected_ids), len({r[pk] for r in result}))
     return result
 
 
@@ -74,6 +81,23 @@ def check_foreign_keys(c):
         )
 
 
+def history_matches(point, card, term):
+    """Compute membership independently from snapshots and the documented search contract."""
+    term = term.strip()
+    fields = [card[k] for k in ("name", "address", "deliveryDetails")]
+    fields += [point[k] for k in ("clientName", "clientAddress", "deliveryDetails")]
+    # Deliberately avoid the production normalizer and SQL search implementation.
+    phone_shaped = all(ch in "0123456789 +().-" for ch in term)
+    digits = "".join(ch for ch in term if ch in "0123456789") if phone_shaped else ""
+    return (
+        any(term.casefold() in value.casefold() for value in fields)
+        or bool(digits)
+        and any(
+            digits in "".join(ch for ch in phone if ch in "0123456789") for phone in (card["phone"], point["phone"])
+        )
+    )
+
+
 def history_checks(seed, docs):
     params = {"date_from": str(plan.START), "date_to": str(plan.END)}
     docs = sorted(docs, key=lambda o: (o["saved"]["plannedDate"], o["saved"]["createdAt"], o["id"]), reverse=True)
@@ -99,22 +123,12 @@ def history_checks(seed, docs):
         pages(seed, "/protected/delivery-history", "documents", expected, month | {"document_type": api_kind})
     client_by_id = {o["id"]: o for o in seed.state["objects"].values() if o["kind"] == "clients"}
     for term in ("LOAD Клиент 00000", "LOAD Синтетическая улица 00000", "00000000"):
-
-        def matches(point, term=term):
-            card = client_by_id[point["clientId"]]["saved"]
-            fields = [card[k] for k in ("name", "address", "deliveryDetails")]
-            fields += [point[k] for k in ("clientName", "clientAddress", "deliveryDetails")]
-            digits = "".join(ch for ch in term if ch.isascii() and ch.isdigit())
-            return (
-                any(term.casefold() in s.casefold() for s in fields)
-                or bool(digits)
-                and any(
-                    digits in "".join(ch for ch in phone if ch.isascii() and ch.isdigit())
-                    for phone in (card["phone"], point["phone"])
-                )
-            )
-
-        selected = [(o, p) for o, p in points if o["saved"]["plannedDate"].startswith("2026-06") and matches(p)]
+        selected = [
+            (o, p)
+            for o, p in points
+            if o["saved"]["plannedDate"].startswith("2026-06")
+            and history_matches(p, client_by_id[p["clientId"]]["saved"], term)
+        ]
         require(len(selected) > 50, "Filtered client history needs >50 matches")
         pages(
             seed,

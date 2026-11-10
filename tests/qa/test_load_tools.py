@@ -14,7 +14,7 @@ import pytest
 from scripts.load import manage, plan
 from scripts.load.benchmark import statistics_for
 from scripts.load.seed import LoadSeed
-from scripts.load.verify import equal, pages
+from scripts.load.verify import equal, history_matches, pages
 from scripts.qa.seed_plan import expectations
 from src.common.infra.db.postgres.alembic import load_guard as guard
 
@@ -597,3 +597,95 @@ def test_history_orders_equal_dates_and_creation_times_independently(monkeypatch
         f"p{int(UUID(o['id'])) - 1}-{p}" for o in ordered if o["kind"] == "delivery-route-sheets" for p in (0, 1, 2)
     ]
     assert calls[-1][2]["search"] == "00000000"
+
+
+@pytest.mark.parametrize(
+    ("term", "members"),
+    [
+        ("LOAD Клиент 00000", {"current", "snapshot"}),
+        ("LOAD Синтетическая улица 00000", {"current", "snapshot"}),
+        ("00000000", {"current", "snapshot", "phone-only"}),
+        (" +0 (000).00-00 ", {"current", "snapshot", "phone-only"}),
+        ("lOaD кЛиЕнТ", {"current", "snapshot"}),
+        ("Архив", {"snapshot"}),
+        ("00000x", set()),
+        ("0000/0000", set()),
+        ("００００００００", set()),
+    ],
+)
+def test_history_search_membership_and_pages(monkeypatch, tmp_path, term, members):
+    blank = dict(name="Другой", address="Другая", deliveryDetails="", phone="12345678")
+    current = dict(blank, name="LOAD Клиент 00000", address="LOAD Синтетическая улица 00000", phone="00000000")
+    snapshot = dict(
+        clientName=current["name"], clientAddress=current["address"], deliveryDetails="Архив", phone="00000000"
+    )
+    other = dict(clientName="Другой", clientAddress="Другая", deliveryDetails="", phone="12345678")
+    fixtures = {
+        "current": (current, other),
+        "snapshot": (blank, snapshot),
+        "phone-only": (dict(blank, phone="00000000"), other),
+        "unrelated": (blank, other),
+    }
+    # Explicit fixture labels define the oracle, never API responses or production search.
+    ordered = [(f"{kind}-{n}", kind) for n in range(64, -1, -1) for kind in fixtures]
+    expected = [identity for identity, kind in ordered if kind in members]
+    calculated = [identity for identity, kind in ordered if history_matches(fixtures[kind][1], fixtures[kind][0], term)]
+    assert calculated == expected
+    offsets = []
+
+    def handler(request):
+        offset = int(request.url.params["offset"])
+        offsets.append(offset)
+        assert request.url.params["search"] == term
+        return httpx.Response(
+            200,
+            headers={"X-Load-Run": "nonce"},
+            json={
+                "total": len(expected),
+                "data": {"deliveries": [{"pointId": identity} for identity in expected[offset : offset + 50]]},
+            },
+        )
+
+    seed = make_seed(monkeypatch, tmp_path, handler)
+    rows = pages(seed, "/protected/client-delivery-history", "deliveries", calculated, {"search": term})
+    assert [row["pointId"] for row in rows] == expected
+    assert offsets == list(range(0, len(expected) + 50, 50))
+
+
+@pytest.mark.parametrize("failure", ["total", "order", "http"])
+def test_history_diagnostics_include_filters_and_offset(monkeypatch, tmp_path, failure):
+    params = dict(
+        search="LOAD Клиент 00000",
+        date_from="2026-06-01",
+        date_to="2026-06-30",
+        document_type="delivery_route_sheet",
+        include_cancelled="true",
+    )
+    expected = [str(n) for n in range(60)]
+
+    def handler(request):
+        offset = int(request.url.params["offset"])
+        page = expected[offset : offset + 50]
+        if offset == 50 and failure == "order":
+            page.reverse()
+        return httpx.Response(
+            503 if offset == 50 and failure == "http" else 200,
+            headers={"X-Load-Run": "nonce"},
+            json={
+                "total": 61 if offset == 50 and failure == "total" else 60,
+                "data": {"deliveries": [{"pointId": identity} for identity in page]},
+            },
+        )
+
+    seed = make_seed(monkeypatch, tmp_path, handler)
+    with pytest.raises(RuntimeError) as error:
+        pages(seed, "/protected/client-delivery-history", "deliveries", expected, params)
+    message = str(error.value)
+    assert "/protected/client-delivery-history" in message
+    assert "offset=50" in message
+    for key, value in params.items():
+        assert key in message
+        assert value in message
+    if failure != "http":
+        assert "expected=" in message
+        assert "actual=" in message
