@@ -12,9 +12,9 @@ from src.common.api.deps import (
 from src.common.api.excs_handlers import map_exceptions_to_responses
 from src.common.api.schemas import StdResponse
 from src.feat.products.api.product_schemas import (
+    CreateProductReq,
     ProductResp,
     ProductsResp,
-    CreateProductReq,
     UpdateProductReq,
 )
 from src.feat.products.app.usecases.check_duplicate import CheckProductDuplicateDTO
@@ -23,6 +23,7 @@ from src.feat.products.app.usecases.get import GetProductDTO
 from src.feat.products.app.usecases.get_all import GetProductsDTO
 from src.feat.products.app.usecases.update import UpdateProductDTO
 from src.feat.products.domain import product_excs
+
 
 """
 API CONTRACT — PRODUCTS
@@ -45,9 +46,9 @@ API CONTRACT — PRODUCTS
 Особенности данных:
     - name: 1–120 символов.
     - base_price: 0–1 000 000 000.
-    - Поле name уникально: проверка выполняется по точному совпадению, регистрозависимо, 
+    - Поле name уникально: проверка выполняется по точному совпадению, регистрозависимо,
       без обрезки пробелов и нормализации. "Product" и "product" — разные имена.
-      Похожее, но не идентичное имя допустимо. Попытка создания или обновления на 
+      Похожее, но не идентичное имя допустимо. Попытка создания или обновления на
       точно такое же имя вызывает 409 Conflict.
 
 Авторизация:
@@ -100,7 +101,7 @@ products_router = APIRouter(
 )
 async def get_products(
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
     include_deactivated: Annotated[bool, Query()] = False,
 ) -> StdResponse[ProductsResp]:
     products = await ctx.products_use_cases.get_products().execute(
@@ -148,7 +149,7 @@ async def get_products(
 async def get_product(
     product_id: UUID,
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp]:
     product = await ctx.products_use_cases.get_product().execute(
         GetProductDTO(product_id=product_id),
@@ -314,7 +315,7 @@ async def update_product(
 async def check_duplicate_product(
     name: Annotated[str, Query(min_length=1, max_length=120)],
     ctx: Context,
-    access_token_payload: AccessTokenPayloadDep,
+    _access_token_payload: AccessTokenPayloadDep,
 ) -> StdResponse[ProductResp | None]:
     product = await ctx.products_use_cases.check_duplicate().execute(
         CheckProductDuplicateDTO(name=name),
