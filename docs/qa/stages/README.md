@@ -34,5 +34,6 @@
 **Этап 6 в работе:** [общий план](06-release-readiness.md),
 [6.1 принят](../reports/2026-11-10-stage-6-block-1.md),
 [6.2 принят](../reports/2026-11-10-stage-6-block-2.md),
-[6.3 — локальные Windows-обновления](06-3-windows-updates.md) к выполнению.
+[6.3 — локальные Windows-обновления](06-3-windows-updates.md) на проверке владельцем:
+[отчёт, auto/native результаты и ограничения](../reports/2026-11-10-stage-6-block-3.md).
 Без автоматической публикации или production-деплоя.
