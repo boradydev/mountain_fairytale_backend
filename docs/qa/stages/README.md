@@ -34,6 +34,7 @@
 **Этап 6 в работе:** [общий план](06-release-readiness.md),
 [6.1 принят](../reports/2026-11-10-stage-6-block-1.md),
 [6.2 принят](../reports/2026-11-10-stage-6-block-2.md),
-[6.3 — локальные Windows-обновления](06-3-windows-updates.md) на проверке владельцем:
-[отчёт, auto/native результаты и ограничения](../reports/2026-11-10-stage-6-block-3.md).
+[6.3 — локальные Windows-обновления](06-3-windows-updates.md) принят владельцем:
+[отчёт и ограничения](../reports/2026-11-10-stage-6-block-3.md).
+**Блок 6.4 к выполнению:** [финальный smoke и решение о релизе](06-4-final-release-readiness.md).
 Без автоматической публикации или production-деплоя.
